@@ -1,0 +1,429 @@
+{
+    "org.cbioportal.genome_nexus.web.SignalQueryController": [
+        {
+            "method_signature": "searchSignalByKeywordGET(String, Integer)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "org.cbioportal.genome_nexus.web.PdbController": [
+        {
+            "method_signature": "fetchPdbHeaderGET(String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchPdbHeaderPOST(List)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "org.cbioportal.genome_nexus.GenomeNexusAnnotation": [
+        {
+            "method_signature": "error()",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "org.cbioportal.genome_nexus.web.MyVariantInfoController": [
+        {
+            "method_signature": "fetchMyVariantInfoAnnotationGET(String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchMyVariantInfoAnnotationPOST(List)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "org.cbioportal.genome_nexus.web.AnnotationSummaryController": [
+        {
+            "method_signature": "fetchVariantAnnotationSummaryGET(String, String, TranscriptSummaryProjection)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchVariantAnnotationSummaryPOST(List, String, TranscriptSummaryProjection)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "org.cbioportal.genome_nexus.web.MutationAssessorController": [
+        {
+            "method_signature": "fetchMutationAssessorAnnotationPOST(List)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchMutationAssessorAnnotationGET(String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "org.cbioportal.genome_nexus.web.PostTranslationalModificationController": [
+        {
+            "method_signature": "fetchPostTranslationalModificationsByPtmFilterPOST(PtmFilter)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchPostTranslationalModificationsGET(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "org.cbioportal.genome_nexus.web.PfamController": [
+        {
+            "method_signature": "fetchPfamDomainsByPfamAccessionPOST(List)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchPfamDomainsByAccessionGET(String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "org.cbioportal.genome_nexus.web.AnnotationController": [
+        {
+            "method_signature": "getVariantAnnotation(List, String, String, List)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchVariantAnnotationPOST(List, String, String, List)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchVariantAnnotationByDbSnpIdGET(String, String, String, List)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "postVariantAnnotation(List, String, String, List)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchVariantAnnotationGET(String, String, String, List)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchVariantbyDbSnpIdAnnotationPOST(List, String, String, List)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchVariantAnnotationByGenomicLocationGET(String, String, String, List)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchVariantAnnotationByGenomicLocationPOST(List, String, String, List)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "org.cbioportal.genome_nexus.web.CuriousCasesController": [
+        {
+            "method_signature": "fetchCuriousCasesGET(String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "org.cbioportal.genome_nexus.web.SignalMutationController": [
+        {
+            "method_signature": "fetchSignalMutationsByHugoSymbolGET(String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchSignalMutationsByMutationFilterPOST(SignalMutationFilter)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchSignalMutationsByHgvsgGET(String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "org.cbioportal.genome_nexus.web.CrossReferenceController": [
+        {
+            "method_signature": "fetchGeneXrefsGET(String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "org.cbioportal.genome_nexus.web.SearchController": [
+        {
+            "method_signature": "searchAnnotationByKeywordGET(String, Integer)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "org.cbioportal.genome_nexus.web.CancerHotspotsController": [
+        {
+            "method_signature": "fetchHotspotAnnotationByHgvsGET(String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchHotspotAnnotationByGenomicLocationGET(String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchHotspotAnnotationByHgvsPOST(List)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchHotspotAnnotationByGenomicLocationPOST(List)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchHotspotAnnotationByProteinLocationsPOST(List)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchHotspotAnnotationByTranscriptIdGET(String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchHotspotAnnotationByTranscriptIdPOST(List)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "org.cbioportal.genome_nexus.web.NucleotideContextController": [
+        {
+            "method_signature": "fetchNucleotideContextAnnotationGET(String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchNucleotideContextAnnotationPOST(List)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "org.cbioportal.genome_nexus.web.EnsemblController": [
+        {
+            "method_signature": "fetchCanonicalEnsemblGeneIdByEntrezGeneIdPOST(List)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchCanonicalEnsemblGeneIdByEntrezGeneIdGET(String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchEnsemblTranscriptsGET(String, String, String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchEnsemblTranscriptsByEnsemblFilterPOST(EnsemblFilter)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchCanonicalEnsemblGeneIdByHugoSymbolPOST(List)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchCanonicalEnsemblTranscriptsByHugoSymbolPOST(List, String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchGeneXrefsGET(String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchCanonicalEnsemblTranscriptByHugoSymbolGET(String, String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchEnsemblTranscriptByTranscriptIdGET(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "fetchCanonicalEnsemblGeneIdByHugoSymbolGET(String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "org.cbioportal.genome_nexus.web.InfoController": [
+        {
+            "method_signature": "fetchVersionGET()",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "overall_coverage": [
+        {
+            "line_coverage": 35.18518518518518,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 39.228295819935695,
+            "database_interaction_coverage": -100,
+            "database_uncovered_lines": "{}"
+        }
+    ]
+}

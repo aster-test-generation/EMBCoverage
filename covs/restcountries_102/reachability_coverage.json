@@ -1,0 +1,495 @@
+{
+    "eu.fayder.restcountries.v2.rest.CountryRestV2": [
+        {
+            "method_signature": "doPOST()",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByRegion(String, String)",
+            "line_coverage": 62.5,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 72.22222222222221,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "parsedCountries(List, String)",
+            "line_coverage": 100.0,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByCapital(String, String)",
+            "line_coverage": 62.5,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 72.22222222222221,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByRegionalBloc(String, String)",
+            "line_coverage": 62.5,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 72.22222222222221,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByName(String, boolean, String)",
+            "line_coverage": 62.5,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 72.97297297297297,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getAllCountries(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getCountries(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByCurrency(String, String)",
+            "line_coverage": 70.0,
+            "branch_coverage": 83.33333333333334,
+            "instruction_coverage": 79.16666666666666,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "isEmpty(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": 75.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByAlphaList(String, String)",
+            "line_coverage": 90.0,
+            "branch_coverage": 80.0,
+            "instruction_coverage": 92.85714285714286,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByLanguage(String, String)",
+            "line_coverage": 62.5,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 72.22222222222221,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByCallingCode(String, String)",
+            "line_coverage": 62.5,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 72.22222222222221,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByDemonym(String, String)",
+            "line_coverage": 62.5,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 72.22222222222221,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getBySubRegion(String, String)",
+            "line_coverage": 62.5,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 72.22222222222221,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByAlpha(String, String)",
+            "line_coverage": 100.0,
+            "branch_coverage": 87.5,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "parsedCountry(Country, String)",
+            "line_coverage": 100.0,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "eu.fayder.restcountries.v2.rest.CountryService": [
+        {
+            "method_signature": "getInstance()",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByRegion(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByCapital(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByRegionalBloc(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": 87.5,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByName(String, boolean)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByCurrency(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByCodeList(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByLanguage(String)",
+            "line_coverage": 93.75,
+            "branch_coverage": 93.75,
+            "instruction_coverage": 95.06172839506173,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByCallingCode(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getAll()",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByDemonym(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getBySubRegion(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByAlpha(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "eu.fayder.restcountries.v1.rest.CountryRestV1": [
+        {
+            "method_signature": "doPOST()",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getResponse(Status)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByName(String, boolean)",
+            "line_coverage": 62.5,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 70.58823529411765,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByLanguage(String)",
+            "line_coverage": 62.5,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 69.6969696969697,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getBySubregion(String)",
+            "line_coverage": 62.5,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 69.6969696969697,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getCountries()",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByCurrency(String)",
+            "line_coverage": 70.0,
+            "branch_coverage": 83.33333333333334,
+            "instruction_coverage": 77.77777777777779,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "isEmpty(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": 75.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getAllCountries()",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByCapital(String)",
+            "line_coverage": 62.5,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 69.6969696969697,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByAlphaList(String)",
+            "line_coverage": 60.0,
+            "branch_coverage": 80.0,
+            "instruction_coverage": 73.58490566037736,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByRegion(String)",
+            "line_coverage": 62.5,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 69.6969696969697,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByCallingCode(String)",
+            "line_coverage": 62.5,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 69.6969696969697,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByAlpha(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": 87.5,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "eu.fayder.restcountries.v1.rest.CountryService": [
+        {
+            "method_signature": "getInstance()",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByName(String, boolean)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByLanguage(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getBySubregion(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getAll()",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByCurrency(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByCapital(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByCodeList(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByRegion(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByCallingCode(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getByAlpha(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "eu.fayder.restcountries.v2.rest.StripeRest": [
+        {
+            "method_signature": "contribute(Contribution)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "isBlank(String)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "eu.fayder.restcountries.v2.domain.Contribution": [
+        {
+            "method_signature": "getToken()",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getAmount()",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "overall_coverage": [
+        {
+            "line_coverage": 72.95373665480427,
+            "branch_coverage": 86.48648648648648,
+            "instruction_coverage": 78.73955960516325,
+            "database_interaction_coverage": -100,
+            "database_uncovered_lines": "{}"
+        }
+    ]
+}

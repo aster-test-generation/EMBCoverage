@@ -1,0 +1,388 @@
+{
+    "org.javiermf.features.services.rest.ProductsResource": [
+        {
+            "method_signature": "getAllProducts()",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "addProduct(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "deleteProductByName(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getProductByName(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "org.javiermf.features.services.ProductsService": [
+        {
+            "method_signature": "getAllProductNames()",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": 0.0,
+            "database_uncovered_lines": [
+                34
+            ]
+        },
+        {
+            "method_signature": "add(String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": 0.0,
+            "database_uncovered_lines": [
+                51,
+                52,
+                53
+            ]
+        },
+        {
+            "method_signature": "deleteByName(String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": 0.0,
+            "database_uncovered_lines": [
+                45,
+                46,
+                47
+            ]
+        },
+        {
+            "method_signature": "findByName(String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "addRequiresConstraintToProduct(String, String, String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": 0.0,
+            "database_uncovered_lines": [
+                96,
+                94,
+                95
+            ]
+        },
+        {
+            "method_signature": "addExcludesConstraintToProduct(String, String, String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": 0.0,
+            "database_uncovered_lines": [
+                108,
+                109,
+                110
+            ]
+        },
+        {
+            "method_signature": "deleteConstraintFromProduct(String, Long)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": 0.0,
+            "database_uncovered_lines": [
+                102
+            ]
+        },
+        {
+            "method_signature": "getFeaturesForProduct(String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": 0.0,
+            "database_uncovered_lines": [
+                58
+            ]
+        },
+        {
+            "method_signature": "addFeatureToProduct(String, String, String)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": 0.0,
+            "database_uncovered_lines": [
+                66,
+                67,
+                68,
+                63
+            ]
+        },
+        {
+            "method_signature": "deleteFeatureOfProduct(String, String)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": 0.0,
+            "database_uncovered_lines": [
+                88,
+                82,
+                85
+            ]
+        },
+        {
+            "method_signature": "updateFeatureOfProduct(String, String, String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": 0.0,
+            "database_uncovered_lines": [
+                74,
+                75
+            ]
+        }
+    ],
+    "org.javiermf.features.services.rest.ProductsConfigurationFeaturesResource": [
+        {
+            "method_signature": "addFeatureToConfiguration(String, String, String)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": 0.0,
+            "database_uncovered_lines": [
+                35
+            ]
+        },
+        {
+            "method_signature": "deleteFeature(String, String, String)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": 0.0,
+            "database_uncovered_lines": [
+                51
+            ]
+        },
+        {
+            "method_signature": "getConfigurationActivedFeatures(String, String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "org.javiermf.features.services.ProductsConfigurationsService": [
+        {
+            "method_signature": "addFeatureFromConfiguration(String, String, String)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": 0.0,
+            "database_uncovered_lines": [
+                82,
+                79
+            ]
+        },
+        {
+            "method_signature": "removeFeatureFromConfiguration(String, String, String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": 0.0,
+            "database_uncovered_lines": [
+                70
+            ]
+        },
+        {
+            "method_signature": "getConfigurationActivedFeaturesNames(String, String)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": 0.0,
+            "database_uncovered_lines": [
+                46,
+                47
+            ]
+        },
+        {
+            "method_signature": "add(String, String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": 0.0,
+            "database_uncovered_lines": [
+                56,
+                57,
+                58,
+                59
+            ]
+        },
+        {
+            "method_signature": "getConfigurationsNamesForProduct(String)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": 0.0,
+            "database_uncovered_lines": [
+                33
+            ]
+        },
+        {
+            "method_signature": "deleteByName(String, String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": 0.0,
+            "database_uncovered_lines": [
+                63
+            ]
+        },
+        {
+            "method_signature": "findByNameAndProductName(String, String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "org.javiermf.features.exceptions.WrongProductConfigurationException": [
+        {
+            "method_signature": "<init>(Set)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "org.javiermf.features.services.rest.ProductsConstraintsResource": [
+        {
+            "method_signature": "addRequiresConstraintToProduct(String, String, String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "addExcludesConstraintToProduct(String, String, String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "deleteConstraint(String, Long)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "org.javiermf.features.models.constraints.FeatureConstraint": [
+        {
+            "method_signature": "getId()",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "org.javiermf.features.services.rest.ProductsFeaturesResource": [
+        {
+            "method_signature": "getFeaturesForProduct(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "addFeatureToProduct(String, String, String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "deleteFeatureOfProduct(String, String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "updateFeatureOfProduct(String, String, String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "org.javiermf.features.services.rest.ProductsConfigurationResource": [
+        {
+            "method_signature": "addConfiguration(String, String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getConfigurationsForProduct(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "deleteConfiguration(String, String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        },
+        {
+            "method_signature": "getConfigurationWithNameForProduct(String, String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null
+        }
+    ],
+    "overall_coverage": [
+        {
+            "line_coverage": 22.727272727272727,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 32.73703041144901,
+            "database_interaction_coverage": 0.0,
+            "database_uncovered_lines": "{\"typing.Tuple[ForwardRef('org.javiermf.features.services.ProductsService'), ForwardRef('getAllProductNames()')]\": [34], \"typing.Tuple[ForwardRef('org.javiermf.features.services.ProductsService'), ForwardRef('add(String)')]\": [51, 52, 53], \"typing.Tuple[ForwardRef('org.javiermf.features.services.ProductsService'), ForwardRef('deleteByName(String)')]\": [45, 46, 47], \"typing.Tuple[ForwardRef('org.javiermf.features.services.rest.ProductsConfigurationFeaturesResource'), ForwardRef('addFeatureToConfiguration(String, String, String)')]\": [35], \"typing.Tuple[ForwardRef('org.javiermf.features.services.ProductsConfigurationsService'), ForwardRef('addFeatureFromConfiguration(String, String, String)')]\": [82, 79], \"typing.Tuple[ForwardRef('org.javiermf.features.services.rest.ProductsConfigurationFeaturesResource'), ForwardRef('deleteFeature(String, String, String)')]\": [51], \"typing.Tuple[ForwardRef('org.javiermf.features.services.ProductsConfigurationsService'), ForwardRef('removeFeatureFromConfiguration(String, String, String)')]\": [70], \"typing.Tuple[ForwardRef('org.javiermf.features.services.ProductsConfigurationsService'), ForwardRef('getConfigurationActivedFeaturesNames(String, String)')]\": [46, 47], \"typing.Tuple[ForwardRef('org.javiermf.features.services.ProductsService'), ForwardRef('addRequiresConstraintToProduct(String, String, String)')]\": [96, 94, 95], \"typing.Tuple[ForwardRef('org.javiermf.features.services.ProductsService'), ForwardRef('addExcludesConstraintToProduct(String, String, String)')]\": [108, 109, 110], \"typing.Tuple[ForwardRef('org.javiermf.features.services.ProductsService'), ForwardRef('deleteConstraintFromProduct(String, Long)')]\": [102], \"typing.Tuple[ForwardRef('org.javiermf.features.services.ProductsService'), ForwardRef('getFeaturesForProduct(String)')]\": [58], \"typing.Tuple[ForwardRef('org.javiermf.features.services.ProductsService'), ForwardRef('addFeatureToProduct(String, String, String)')]\": [66, 67, 68, 63], \"typing.Tuple[ForwardRef('org.javiermf.features.services.ProductsService'), ForwardRef('deleteFeatureOfProduct(String, String)')]\": [88, 82, 85], \"typing.Tuple[ForwardRef('org.javiermf.features.services.ProductsService'), ForwardRef('updateFeatureOfProduct(String, String, String)')]\": [74, 75], \"typing.Tuple[ForwardRef('org.javiermf.features.services.ProductsConfigurationsService'), ForwardRef('add(String, String)')]\": [56, 57, 58, 59], \"typing.Tuple[ForwardRef('org.javiermf.features.services.ProductsConfigurationsService'), ForwardRef('getConfigurationsNamesForProduct(String)')]\": [33], \"typing.Tuple[ForwardRef('org.javiermf.features.services.ProductsConfigurationsService'), ForwardRef('deleteByName(String, String)')]\": [63]}"
+        }
+    ]
+}
