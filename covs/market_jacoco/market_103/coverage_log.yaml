@@ -1,0 +1,135 @@
+- timestamp: '2025-04-23T14:56:48.219320'
+  overall_coverage:
+    instruction:
+      covered: 372
+      total: 722
+      percent: 51.52354570637119
+    line:
+      covered: 101
+      total: 165
+      percent: 61.212121212121204
+    branch:
+      covered: 3
+      total: 8
+      percent: 37.5
+    method:
+      covered: 31
+      total: 51
+      percent: 60.78431372549019
+    class:
+      covered: 10
+      total: 10
+      percent: 100.0
+  coverage_change: {}
+  newly_covered_lines:
+    market/RestSecurityConfig.java:
+    - 7
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 19
+    market/RestApplication.java:
+    - 13
+    market/RestConfig.java:
+    - 13
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    market/rest/exception/RestExceptionHandler.java:
+    - 29
+    - 33
+    - 34
+    - 35
+    - 40
+    - 41
+    - 42
+    - 48
+    - 49
+    - 50
+    - 56
+    - 57
+    - 58
+    - 59
+    - 60
+    - 76
+    - 77
+    - 78
+    - 79
+    - 80
+    - 81
+    - 87
+    - 88
+    - 89
+    - 90
+    - 94
+    - 95
+    - 96
+    - 97
+    - 98
+    - 102
+    - 103
+    - 105
+    - 110
+    market/rest/exception/RestErrorResponse.java:
+    - 17
+    - 20
+    - 21
+    - 24
+    - 25
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 34
+    - 35
+    - 38
+    - 42
+    - 46
+    - 50
+    - 55
+    market/rest/CustomerRestController.java:
+    - 30
+    - 32
+    - 33
+    - 34
+    - 35
+    market/rest/OrdersRestController.java:
+    - 28
+    - 30
+    - 31
+    - 32
+    market/rest/ContactsRestController.java:
+    - 29
+    - 31
+    - 32
+    - 33
+    market/rest/ProductsRestController.java:
+    - 27
+    - 29
+    - 30
+    - 31
+    - 38
+    - 39
+    - 40
+    - 41
+    - 42
+    - 57
+    - 58
+    - 59
+    - 60
+    market/rest/CartRestController.java:
+    - 48
+    - 51
+    - 52
+    - 53
+    - 54
+    - 55
+    - 56
