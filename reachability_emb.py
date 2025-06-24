@@ -4,6 +4,7 @@ from typing import List
 from cldk.analysis.java import JavaAnalysis
 
 
+
 class EMBReachability:
 
     def __init__(self, analysis: JavaAnalysis):
@@ -11,7 +12,7 @@ class EMBReachability:
         self.__reachable_methods: List[dict] = []
 
     def get_reachable_methods(self, qualified_class_name: str, method_signature: str,
-                              depth: int = 2,
+                              depth: int = 4,
                               is_recursive: bool = False) -> List[dict]:
         """
         Computes all the methods reachable from the endpoint
@@ -39,7 +40,8 @@ class EMBReachability:
         current_method = {"qualified_class_name": qualified_class_name, "method_signature": method_signature,
                           "start_line": method_details.start_line, "end_line": method_details.end_line,
                           "method_code": method_details.declaration + '\n' + method_details.code,
-                          "fields": tuple(method_details.accessed_fields)}
+                          "fields": tuple(method_details.accessed_fields),
+                          "parameters": method_details.parameters}
         if current_method not in self.__reachable_methods:
             self.__reachable_methods.append(current_method)
 
@@ -51,9 +53,9 @@ class EMBReachability:
                 if class_details:
                     if class_details.is_interface:
                         if call_site.receiver_type not in interface_class_method_pairs:
-                            interface_class_method_pairs[call_site.receiver_type] = [self.process_callee_signature(call_site.callee_signature)]
+                            interface_class_method_pairs[call_site.receiver_type] = [self.__process_callee_signature(call_site.callee_signature)]
                         else:
-                            interface_class_method_pairs[call_site.receiver_type].append(self.process_callee_signature(call_site.callee_signature))
+                            interface_class_method_pairs[call_site.receiver_type].append(self.__process_callee_signature(call_site.callee_signature))
 
             # Map the concrete class and the interface methods
             concrete_class_methods_map = {}
@@ -70,7 +72,7 @@ class EMBReachability:
                         self.get_reachable_methods(concrete_class, method_signature, depth - 1, True)
 
             callees = self.analysis.get_callees(source_class_name=qualified_class_name,
-                                                source_method_declaration=method_signature)
+                                                source_method_declaration=method_signature, using_symbol_table=True)
             if 'callee_details' in callees:
                 for callee in callees['callee_details']:
                     callee_class_name = callee['callee_method'].klass
@@ -104,7 +106,7 @@ class EMBReachability:
         return concrete_classes
 
     @staticmethod
-    def process_callee_signature(callee_signature: str) -> str:
+    def __process_callee_signature(callee_signature: str) -> str:
         """
         Processes callee signature
         Args:
