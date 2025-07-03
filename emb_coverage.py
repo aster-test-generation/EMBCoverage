@@ -6,6 +6,7 @@ from typing import List, Tuple, Any
 from cldk.analysis.java import JavaAnalysis
 
 from reachability_emb import EMBReachability
+import re
 
 
 class EMBCoverage:
