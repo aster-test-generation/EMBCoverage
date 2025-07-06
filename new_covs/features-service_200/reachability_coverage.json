@@ -1,0 +1,12 @@
+{
+    "overall_coverage": [
+        {
+            "line_coverage": -100,
+            "branch_coverage": -100,
+            "instruction_coverage": -100,
+            "database_interaction_coverage": -100,
+            "database_uncovered_lines": "{}",
+            "database_covered_lines": "{}"
+        }
+    ]
+}
