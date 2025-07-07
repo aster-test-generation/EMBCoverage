@@ -1,0 +1,1776 @@
+{
+    "org.heigit.ohsome.ohsomeapi.controller.metadata.MetadataController": [
+        {
+            "method_signature": "getMetadata(HttpServletRequest)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.executor.MetadataRequestExecutor": [
+        {
+            "method_signature": "executeGetMetadata(HttpServletRequest)",
+            "line_coverage": 75.0,
+            "branch_coverage": 50.0,
+            "instruction_coverage": 83.33333333333334,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.controller.dataaggregation.users.UsersController": [
+        {
+            "method_signature": "countDensity(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 50.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 58.333333333333336,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "countGroupByKey(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "countDensityGroupByTag(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "countGroupByType(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "countGroupByBoundary(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 50.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 63.63636363636363,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "countGroupByTag(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "countDensityGroupByBoundary(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 50.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 63.63636363636363,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "countDensityGroupByType(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "count(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 50.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 58.333333333333336,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.executor.ContributionsExecutor": [
+        {
+            "method_signature": "count(boolean, boolean)",
+            "line_coverage": 20.0,
+            "branch_coverage": 30.0,
+            "instruction_coverage": 12.149532710280374,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "usersCount(MapReducer)",
+            "line_coverage": 80.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 83.33333333333334,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "contributionsCount(MapReducer, boolean)",
+            "line_coverage": 81.25,
+            "branch_coverage": 75.0,
+            "instruction_coverage": 75.60975609756098,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "countGroupByBoundary(boolean)",
+            "line_coverage": 45.09803921568628,
+            "branch_coverage": 43.75,
+            "instruction_coverage": 40.7035175879397,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.inputprocessing.InputProcessor": [
+        {
+            "method_signature": "getProcessingData()",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "processParameters()",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "processParameters(ComputeMode)",
+            "line_coverage": 57.73195876288659,
+            "branch_coverage": 40.42553191489361,
+            "instruction_coverage": 60.43478260869565,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "defineRequestTimeout()",
+            "line_coverage": 100.0,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "createEmptyStringIfNull(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "setBoundaryType(String, String, String)",
+            "line_coverage": 100.0,
+            "branch_coverage": 95.83333333333334,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "processShowMetadata(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "processBooleanParam(String, String)",
+            "line_coverage": 90.0,
+            "branch_coverage": 66.66666666666666,
+            "instruction_coverage": 95.91836734693877,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "defineTypes(String[], MapReducer)",
+            "line_coverage": 35.294117647058826,
+            "branch_coverage": 5.0,
+            "instruction_coverage": 22.727272727272727,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "createEmptyArrayIfNull(String[])",
+            "line_coverage": 100.0,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "checkTypes(String[])",
+            "line_coverage": 25.0,
+            "branch_coverage": 9.090909090909092,
+            "instruction_coverage": 9.30232558139535,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "defineSimpleFeatureTypes(String[])",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "filterOnSimpleFeatures(T)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "extractTime(MapReducer, String[], boolean)",
+            "line_coverage": 82.75862068965517,
+            "branch_coverage": 72.72727272727273,
+            "instruction_coverage": 83.9080459770115,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "extractKeysValues(MapReducer, String[], String[])",
+            "line_coverage": 42.857142857142854,
+            "branch_coverage": 25.0,
+            "instruction_coverage": 36.58536585365854,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "checkKeysValues(String[], String[])",
+            "line_coverage": 66.66666666666666,
+            "branch_coverage": 50.0,
+            "instruction_coverage": 61.53846153846154,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "getGeometry()",
+            "line_coverage": 75.0,
+            "branch_coverage": 50.0,
+            "instruction_coverage": 78.57142857142857,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "getRequestUrlIfGetRequest(HttpServletRequest)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "getRequestUrl()",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "splitParamOnComma(String[])",
+            "line_coverage": 100.0,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "getUtils()",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "processPropertiesParam()",
+            "line_coverage": 81.25,
+            "branch_coverage": 75.0,
+            "instruction_coverage": 84.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "processIsUnclippedParam()",
+            "line_coverage": 100.0,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "includeTags()",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "includeOSMMetadata()",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "includeContributionTypes()",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "isClipGeometry()",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "processKeys2Vals2(String[], String[])",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "setProcessingData(ProcessingData)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "checkFilter(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": 66.66666666666666,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.executor.ExecutionUtils": [
+        {
+            "method_signature": "contributionsFilter(String)",
+            "line_coverage": 43.75,
+            "branch_coverage": 44.44444444444444,
+            "instruction_coverage": 61.53846153846154,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "writeCsvResponse(Result[], HttpServletResponse, List)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "setCsvSettingsInServletResponse(HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "writeComments(HttpServletResponse, List)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "createCsvTopComments(String, String, String, Metadata)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "writeCsvResponse(GroupByObject[], HttpServletResponse, List)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "createCsvResponseForUsersGroupBy(GroupByObject[])",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "createCsvResponseForElementsGroupBy(GroupByObject[])",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "createCsvResponseForElementsRatioGroupBy(GroupByObject[])",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "keysToKeysInt(String[], TagTranslator)",
+            "line_coverage": 50.0,
+            "branch_coverage": 25.0,
+            "instruction_coverage": 17.073170731707318,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "streamResponse(HttpServletResponse, ExtractionResponse, Stream)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "writeStreamResponse(ThreadLocal, Stream, ThreadLocal, ServletOutputStream)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "snapshotFilter(MapReducer, Set, Set, Set, Set, Integer[], Integer[], Integer[], Integer[])",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "snapshotMatches(OSMEntitySnapshot, Set, Set, Integer[], Integer[])",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "setRequestedSimpleFeatures(Set)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "createRatioResponse(String[], Double[], Double[], long, RequestResource, String, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "combineFiltersWithOr(String, String)",
+            "line_coverage": 66.66666666666666,
+            "branch_coverage": 25.0,
+            "instruction_coverage": 41.66666666666667,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "createRatioGroupByBoundaryResponse(Object[], String[], Double[], Double[], long, RequestResource, String, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.output.elements.ElementsResult": [
+        {
+            "method_signature": "getValue()",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.output.contributions.ContributionsResult": [
+        {
+            "method_signature": "getValue()",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.output.ratio.RatioResult": [
+        {
+            "method_signature": "getValue()",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.output.DefaultAggregationResponse": [
+        {
+            "method_signature": "of(Attribution, String, Metadata, Result[])",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.executor.UsersRequestExecutor": [
+        {
+            "method_signature": "countGroupByKey(HttpServletRequest, HttpServletResponse, boolean)",
+            "line_coverage": 11.320754716981133,
+            "branch_coverage": 11.11111111111111,
+            "instruction_coverage": 10.300429184549357,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "countGroupByTag(HttpServletRequest, HttpServletResponse, boolean)",
+            "line_coverage": 10.16949152542373,
+            "branch_coverage": 5.555555555555555,
+            "instruction_coverage": 8.013937282229964,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "countGroupByType(HttpServletRequest, HttpServletResponse, boolean)",
+            "line_coverage": 35.294117647058826,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 25.735294117647058,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.output.Description": [
+        {
+            "method_signature": "countUsersGroupByKey(boolean)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "countUsersGroupByTag(boolean)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "countUsersGroupByType(boolean)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.inputprocessing.InputProcessingUtils": [
+        {
+            "method_signature": "getBoundaryIds()",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "parseFilter(FilterParser, String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.inputprocessing.ProcessingData": [
+        {
+            "method_signature": "getFilterExpression()",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.controller.dataextraction.contributions.ContributionsController": [
+        {
+            "method_signature": "contributionsBboxLatest(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 33.33333333333333,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 72.72727272727273,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "contributions(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 33.33333333333333,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 72.72727272727273,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "contributionsBbox(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 33.33333333333333,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 72.72727272727273,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "contributionsLatest(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 33.33333333333333,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 72.72727272727273,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "contributionsCentroid(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 33.33333333333333,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 72.72727272727273,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "contributionsCentroidLatest(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 33.33333333333333,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 72.72727272727273,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.executor.DataRequestExecutor": [
+        {
+            "method_signature": "extract()",
+            "line_coverage": 24.242424242424242,
+            "branch_coverage": 12.5,
+            "instruction_coverage": 23.985239852398525,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.utils.RequestUtils": [
+        {
+            "method_signature": "isContributionsExtraction(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "isDataExtraction(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "usesCsvFormat(HttpServletRequest)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "cacheNotAllowed(String, String[])",
+            "line_coverage": 100.0,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "isMetadata(String)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "usesDefaultToTimestamp(String[])",
+            "line_coverage": 83.33333333333334,
+            "branch_coverage": 60.0,
+            "instruction_coverage": 87.09677419354838,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "extractOSHDBMetadata()",
+            "line_coverage": 87.5,
+            "branch_coverage": 50.0,
+            "instruction_coverage": 89.1566265060241,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.controller.dataaggregation.elements.PerimeterController": [
+        {
+            "method_signature": "perimeterDensityGroupByBoundary(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 50.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 72.72727272727273,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "perimeterDensityGroupByTag(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "perimeterDensity(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "perimeterRatio(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "perimeterGroupByKey(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "perimeterDensityGroupByType(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "perimeterRatioGroupByBoundary(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "perimeter(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "perimeterGroupByType(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "perimeterDensityGroupByBoundaryGroupByTag(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "perimeterGroupByBoundary(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "perimeterGroupByTag(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "perimeterGroupByBoundaryGroupByTag(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.executor.AggregateRequestExecutor": [
+        {
+            "method_signature": "aggregateGroupByBoundary()",
+            "line_coverage": 89.28571428571429,
+            "branch_coverage": 66.66666666666666,
+            "instruction_coverage": 85.29411764705883,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "generateMetadata(String)",
+            "line_coverage": 50.0,
+            "branch_coverage": 50.0,
+            "instruction_coverage": 32.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "writeCsv(List, Consumer)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "setCsvSettingsInServletResponse()",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "createCsvTopComments(Metadata)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "writeCsvResponse(Object[])",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "writeCsvResponse(CSVWriter, Object[])",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "createCsvResponseForElementsGroupBy(GroupByObject[])",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "aggregate()",
+            "line_coverage": 92.3076923076923,
+            "branch_coverage": 71.42857142857143,
+            "instruction_coverage": 85.1063829787234,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.executor.ElementsRequestExecutor": [
+        {
+            "method_signature": "aggregateGroupByTag(RequestResource, HttpServletRequest, HttpServletResponse, boolean, boolean)",
+            "line_coverage": 79.62962962962963,
+            "branch_coverage": 75.0,
+            "instruction_coverage": 81.56028368794325,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "aggregateRatio(RequestResource, HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 27.11864406779661,
+            "branch_coverage": 28.57142857142857,
+            "instruction_coverage": 23.103448275862068,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "aggregateBasicFiltersRatio(RequestResource, HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "aggregateGroupByKey(RequestResource, HttpServletRequest, HttpServletResponse, boolean, boolean)",
+            "line_coverage": 75.0,
+            "branch_coverage": 68.75,
+            "instruction_coverage": 77.88018433179722,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "aggregateGroupByType(RequestResource, HttpServletRequest, HttpServletResponse, boolean, boolean)",
+            "line_coverage": 71.875,
+            "branch_coverage": 66.66666666666666,
+            "instruction_coverage": 73.13432835820896,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "aggregateRatioGroupByBoundary(RequestResource, HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 20.43010752688172,
+            "branch_coverage": 14.285714285714285,
+            "instruction_coverage": 18.75,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "aggregateBasicFiltersRatioGroupByBoundary(RequestResource, HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "aggregateGroupByBoundaryGroupByTag(RequestResource, HttpServletRequest, HttpServletResponse, boolean, boolean)",
+            "line_coverage": 77.77777777777779,
+            "branch_coverage": 68.18181818181817,
+            "instruction_coverage": 80.59299191374663,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "extract(RequestResource, ElementsGeometry, HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 22.22222222222222,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 18.627450980392158,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.utils.FilterUtil": [
+        {
+            "method_signature": "filter(Set)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.utils.TimestampFormatter": [
+        {
+            "method_signature": "getInstance()",
+            "line_coverage": 100.0,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.output.ratio.RatioGroupByBoundaryResponse": [
+        {
+            "method_signature": "of(Attribution, String, Metadata, String, Feature[])",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.utils.GroupByBoundaryGeoJsonGenerator": [
+        {
+            "method_signature": "createGeoJsonFeatures(GroupByObject[], GeoJsonObject[])",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "generateGroupByResultGeoJson(GroupByObject[], GeoJsonObject[], int, int, int, int)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "generateRatioGroupByResultGeoJson(GroupByObject[], GeoJsonObject[], int, int, int)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "fillGeojsonFeature(GroupByObject[], int, String)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "makeGeojsonFeature(GroupByObject[], int, String)",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.controller.dataextraction.elements.ElementsController": [
+        {
+            "method_signature": "elementsGeometry(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "elementsBbox(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "elementsCentroid(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.interceptor.LoggingRequestInterceptor": [
+        {
+            "method_signature": "afterCompletion(HttpServletRequest, HttpServletResponse, Object, Exception)",
+            "line_coverage": 85.71428571428571,
+            "branch_coverage": 50.0,
+            "instruction_coverage": 84.84848484848484,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.controller.dataaggregation.elements.AreaController": [
+        {
+            "method_signature": "areaGroupByTag(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "areaDensityGroupByBoundary(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "areaDensityGroupByBoundaryGroupByTag(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "areaRatio(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "areaGroupByBoundary(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "areaDensityGroupByType(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "areaRatioGroupByBoundary(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "areaGroupByType(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "area(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "areaDensity(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 50.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 72.72727272727273,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "areaGroupByKey(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "areaDensityGroupByTag(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "areaGroupByBoundaryGroupByTag(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.controller.dataaggregation.contributions.ContributionsCountController": [
+        {
+            "method_signature": "contributionsLatestCountDensity(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 50.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 58.333333333333336,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "contributionsCountDensityGroupByBoundary(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 50.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 63.63636363636363,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "contributionsCount(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 50.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 58.333333333333336,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "contributionsCountDensity(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 50.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 58.333333333333336,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "contributionsLatestCount(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 50.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 58.333333333333336,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "contributionsCountGroupByBoundary(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 50.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 63.63636363636363,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.controller.dataextraction.elements.ElementsFullHistoryController": [
+        {
+            "method_signature": "elementsFullHistory(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 33.33333333333333,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 72.72727272727273,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "elementsCentroidFullHistory(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 33.33333333333333,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 72.72727272727273,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "elementsBboxFullHistory(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 33.33333333333333,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 72.72727272727273,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.controller.dataaggregation.elements.CountController": [
+        {
+            "method_signature": "countDensity(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "countDensityGroupByBoundaryGroupByTag(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "countRatioGroupByBoundary(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "countRatio(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "countGroupByBoundaryGroupByTag(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "countGroupByKey(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "countDensityGroupByTag(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "countGroupByType(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "countGroupByBoundary(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 50.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 72.72727272727273,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "countGroupByTag(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "countDensityGroupByBoundary(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 50.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 72.72727272727273,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "countDensityGroupByType(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "count(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.config.JacksonConfig": [
+        {
+            "method_signature": "setup()",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.controller.dataaggregation.elements.LengthController": [
+        {
+            "method_signature": "lengthGroupByType(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "lengthGroupByBoundaryGroupByTag(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "lengthGroupByTag(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "lengthRatioGroupByBoundary(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "lengthRatio(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "lengthDensityGroupByTag(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "lengthGroupByBoundary(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 50.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 72.72727272727273,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "lengthDensity(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 50.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 72.72727272727273,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "lengthDensityGroupByType(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "length(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "lengthGroupByKey(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "lengthDensityGroupByBoundary(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "lengthDensityGroupByBoundaryGroupByTag(HttpServletRequest, HttpServletResponse)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.filter.RequestFilter": [
+        {
+            "method_signature": "doFilterInternal(HttpServletRequest, HttpServletResponse, FilterChain)",
+            "line_coverage": 94.73684210526315,
+            "branch_coverage": 75.0,
+            "instruction_coverage": 94.11764705882352,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.inputprocessing.GeometryBuilder": [
+        {
+            "method_signature": "createGeometryFromMetadataGeoJson(String)",
+            "line_coverage": 66.66666666666666,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 62.5,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.Application": [
+        {
+            "method_signature": "main(String[])",
+            "line_coverage": 55.55555555555556,
+            "branch_coverage": 50.0,
+            "instruction_coverage": 61.53846153846154,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "preRun(ApplicationArguments)",
+            "line_coverage": 100.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "getApplicationContext()",
+            "line_coverage": 0.0,
+            "branch_coverage": -100.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "org.heigit.ohsome.ohsomeapi.utils.ConfigureApplication": [
+        {
+            "method_signature": "parseArguments(ApplicationArguments)",
+            "line_coverage": 38.46153846153847,
+            "branch_coverage": 26.666666666666668,
+            "instruction_coverage": 41.40127388535032,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
+    "overall_coverage": [
+        {
+            "line_coverage": 35.39731682146543,
+            "branch_coverage": 32.650273224043715,
+            "instruction_coverage": 34.32543993048012,
+            "database_interaction_coverage": -100,
+            "database_uncovered_lines": "{}",
+            "database_covered_lines": "{}"
+        }
+    ]
+}
