@@ -1,9 +1,29 @@
 {
+    "org.languagetool.server.DatabaseLogger": [
+        {
+            "method_signature": "disableLogging()",
+            "line_coverage": 0.0,
+            "branch_coverage": 0.0,
+            "instruction_coverage": 0.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        },
+        {
+            "method_signature": "getInstance()",
+            "line_coverage": 100.0,
+            "branch_coverage": 100.0,
+            "instruction_coverage": 100.0,
+            "database_interaction_coverage": -100.0,
+            "database_uncovered_lines": null,
+            "database_covered_lines": null
+        }
+    ],
     "overall_coverage": [
         {
-            "line_coverage": -100,
-            "branch_coverage": -100,
-            "instruction_coverage": -100,
+            "line_coverage": 42.857142857142854,
+            "branch_coverage": 50.0,
+            "instruction_coverage": 44.44444444444444,
             "database_interaction_coverage": -100,
             "database_uncovered_lines": "{}",
             "database_covered_lines": "{}"
