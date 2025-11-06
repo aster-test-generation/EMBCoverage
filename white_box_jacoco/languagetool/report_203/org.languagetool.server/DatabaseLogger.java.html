@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DatabaseLogger.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.server</a> &gt; <span class="el_source">DatabaseLogger.java</span></div><h1>DatabaseLogger.java</h1><pre class="source lang-java linenums">/*
+ *  LanguageTool, a natural language style checker
+ *  * Copyright (C) 2018 Fabian Richter
+ *  *
+ *  * This library is free software; you can redistribute it and/or
+ *  * modify it under the terms of the GNU Lesser General Public
+ *  * License as published by the Free Software Foundation; either
+ *  * version 2.1 of the License, or (at your option) any later version.
+ *  *
+ *  * This library is distributed in the hope that it will be useful,
+ *  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *  * Lesser General Public License for more details.
+ *  *
+ *  * You should have received a copy of the GNU Lesser General Public
+ *  * License along with this library; if not, write to the Free Software
+ *  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ *  * USA
+ *
+ */
+
+package org.languagetool.server;
+
+import org.apache.ibatis.session.ExecutorType;
+import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
+
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * @since 4.3
+ */
+class DatabaseLogger {
+
+  // package private for mocking in tests
+<span class="fc" id="L38">  static DatabaseLogger instance = null;</span>
+
+  // smaller numbers used for tests
+  static final int POLLING_TIME = 1000;
+<span class="fc" id="L42">  static int SQL_BATCH_SIZE = 1000;</span>
+<span class="fc" id="L43">  static int SQL_BATCH_WAITING_TIME = 10000; // milliseconds to wait until batch gets committed anyway</span>
+  
+  private static final int MAX_QUEUE_SIZE = 50000; // drop entries after limit is reached, to avoid running out of memory
+
+  /**
+   * @return an instance that will be disabled until initialized by DatabaseAccess
+   */
+  public static DatabaseLogger getInstance() {
+<span class="fc bfc" id="L51" title="All 2 branches covered.">    if (instance == null) {</span>
+<span class="fc" id="L52">      instance = new DatabaseLogger();</span>
+    }
+<span class="fc" id="L54">    return instance;</span>
+  }
+
+  /**
+   * called by DatabaseAccess.init
+   * @param factory shared factory from DatabaseAccess
+   */
+  static void init(SqlSessionFactory factory) {
+<span class="nc" id="L62">    getInstance().start(factory);</span>
+<span class="nc" id="L63">  }</span>
+
+<span class="nc" id="L65">  private class WorkerThread extends Thread {</span>
+    @Override
+    public void run() {
+<span class="nc" id="L68">      try (SqlSession session = sessionFactory.openSession(ExecutorType.BATCH, false)) {</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        while (!Thread.currentThread().isInterrupted()) {</span>
+<span class="nc" id="L70">          int batchSize = 0;</span>
+<span class="nc" id="L71">          long batchTime = System.currentTimeMillis();</span>
+          // commit when batch size is reached or after waiting period elapsed
+<span class="nc bnc" id="L73" title="All 4 branches missed.">          while(!Thread.currentThread().isInterrupted()</span>
+            &amp;&amp; batchSize &lt; SQL_BATCH_SIZE
+<span class="nc bnc" id="L75" title="All 2 branches missed.">            &amp;&amp; System.currentTimeMillis() - batchTime &lt; SQL_BATCH_WAITING_TIME)  {</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">            if (messages.size() &gt; SQL_BATCH_SIZE) {</span>
+<span class="nc" id="L77">              ServerTools.print(String.format(&quot;Logging queue filling up: %d entries&quot;, messages.size()));</span>
+            }
+            // polling to be able to react when waiting time has elapsed
+<span class="nc" id="L80">            DatabaseLogEntry entry = messages.poll(POLLING_TIME, TimeUnit.MILLISECONDS);</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">            if (entry == null) {</span>
+<span class="nc" id="L82">              continue;</span>
+            }
+<span class="nc" id="L84">            batchSize++;</span>
+<span class="nc" id="L85">            session.insert(entry.getMappingIdentifier(), entry.getMapping());</span>
+<span class="nc" id="L86">            DatabaseLogEntry followup = entry.followup();</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            if (followup != null) { // followup statements need to be inserted directly afterwards, dependant on e.g. generated primary keys</span>
+<span class="nc" id="L88">              session.insert(followup.getMappingIdentifier(), followup.getMapping());</span>
+<span class="nc" id="L89">              batchSize++;</span>
+            }
+<span class="nc" id="L91">          }</span>
+<span class="nc" id="L92">          session.commit();</span>
+<span class="nc" id="L93">        }</span>
+<span class="nc" id="L94">      } catch (Exception e) {</span>
+<span class="nc" id="L95">        e.printStackTrace();</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        if (!Thread.currentThread().isInterrupted()) {</span>
+<span class="nc" id="L97">          new WorkerThread().start();</span>
+        }
+<span class="nc" id="L99">      }</span>
+<span class="nc" id="L100">    }</span>
+  }
+
+<span class="fc" id="L103">  private final BlockingQueue&lt;DatabaseLogEntry&gt; messages = new LinkedBlockingQueue&lt;&gt;();</span>
+<span class="fc" id="L104">  private SqlSessionFactory sessionFactory = null;</span>
+<span class="fc" id="L105">  private WorkerThread worker = null;</span>
+<span class="fc" id="L106">  private boolean disabled = true;</span>
+
+<span class="fc" id="L108">  private DatabaseLogger() {</span>
+<span class="fc" id="L109">  }</span>
+
+  private void start(SqlSessionFactory factory) {
+<span class="nc" id="L112">    sessionFactory = factory;</span>
+<span class="nc" id="L113">    disabled = false;</span>
+<span class="nc" id="L114">    worker = new WorkerThread();</span>
+<span class="nc" id="L115">    worker.start();</span>
+<span class="nc" id="L116">  }</span>
+
+  public void disableLogging() {
+<span class="nc" id="L119">    this.disabled = true;</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">    if (worker != null) {</span>
+<span class="nc" id="L121">      worker.interrupt();</span>
+    }
+<span class="nc" id="L123">  }</span>
+
+  public boolean isLogging() {
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">    return !this.disabled;</span>
+  }
+
+  public void log(DatabaseLogEntry entry) {
+    try {
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">      if (!disabled) {</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        if (messages.size() &lt; MAX_QUEUE_SIZE) {</span>
+<span class="nc" id="L133">          messages.put(entry);</span>
+        } else {
+<span class="nc" id="L135">          ServerTools.print(&quot;Logging queue has reached size limit; discarding new messages.&quot;);</span>
+        }
+      }
+<span class="nc" id="L138">    } catch (InterruptedException e) {</span>
+<span class="nc" id="L139">      e.printStackTrace();</span>
+<span class="fc" id="L140">    }</span>
+<span class="fc" id="L141">  }</span>
+
+  void createTestTables() {
+<span class="nc" id="L144">    createTestTables(false);</span>
+<span class="nc" id="L145">  }</span>
+
+  void createTestTables(boolean mysql) {
+<span class="nc" id="L148">    try (SqlSession session = sessionFactory.openSession(true)) {</span>
+<span class="nc" id="L149">      String[] statements = {&quot;org.languagetool.server.LogMapper.createRuleMatches&quot;,</span>
+        &quot;org.languagetool.server.LogMapper.createCheckLog&quot;,
+        &quot;org.languagetool.server.LogMapper.createMiscLog&quot;,
+        &quot;org.languagetool.server.LogMapper.createPings&quot;,
+        &quot;org.languagetool.server.LogMapper.createAccessLimits&quot;,
+        &quot;org.languagetool.server.LogMapper.createCheckError&quot;,
+        &quot;org.languagetool.server.LogMapper.createCacheStats&quot;,
+        &quot;org.languagetool.server.LogMapper.createServers&quot;,
+        &quot;org.languagetool.server.LogMapper.createClients&quot;};
+<span class="nc bnc" id="L158" title="All 2 branches missed.">      for (String statement : statements) {</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">        if (mysql) {</span>
+<span class="nc" id="L160">          session.insert(statement + &quot;MySQL&quot;);</span>
+        } else {
+<span class="nc" id="L162">          session.insert(statement);</span>
+        }
+      }
+    }
+<span class="nc" id="L166">  }</span>
+
+  void dropTestTables() {
+<span class="nc" id="L169">    try (SqlSession session = sessionFactory.openSession(true)) {</span>
+<span class="nc" id="L170">      session.delete(&quot;org.languagetool.server.LogMapper.dropRuleMatches&quot;);</span>
+<span class="nc" id="L171">      session.delete(&quot;org.languagetool.server.LogMapper.dropCheckLog&quot;);</span>
+<span class="nc" id="L172">      session.delete(&quot;org.languagetool.server.LogMapper.dropMiscLog&quot;);</span>
+<span class="nc" id="L173">      session.delete(&quot;org.languagetool.server.LogMapper.dropPings&quot;);</span>
+<span class="nc" id="L174">      session.delete(&quot;org.languagetool.server.LogMapper.dropAccessLimits&quot;);</span>
+<span class="nc" id="L175">      session.delete(&quot;org.languagetool.server.LogMapper.dropCheckError&quot;);</span>
+<span class="nc" id="L176">      session.delete(&quot;org.languagetool.server.LogMapper.dropCacheStats&quot;);</span>
+<span class="nc" id="L177">      session.delete(&quot;org.languagetool.server.LogMapper.dropServers&quot;);</span>
+<span class="nc" id="L178">      session.delete(&quot;org.languagetool.server.LogMapper.dropClients&quot;);</span>
+    }
+<span class="nc" id="L180">  }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

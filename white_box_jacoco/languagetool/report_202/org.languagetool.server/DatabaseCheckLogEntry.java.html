@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DatabaseCheckLogEntry.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.server</a> &gt; <span class="el_source">DatabaseCheckLogEntry.java</span></div><h1>DatabaseCheckLogEntry.java</h1><pre class="source lang-java linenums">/*
+ *  LanguageTool, a natural language style checker
+ *  * Copyright (C) 2018 Fabian Richter
+ *  *
+ *  * This library is free software; you can redistribute it and/or
+ *  * modify it under the terms of the GNU Lesser General Public
+ *  * License as published by the Free Software Foundation; either
+ *  * version 2.1 of the License, or (at your option) any later version.
+ *  *
+ *  * This library is distributed in the hope that it will be useful,
+ *  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *  * Lesser General Public License for more details.
+ *  *
+ *  * You should have received a copy of the GNU Lesser General Public
+ *  * License along with this library; if not, write to the Free Software
+ *  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ *  * USA
+ *
+ */
+
+package org.languagetool.server;
+
+import org.apache.commons.lang3.StringUtils;
+import org.languagetool.Language;
+
+import java.text.SimpleDateFormat;
+import java.util.*;
+
+class DatabaseCheckLogEntry extends DatabaseLogEntry {
+  private final Long userId;
+  private final Long client;
+  private final Long server;
+  private final int textSize;
+  private final int matches;
+  private final Language lang;
+  private final Language langDetected;
+  private final int computationTime;
+  private final Long textSessionId;
+  private final Calendar date;
+  private final String checkMode;
+<span class="fc" id="L42">  private DatabaseRuleMatchLogEntry ruleMatches = null;</span>
+
+  public DatabaseCheckLogEntry(Long userId, Long client, Long server, int textSize, int matches,
+                               Language lang, Language langDetected, int computationTime,
+<span class="fc" id="L46">                               Long textSessionId, String checkMode) {</span>
+<span class="fc" id="L47">    this.userId = userId;</span>
+<span class="fc" id="L48">    this.client = client;</span>
+<span class="fc" id="L49">    this.server = server;</span>
+<span class="fc" id="L50">    this.textSize = textSize;</span>
+<span class="fc" id="L51">    this.matches = matches;</span>
+<span class="fc" id="L52">    this.lang = lang;</span>
+<span class="fc" id="L53">    this.langDetected = langDetected;</span>
+<span class="fc" id="L54">    this.computationTime = computationTime;</span>
+<span class="fc" id="L55">    this.textSessionId = textSessionId;</span>
+<span class="fc" id="L56">    this.checkMode = checkMode;</span>
+<span class="fc" id="L57">    this.date = Calendar.getInstance();</span>
+<span class="fc" id="L58">  }</span>
+
+  public void setRuleMatches(DatabaseRuleMatchLogEntry entry) {
+<span class="fc" id="L61">    ruleMatches = entry;</span>
+<span class="fc" id="L62">  }</span>
+
+  @Override
+  public Map&lt;Object, Object&gt; getMapping() {
+<span class="nc" id="L66">    HashMap&lt;Object, Object&gt; map = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L67">    SimpleDateFormat dayFormat = new SimpleDateFormat(&quot;yyyy-MM-dd&quot;);</span>
+<span class="nc" id="L68">    dayFormat.setTimeZone(TimeZone.getTimeZone(&quot;UTC&quot;));</span>
+<span class="nc" id="L69">    map.put(&quot;day&quot;, dayFormat.format(date.getTime()));</span>
+<span class="nc" id="L70">    map.put(&quot;date&quot;, ServerTools.getSQLDatetimeString(date));</span>
+<span class="nc" id="L71">    map.put(&quot;user_id&quot;, userId);</span>
+<span class="nc" id="L72">    map.put(&quot;textsize&quot;, textSize);</span>
+<span class="nc" id="L73">    map.put(&quot;matches&quot;, matches);</span>
+<span class="nc" id="L74">    map.put(&quot;language&quot;, StringUtils.abbreviate(lang.getShortCodeWithCountryAndVariant(), 30));</span>
+<span class="nc" id="L75">    map.put(&quot;language_detected&quot;, StringUtils.abbreviate(langDetected.getShortCodeWithCountryAndVariant(), 30));</span>
+<span class="nc" id="L76">    map.put(&quot;computation_time&quot;, computationTime);</span>
+<span class="nc" id="L77">    map.put(&quot;text_session_id&quot;, textSessionId);</span>
+<span class="nc" id="L78">    map.put(&quot;check_mode&quot;, StringUtils.abbreviate(checkMode, 32));</span>
+<span class="nc" id="L79">    map.put(&quot;server&quot;, server);</span>
+<span class="nc" id="L80">    map.put(&quot;client&quot;, client);</span>
+<span class="nc" id="L81">    return map;</span>
+  }
+
+  @Override
+  public String getMappingIdentifier() {
+<span class="nc" id="L86">    return &quot;org.languagetool.server.LogMapper.logCheck&quot;;</span>
+  }
+
+  @Override
+  public DatabaseLogEntry followup() {
+<span class="nc bnc" id="L91" title="All 2 branches missed.">    if (ruleMatches == null) {</span>
+<span class="nc" id="L92">      throw new IllegalStateException(&quot;No rule matches provided for check_log entry: &quot; + getMapping());</span>
+    }
+<span class="nc bnc" id="L94" title="All 2 branches missed.">    if (ruleMatches.getMatchCount() == 0) {</span>
+<span class="nc" id="L95">      return null;</span>
+    }
+<span class="nc" id="L97">    return ruleMatches;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

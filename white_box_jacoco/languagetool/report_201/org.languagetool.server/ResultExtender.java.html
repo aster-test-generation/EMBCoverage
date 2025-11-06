@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ResultExtender.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.server</a> &gt; <span class="el_source">ResultExtender.java</span></div><h1>ResultExtender.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2017 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.server;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.jetbrains.annotations.NotNull;
+import org.languagetool.AnalyzedSentence;
+import org.languagetool.AnalyzedTokenReadings;
+import org.languagetool.rules.ITSIssueType;
+import org.languagetool.rules.Rule;
+import org.languagetool.rules.RuleMatch;
+import org.languagetool.tools.Tools;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.net.ssl.SSLHandshakeException;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
+import java.net.SocketTimeoutException;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+
+/**
+ * Extend results by adding rules matches from a different API server.
+ * @since 4.0
+ */
+class ResultExtender {
+
+<span class="nc" id="L50">  private static final Logger logger = LoggerFactory.getLogger(ResultExtender.class);</span>
+
+  private final URL url;
+  private final int connectTimeoutMillis;
+<span class="nc" id="L54">  private final ObjectMapper mapper = new ObjectMapper();</span>
+
+<span class="nc" id="L56">  ResultExtender(String url, int connectTimeoutMillis) {</span>
+<span class="nc" id="L57">    this.url = Tools.getUrl(url);</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">    if (connectTimeoutMillis &lt;= 0) {</span>
+<span class="nc" id="L59">      throw new IllegalArgumentException(&quot;connectTimeoutMillis must be &gt; 0: &quot; + connectTimeoutMillis);</span>
+    }
+<span class="nc" id="L61">    this.connectTimeoutMillis = connectTimeoutMillis;</span>
+<span class="nc" id="L62">  }</span>
+
+  /**
+   * Filter {@code extensionMatches} so that only those matches are left that don't cover or touch one of the {@code matches}. 
+   */
+  @NotNull
+  List&lt;RuleMatch&gt; getFilteredExtensionMatches(List&lt;RuleMatch&gt; matches, List&lt;RemoteRuleMatch&gt; extensionMatches) {
+<span class="nc" id="L69">    List&lt;RuleMatch&gt; filteredExtMatches = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">    for (RemoteRuleMatch extensionMatch : extensionMatches) {</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">      if (!extensionMatch.isTouchedByOneOf(matches)) {</span>
+<span class="nc" id="L72">        AnalyzedSentence sentence = new AnalyzedSentence(new AnalyzedTokenReadings[]{});</span>
+<span class="nc" id="L73">        HiddenRule hiddenRule = new HiddenRule(extensionMatch.getLocQualityIssueType().orElse(null), extensionMatch.estimatedContextForSureMatch());</span>
+<span class="nc" id="L74">        RuleMatch hiddenRuleMatch = new RuleMatch(hiddenRule, sentence, extensionMatch.getErrorOffset(),</span>
+<span class="nc" id="L75">                extensionMatch.getErrorOffset()+extensionMatch.getErrorLength(), &quot;(hidden message)&quot;);</span>
+<span class="nc" id="L76">        filteredExtMatches.add(hiddenRuleMatch);</span>
+      }
+<span class="nc" id="L78">    }</span>
+<span class="nc" id="L79">    return filteredExtMatches;</span>
+  }
+
+  @NotNull
+  List&lt;RemoteRuleMatch&gt; getExtensionMatches(String plainText, Map&lt;String, String&gt; params) throws IOException {
+<span class="nc" id="L84">    HttpURLConnection huc = (HttpURLConnection) url.openConnection();</span>
+<span class="nc" id="L85">    HttpURLConnection.setFollowRedirects(false);</span>
+<span class="nc" id="L86">    huc.setConnectTimeout(connectTimeoutMillis);</span>
+<span class="nc" id="L87">    huc.setReadTimeout(connectTimeoutMillis*2);</span>
+    // longer texts take longer to check, so increase the timeout:
+<span class="nc" id="L89">    float factor = plainText.length() / 1000.0f;</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">    if (factor &gt; 1) {</span>
+<span class="nc" id="L91">      int increasedTimeout = (int)(connectTimeoutMillis * 2 * Math.min(factor, 5));</span>
+<span class="nc" id="L92">      huc.setReadTimeout(increasedTimeout);</span>
+    }
+<span class="nc" id="L94">    huc.setRequestMethod(&quot;POST&quot;);</span>
+<span class="nc" id="L95">    huc.setDoOutput(true);</span>
+    try {
+<span class="nc" id="L97">      huc.connect();</span>
+<span class="nc" id="L98">      try (DataOutputStream wr = new DataOutputStream(huc.getOutputStream())) {</span>
+<span class="nc" id="L99">        String urlParameters = &quot;&quot;;</span>
+<span class="nc" id="L100">        List&lt;String&gt; ignoredParameters = Arrays.asList(&quot;enableHiddenRules&quot;, &quot;username&quot;, &quot;password&quot;, &quot;token&quot;, &quot;apiKey&quot;, &quot;c&quot;);</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        for (Map.Entry&lt;String, String&gt; entry : params.entrySet()) {</span>
+          // We could set 'language' to the language already detected, so the queried server
+          // wouldn't need to guess the language again. But then we'd run into cases where
+          // we get an error because e.g. 'noopLanguages' can only be used with 'language=auto'
+<span class="nc bnc" id="L105" title="All 2 branches missed.">          if (!ignoredParameters.contains(entry.getKey())) {</span>
+<span class="nc" id="L106">            urlParameters += &quot;&amp;&quot; + encode(entry.getKey()) + &quot;=&quot; + encode(entry.getValue());</span>
+          }
+<span class="nc" id="L108">        }</span>
+<span class="nc" id="L109">        byte[] postData = urlParameters.getBytes(StandardCharsets.UTF_8);</span>
+<span class="nc" id="L110">        wr.write(postData);</span>
+      }
+<span class="nc" id="L112">      InputStream input = huc.getInputStream();</span>
+<span class="nc" id="L113">      return parseJson(input);</span>
+<span class="nc" id="L114">    } catch (SSLHandshakeException | SocketTimeoutException e) {</span>
+      // &quot;hard&quot; errors that will probably not resolve themselves easily:
+<span class="nc" id="L116">      logger.error(&quot;Error while querying hidden matches server&quot;, e);</span>
+<span class="nc" id="L117">      throw e;</span>
+<span class="nc" id="L118">    } catch (Exception e) {</span>
+      // These are issue that can be request-specific, like wrong parameters. We don't throw an
+      // exception, as the calling code would otherwise assume this is a persistent error:
+<span class="nc" id="L121">      logger.warn(&quot;Warn: Failed to query hidden matches server at &quot; + url + &quot;: &quot; + e.getClass() + &quot;: &quot; + e.getMessage() + &quot;, input was &quot; + plainText.length() + &quot; characters - request-specific error, ignoring&quot;);</span>
+<span class="nc" id="L122">      return Collections.emptyList();</span>
+    } finally {
+<span class="nc" id="L124">      huc.disconnect();</span>
+    }
+  }
+
+  private String encode(String plainText) throws UnsupportedEncodingException {
+<span class="nc" id="L129">    return URLEncoder.encode(plainText, StandardCharsets.UTF_8.name());</span>
+  }
+
+  @NotNull
+  private List&lt;RemoteRuleMatch&gt; parseJson(InputStream inputStream) throws IOException {
+<span class="nc" id="L134">    Map map = mapper.readValue(inputStream, Map.class);</span>
+<span class="nc" id="L135">    List matches = (ArrayList) map.get(&quot;matches&quot;);</span>
+<span class="nc" id="L136">    List&lt;RemoteRuleMatch&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">    for (Object match : matches) {</span>
+<span class="nc" id="L138">      RemoteRuleMatch remoteMatch = getMatch((Map&lt;String, Object&gt;)match);</span>
+<span class="nc" id="L139">      result.add(remoteMatch);</span>
+<span class="nc" id="L140">    }</span>
+<span class="nc" id="L141">    return result;</span>
+  }
+
+  @NotNull
+  private RemoteRuleMatch getMatch(Map&lt;String, Object&gt; match) {
+<span class="nc" id="L146">    Map&lt;String, Object&gt; rule = (Map&lt;String, Object&gt;) match.get(&quot;rule&quot;);</span>
+<span class="nc" id="L147">    int offset = (int) getRequired(match, &quot;offset&quot;);</span>
+<span class="nc" id="L148">    int errorLength = (int) getRequired(match, &quot;length&quot;);</span>
+
+<span class="nc" id="L150">    Map&lt;String, Object&gt; context = (Map&lt;String, Object&gt;) match.get(&quot;context&quot;);</span>
+<span class="nc" id="L151">    int contextOffset = (int) getRequired(context, &quot;offset&quot;);</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">    int contextForSureMatch = match.get(&quot;contextForSureMatch&quot;) != null ? (int) match.get(&quot;contextForSureMatch&quot;) : 0;</span>
+<span class="nc" id="L153">    RemoteRuleMatch remoteMatch = new RemoteRuleMatch(getRequiredString(rule, &quot;id&quot;), getRequiredString(match, &quot;message&quot;),</span>
+<span class="nc" id="L154">            getRequiredString(context, &quot;text&quot;), contextOffset, offset, errorLength, contextForSureMatch);</span>
+<span class="nc" id="L155">    remoteMatch.setShortMsg(getOrNull(match, &quot;shortMessage&quot;));</span>
+<span class="nc" id="L156">    remoteMatch.setRuleSubId(getOrNull(rule, &quot;subId&quot;));</span>
+<span class="nc" id="L157">    remoteMatch.setLocQualityIssueType(getOrNull(rule, &quot;issueType&quot;));</span>
+<span class="nc" id="L158">    List&lt;String&gt; urls = getValueList(rule, &quot;urls&quot;);</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">    if (urls.size() &gt; 0) {</span>
+<span class="nc" id="L160">      remoteMatch.setUrl(urls.get(0));</span>
+    }
+<span class="nc" id="L162">    Map&lt;String, Object&gt; category = (Map&lt;String, Object&gt;) rule.get(&quot;category&quot;);</span>
+<span class="nc" id="L163">    remoteMatch.setCategory(getOrNull(category, &quot;name&quot;));</span>
+<span class="nc" id="L164">    remoteMatch.setCategoryId(getOrNull(category, &quot;id&quot;));</span>
+
+<span class="nc" id="L166">    remoteMatch.setReplacements(getValueList(match, &quot;replacements&quot;));</span>
+<span class="nc" id="L167">    return remoteMatch;</span>
+  }
+
+  private Object getRequired(Map&lt;String, Object&gt; elem, String propertyName) {
+<span class="nc" id="L171">    Object val = elem.get(propertyName);</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">    if (val != null) {</span>
+<span class="nc" id="L173">      return val;</span>
+    }
+<span class="nc" id="L175">    throw new RuntimeException(&quot;JSON item &quot; + elem + &quot; doesn't contain required property '&quot; + propertyName + &quot;'&quot;);</span>
+  }
+
+  private String getRequiredString(Map&lt;String, Object&gt; elem, String propertyName) {
+<span class="nc" id="L179">    return (String) getRequired(elem, propertyName);</span>
+  }
+
+  private String getOrNull(Map&lt;String, Object&gt; elem, String propertyName) {
+<span class="nc" id="L183">    Object val = elem.get(propertyName);</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">    if (val != null) {</span>
+<span class="nc" id="L185">      return (String) val;</span>
+    }
+<span class="nc" id="L187">    return null;</span>
+  }
+
+  private List&lt;String&gt; getValueList(Map&lt;String, Object&gt; match, String propertyName) {
+<span class="nc" id="L191">    List&lt;Object&gt; matches = (List&lt;Object&gt;) match.get(propertyName);</span>
+<span class="nc" id="L192">    List&lt;String&gt; l = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">    if (matches != null) {</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">      for (Object o : matches) {</span>
+<span class="nc" id="L195">        Map&lt;String, Object&gt; item = (Map&lt;String, Object&gt;) o;</span>
+<span class="nc" id="L196">        l.add((String) item.get(&quot;value&quot;));</span>
+<span class="nc" id="L197">      }</span>
+    }
+<span class="nc" id="L199">    return l;</span>
+  }
+  
+  class HiddenRule extends Rule {
+    final ITSIssueType itsType;
+    final int estimatedContextForSureMatch;
+<span class="nc" id="L205">    HiddenRule(String type, int estimatedContextForSureMatch) {</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">      itsType = type != null ? ITSIssueType.getIssueType(type) : ITSIssueType.Uncategorized;</span>
+<span class="nc" id="L207">      this.estimatedContextForSureMatch = estimatedContextForSureMatch;</span>
+<span class="nc" id="L208">    }</span>
+    @Override
+    public String getId() {
+<span class="nc" id="L211">      return &quot;HIDDEN_RULE&quot;;</span>
+    }
+    @Override
+    public ITSIssueType getLocQualityIssueType() {
+<span class="nc" id="L215">      return itsType;</span>
+    }
+    @Override
+    public String getDescription() {
+<span class="nc" id="L219">      return &quot;(description hidden)&quot;;</span>
+    }
+    @Override
+    public RuleMatch[] match(AnalyzedSentence sentence) {
+<span class="nc" id="L223">      throw new RuntimeException(&quot;not implemented&quot;);</span>
+    }
+    @Override
+    public int estimateContextForSureMatch() {
+<span class="nc" id="L227">      return estimatedContextForSureMatch;</span>
+    }
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

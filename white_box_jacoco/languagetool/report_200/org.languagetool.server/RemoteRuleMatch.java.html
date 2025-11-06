@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RemoteRuleMatch.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.server</a> &gt; <span class="el_source">RemoteRuleMatch.java</span></div><h1>RemoteRuleMatch.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2017 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.server;
+
+import org.languagetool.Experimental;
+import org.languagetool.rules.RuleMatch;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * A potential error as returned by the HTTP API of LanguageTool.
+ * @since 4.0
+ */
+class RemoteRuleMatch {
+
+  private final String ruleId;
+  private final String msg;
+  private final String context;
+  private final int contextOffset;
+  private final int offset;
+  private final int errorLength;
+  private final int estimatedContextForSureMatch;
+
+  private String subId;
+  private String shortMsg;
+  private List&lt;String&gt; replacements;
+  private String url;
+  private String category;
+  private String categoryId;
+  private String locQualityIssueType;
+
+  RemoteRuleMatch(String ruleId, String msg, String context, int contextOffset, int offset, int errorLength) {
+<span class="nc" id="L52">    this(ruleId, msg, context, contextOffset, offset, errorLength, 0);</span>
+<span class="nc" id="L53">  }</span>
+  
+  RemoteRuleMatch(String ruleId, String msg, String context, int contextOffset, int offset, int errorLength,
+<span class="nc" id="L56">                  int estimatedContextForSureMatch) {</span>
+<span class="nc" id="L57">    this.ruleId = Objects.requireNonNull(ruleId);</span>
+<span class="nc" id="L58">    this.msg = Objects.requireNonNull(msg);</span>
+<span class="nc" id="L59">    this.context = Objects.requireNonNull(context);</span>
+<span class="nc" id="L60">    this.contextOffset = contextOffset;</span>
+<span class="nc" id="L61">    this.offset = offset;</span>
+<span class="nc" id="L62">    this.errorLength = errorLength;</span>
+<span class="nc" id="L63">    this.estimatedContextForSureMatch = estimatedContextForSureMatch;</span>
+<span class="nc" id="L64">  }</span>
+
+  boolean isTouchedByOneOf(List&lt;RuleMatch&gt; matches) {
+<span class="nc bnc" id="L67" title="All 2 branches missed.">    for (RuleMatch match : matches) {</span>
+<span class="nc bnc" id="L68" title="All 4 branches missed.">      if (offset &lt;= match.getToPos() &amp;&amp; offset + errorLength &gt;= match.getFromPos()) {</span>
+<span class="nc" id="L69">        return true;</span>
+      }
+<span class="nc" id="L71">    }</span>
+<span class="nc" id="L72">    return false;</span>
+  }
+
+  /** Unique (per language) identifier for the error. */
+  public String getRuleId() {
+<span class="nc" id="L77">    return ruleId;</span>
+  }
+
+  /** Optional sub id (rule groups have a sub id for each rule). */
+  public Optional&lt;String&gt; getRuleSubId() {
+<span class="nc" id="L82">    return Optional.ofNullable(subId);</span>
+  }
+
+  /** A text describing the error to the user. */
+  public String getMessage() {
+<span class="nc" id="L87">    return msg;</span>
+  }
+
+  /** Optional short message describing the error. */
+  public Optional&lt;String&gt; getShortMessage() {
+<span class="nc" id="L92">    return Optional.ofNullable(shortMsg);</span>
+  }
+
+  /**
+   * Potential corrections for the error. Note that corrections might be wrong and
+   * they are not necessarily ordered by quality.
+   */
+  public Optional&lt;List&lt;String&gt;&gt; getReplacements() {
+<span class="nc" id="L100">    return Optional.ofNullable(replacements);</span>
+  }
+
+  /** The error in its context. See {@link #getContextOffset()} and {@link #getErrorLength()} to get the exact position. */
+  public String getContext() {
+<span class="nc" id="L105">    return context;</span>
+  }
+  
+  /** The character position of the error start inside the result of {@link #getContext()}. */
+  public int getContextOffset() {
+<span class="nc" id="L110">    return contextOffset;</span>
+  }
+  
+  /** The character position where the error starts. */
+  public int getErrorOffset() {
+<span class="nc" id="L115">    return offset;</span>
+  }
+  
+  /** The length of the error in characters. */
+  public int getErrorLength() {
+<span class="nc" id="L120">    return errorLength;</span>
+  }
+
+  /** URL with a more detailed explanation of the error. */
+  public Optional&lt;String&gt; getUrl() {
+<span class="nc" id="L125">    return Optional.ofNullable(url);</span>
+  }
+
+  /** The error's category. */
+  public Optional&lt;String&gt; getCategory() {
+<span class="nc" id="L130">    return Optional.of(category);</span>
+  }
+
+  /** The id of the error's category. */
+  public Optional&lt;String&gt; getCategoryId() {
+<span class="nc" id="L135">    return Optional.of(categoryId);</span>
+  }
+
+  public Optional&lt;String&gt; getLocQualityIssueType() {
+<span class="nc" id="L139">    return Optional.ofNullable(locQualityIssueType);</span>
+  }
+
+  //
+  // non-public setters
+  //
+  
+  void setRuleSubId(String subId) {
+<span class="nc" id="L147">    this.subId = subId;</span>
+<span class="nc" id="L148">  }</span>
+
+  void setShortMsg(String shortMsg) {
+<span class="nc" id="L151">    this.shortMsg = shortMsg;</span>
+<span class="nc" id="L152">  }</span>
+
+  void setReplacements(List&lt;String&gt; replacements) {
+<span class="nc" id="L155">    this.replacements = Collections.unmodifiableList(replacements);</span>
+<span class="nc" id="L156">  }</span>
+
+  void setUrl(String url) {
+<span class="nc" id="L159">    this.url = url;</span>
+<span class="nc" id="L160">  }</span>
+
+  void setCategory(String category) {
+<span class="nc" id="L163">    this.category = category;</span>
+<span class="nc" id="L164">  }</span>
+
+  void setCategoryId(String categoryId) {
+<span class="nc" id="L167">    this.categoryId = categoryId;</span>
+<span class="nc" id="L168">  }</span>
+
+  void setLocQualityIssueType(String locQualityIssueType) {
+<span class="nc" id="L171">    this.locQualityIssueType = locQualityIssueType;</span>
+<span class="nc" id="L172">  }</span>
+
+  int estimatedContextForSureMatch() {
+<span class="nc" id="L175">    return estimatedContextForSureMatch;</span>
+  }
+
+  @Override
+  public String toString() {
+<span class="nc" id="L180">    return ruleId + &quot;@&quot; + offset + &quot;-&quot; + (offset + errorLength);</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

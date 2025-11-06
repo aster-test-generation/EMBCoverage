@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HTTPSServerConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.server</a> &gt; <span class="el_source">HTTPSServerConfig.java</span></div><h1>HTTPSServerConfig.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2012 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.server;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.Properties;
+
+/**
+ * @since 2.0
+ */
+public class HTTPSServerConfig extends HTTPServerConfig {
+
+  private final File keystore;
+  private final String keyStorePassword;
+  
+  /**
+   * @param keystore a Java keystore file as created with the &lt;tt&gt;keytool&lt;/tt&gt; command
+   * @param keyStorePassword the password for the keystore
+   */
+  public HTTPSServerConfig(File keystore, String keyStorePassword) {
+<span class="nc" id="L39">    super(DEFAULT_PORT, false);</span>
+<span class="nc" id="L40">    this.keystore = keystore;</span>
+<span class="nc" id="L41">    this.keyStorePassword = keyStorePassword;</span>
+<span class="nc" id="L42">  }</span>
+
+  /**
+   * @param serverPort the port to bind to
+   * @param verbose when set to &lt;tt&gt;true&lt;/tt&gt;, the input text will be logged in case there is an exception
+   * @param keystore a Java keystore file as created with the &lt;tt&gt;keytool&lt;/tt&gt; command
+   * @param keyStorePassword the password for the keystore
+   */
+  public HTTPSServerConfig(int serverPort, boolean verbose, File keystore, String keyStorePassword) {
+<span class="nc" id="L51">    super(serverPort, verbose);</span>
+<span class="nc" id="L52">    this.keystore = keystore;</span>
+<span class="nc" id="L53">    this.keyStorePassword = keyStorePassword;</span>
+<span class="nc" id="L54">  }</span>
+
+  /**
+   * @param serverPort the port to bind to
+   * @param verbose when set to &lt;tt&gt;true&lt;/tt&gt;, the input text will be logged in case there is an exception
+   * @param keystore a Java keystore file as created with the &lt;tt&gt;keytool&lt;/tt&gt; command
+   * @param keyStorePassword the password for the keystore
+   * @since 2.1
+   */
+  HTTPSServerConfig(int serverPort, boolean verbose, File keystore, String keyStorePassword, int requestLimit, int requestLimitPeriodInSeconds) {
+<span class="nc" id="L64">    super(serverPort, verbose);</span>
+<span class="nc" id="L65">    this.keystore = keystore;</span>
+<span class="nc" id="L66">    this.keyStorePassword = keyStorePassword;</span>
+<span class="nc" id="L67">    this.requestLimit = requestLimit;</span>
+<span class="nc" id="L68">    this.requestLimitPeriodInSeconds = requestLimitPeriodInSeconds;</span>
+<span class="nc" id="L69">  }</span>
+
+  /**
+   * Parse command line options and load settings from property file.
+   */
+  HTTPSServerConfig(String[] args) {
+<span class="nc" id="L75">    super(args);</span>
+<span class="nc" id="L76">    File config = null;</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">    for (int i = 0; i &lt; args.length; i++) {</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">      if (&quot;--config&quot;.equals(args[i])) {</span>
+<span class="nc" id="L79">        config = new File(args[++i]);</span>
+      }
+    }
+<span class="nc bnc" id="L82" title="All 2 branches missed.">    if (config == null) {</span>
+<span class="nc" id="L83">      throw new IllegalConfigurationException(&quot;Parameter --config must be set and point to a property file&quot;);</span>
+    }
+    try {
+<span class="nc" id="L86">      Properties props = new Properties();</span>
+<span class="nc" id="L87">      try (FileInputStream fis = new FileInputStream(config)) {</span>
+<span class="nc" id="L88">        props.load(fis);</span>
+<span class="nc" id="L89">        keystore = new File(getProperty(props, &quot;keystore&quot;, config));</span>
+<span class="nc" id="L90">        keyStorePassword = getProperty(props, &quot;password&quot;, config);</span>
+      }
+<span class="nc" id="L92">    } catch (IOException e) {</span>
+<span class="nc" id="L93">      throw new RuntimeException(&quot;Could not load properties from '&quot; + config + &quot;'&quot;, e);</span>
+<span class="nc" id="L94">    }</span>
+<span class="nc" id="L95">  }</span>
+
+  File getKeystore() {
+<span class="nc" id="L98">    return keystore;</span>
+  }
+
+  String getKeyStorePassword() {
+<span class="nc" id="L102">    return keyStorePassword;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

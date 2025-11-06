@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DatabaseMiscLogEntry.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.server</a> &gt; <span class="el_source">DatabaseMiscLogEntry.java</span></div><h1>DatabaseMiscLogEntry.java</h1><pre class="source lang-java linenums">/*
+ *  LanguageTool, a natural language style checker
+ *  * Copyright (C) 2018 Fabian Richter
+ *  *
+ *  * This library is free software; you can redistribute it and/or
+ *  * modify it under the terms of the GNU Lesser General Public
+ *  * License as published by the Free Software Foundation; either
+ *  * version 2.1 of the License, or (at your option) any later version.
+ *  *
+ *  * This library is distributed in the hope that it will be useful,
+ *  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *  * Lesser General Public License for more details.
+ *  *
+ *  * You should have received a copy of the GNU Lesser General Public
+ *  * License along with this library; if not, write to the Free Software
+ *  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ *  * USA
+ *
+ */
+
+package org.languagetool.server;
+
+import org.apache.commons.lang3.StringUtils;
+
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.Map;
+
+public class DatabaseMiscLogEntry extends DatabaseLogEntry {
+  private final Calendar date;
+  private final Long server;
+  private final Long client;
+  private final Long user;
+  private final String message;
+
+<span class="nc" id="L37">  public DatabaseMiscLogEntry(Long server, Long client, Long user,  String message) {</span>
+<span class="nc" id="L38">    this.server = server;</span>
+<span class="nc" id="L39">    this.client = client;</span>
+<span class="nc" id="L40">    this.user = user;</span>
+<span class="nc" id="L41">    this.message = message;</span>
+<span class="nc" id="L42">    this.date = Calendar.getInstance();</span>
+<span class="nc" id="L43">  }</span>
+
+  @Override
+  public Map&lt;Object, Object&gt; getMapping() {
+<span class="nc" id="L47">    HashMap&lt;Object, Object&gt; parameters = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L48">    parameters.put(&quot;date&quot;, ServerTools.getSQLDatetimeString(date));</span>
+<span class="nc" id="L49">    parameters.put(&quot;server&quot;, server);</span>
+<span class="nc" id="L50">    parameters.put(&quot;client&quot;, client);</span>
+<span class="nc" id="L51">    parameters.put(&quot;user&quot;, user);</span>
+<span class="nc" id="L52">    parameters.put(&quot;message&quot;, StringUtils.abbreviate(message, 4096));</span>
+<span class="nc" id="L53">    return parameters;</span>
+  }
+
+  @Override
+  public String getMappingIdentifier() {
+<span class="nc" id="L58">    return &quot;org.languagetool.server.LogMapper.miscLogs&quot;;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

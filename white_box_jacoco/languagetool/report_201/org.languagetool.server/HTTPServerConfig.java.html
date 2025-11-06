@@ -1,0 +1,1058 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HTTPServerConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.server</a> &gt; <span class="el_source">HTTPServerConfig.java</span></div><h1>HTTPServerConfig.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2012 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.server;
+
+import org.apache.commons.lang3.ArrayUtils;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.languagetool.*;
+import org.languagetool.rules.spelling.morfologik.suggestions_ordering.SuggestionsOrdererConfig;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.*;
+import java.util.regex.Pattern;
+
+/**
+ * @since 2.0
+ */
+public class HTTPServerConfig {
+
+<span class="nc" id="L40">  enum Mode { LanguageTool }</span>
+
+  public static final String DEFAULT_HOST = &quot;localhost&quot;;
+
+  /** The default port on which the server is running (8081). */
+  public static final int DEFAULT_PORT = 8081;
+  
+  static final String LANGUAGE_MODEL_OPTION = &quot;--languageModel&quot;;
+  static final String WORD2VEC_MODEL_OPTION = &quot;--word2vecModel&quot;;
+  static final String NN_MODEL_OPTION = &quot;--neuralNetworkModel&quot;;
+
+<span class="pc" id="L51">  protected boolean verbose = false;</span>
+<span class="pc" id="L52">  protected boolean publicAccess = false;</span>
+<span class="pc" id="L53">  protected int port = DEFAULT_PORT;</span>
+<span class="pc" id="L54">  protected String allowOriginUrl = null;</span>
+
+<span class="pc" id="L56">  protected URI serverURL = null;</span>
+<span class="pc" id="L57">  protected int maxTextLength = Integer.MAX_VALUE;</span>
+<span class="pc" id="L58">  protected int maxTextHardLength = Integer.MAX_VALUE;</span>
+<span class="pc" id="L59">  protected int maxTextLengthWithApiKey = Integer.MAX_VALUE;</span>
+<span class="pc" id="L60">  protected String secretTokenKey = null;</span>
+<span class="pc" id="L61">  protected long maxCheckTimeMillis = -1;</span>
+<span class="pc" id="L62">  protected long maxCheckTimeWithApiKeyMillis = -1;</span>
+<span class="pc" id="L63">  protected int maxCheckThreads = 10;</span>
+  protected Mode mode;
+<span class="pc" id="L65">  protected File languageModelDir = null;</span>
+<span class="pc" id="L66">  protected File word2vecModelDir = null;</span>
+<span class="pc" id="L67">  protected boolean pipelineCaching = false;</span>
+<span class="pc" id="L68">  protected boolean pipelinePrewarming = false;</span>
+
+  protected int maxPipelinePoolSize;
+  protected int pipelineExpireTime;
+<span class="pc" id="L72">  protected File fasttextModel = null;</span>
+<span class="pc" id="L73">  protected File fasttextBinary = null;</span>
+<span class="pc" id="L74">  protected File neuralNetworkModelDir = null;</span>
+  protected int requestLimit;
+  protected int requestLimitInBytes;
+  protected int timeoutRequestLimit;
+  protected int requestLimitPeriodInSeconds;
+<span class="pc" id="L79">  protected int ipFingerprintFactor = 1;</span>
+  protected boolean trustXForwardForHeader;
+  protected int maxWorkQueueSize;
+<span class="pc" id="L82">  protected File rulesConfigFile = null;</span>
+<span class="pc" id="L83">  protected File remoteRulesConfigFile = null;</span>
+<span class="pc" id="L84">  protected int cacheSize = 0;</span>
+<span class="pc" id="L85">  protected long cacheTTLSeconds = 300;</span>
+<span class="pc" id="L86">  protected float maxErrorsPerWordRate = 0;</span>
+<span class="pc" id="L87">  protected int maxSpellingSuggestions = 0;</span>
+<span class="pc" id="L88">  protected List&lt;String&gt; blockedReferrers = new ArrayList&lt;&gt;();</span>
+  protected String hiddenMatchesServer;
+  protected int hiddenMatchesServerTimeout;
+  protected int hiddenMatchesServerFailTimeout;
+  protected int hiddenMatchesServerFall;
+<span class="pc" id="L93">  protected List&lt;Language&gt; hiddenMatchesLanguages = new ArrayList&lt;&gt;();</span>
+<span class="pc" id="L94">  protected String dbDriver = null;</span>
+<span class="pc" id="L95">  protected String dbUrl = null;</span>
+<span class="pc" id="L96">  protected String dbUsername = null;</span>
+<span class="pc" id="L97">  protected String dbPassword = null;</span>
+  protected boolean dbLogging;
+<span class="pc" id="L99">  protected boolean prometheusMonitoring = false;</span>
+<span class="pc" id="L100">  protected int prometheusPort = 9301;</span>
+<span class="pc" id="L101">  protected GlobalConfig globalConfig = new GlobalConfig();</span>
+<span class="pc" id="L102">  protected List&lt;String&gt; disabledRuleIds = new ArrayList&lt;&gt;();</span>
+<span class="pc" id="L103">  protected boolean stoppable = false;</span>
+
+<span class="pc" id="L105">  protected boolean skipLoggingRuleMatches = false;</span>
+<span class="pc" id="L106">  protected boolean skipLoggingChecks = false;</span>
+
+<span class="pc" id="L108">  protected int slowRuleLoggingThreshold = -1; // threshold in milliseconds, used by SlowRuleLogger; &lt; 0 - disabled</span>
+
+<span class="pc" id="L110">  protected String abTest = null;</span>
+<span class="pc" id="L111">  protected Pattern abTestClients = null;</span>
+<span class="pc" id="L112">  protected int abTestRollout = 100; // percentage [0,100]</span>
+
+<span class="fc" id="L114">  private static final List&lt;String&gt; KNOWN_OPTION_KEYS = Arrays.asList(&quot;abTest&quot;, &quot;abTestClients&quot;, &quot;abTestRollout&quot;,</span>
+    &quot;beolingusFile&quot;, &quot;blockedReferrers&quot;, &quot;cacheSize&quot;, &quot;cacheTTLSeconds&quot;,
+    &quot;dbDriver&quot;, &quot;dbPassword&quot;, &quot;dbUrl&quot;, &quot;dbUsername&quot;, &quot;disabledRuleIds&quot;, &quot;fasttextBinary&quot;, &quot;fasttextModel&quot;, &quot;grammalectePassword&quot;,
+    &quot;grammalecteServer&quot;, &quot;grammalecteUser&quot;, &quot;hiddenMatchesLanguages&quot;, &quot;hiddenMatchesServer&quot;, &quot;hiddenMatchesServerFailTimeout&quot;,
+    &quot;hiddenMatchesServerTimeout&quot;, &quot;hiddenMatchesServerFall&quot;, &quot;ipFingerprintFactor&quot;, &quot;languageModel&quot;, &quot;maxCheckThreads&quot;, &quot;maxCheckTimeMillis&quot;,
+    &quot;maxCheckTimeWithApiKeyMillis&quot;, &quot;maxErrorsPerWordRate&quot;, &quot;maxPipelinePoolSize&quot;, &quot;maxSpellingSuggestions&quot;, &quot;maxTextHardLength&quot;,
+    &quot;maxTextLength&quot;, &quot;maxTextLengthWithApiKey&quot;, &quot;maxWorkQueueSize&quot;, &quot;neuralNetworkModel&quot;, &quot;pipelineCaching&quot;,
+    &quot;pipelineExpireTimeInSeconds&quot;, &quot;pipelinePrewarming&quot;, &quot;prometheusMonitoring&quot;, &quot;prometheusPort&quot;, &quot;remoteRulesFile&quot;,
+    &quot;requestLimit&quot;, &quot;requestLimitInBytes&quot;, &quot;requestLimitPeriodInSeconds&quot;, &quot;rulesFile&quot;, &quot;secretTokenKey&quot;, &quot;serverURL&quot;,
+    &quot;skipLoggingChecks&quot;, &quot;skipLoggingRuleMatches&quot;, &quot;timeoutRequestLimit&quot;, &quot;trustXForwardForHeader&quot;, &quot;warmUp&quot;, &quot;word2vecModel&quot;,
+    &quot;keystore&quot;, &quot;password&quot;, &quot;maxTextLengthPremium&quot;, &quot;maxTextLengthAnonymous&quot;, &quot;maxTextLengthLoggedIn&quot;, &quot;gracefulDatabaseFailure&quot;,
+    &quot;redisPassword&quot;, &quot;redisHost&quot;, &quot;dbLogging&quot;, &quot;premiumOnly&quot;);
+
+  /**
+   * Create a server configuration for the default port ({@link #DEFAULT_PORT}).
+   */
+  public HTTPServerConfig() {
+<span class="nc" id="L131">    this(DEFAULT_PORT, false);</span>
+<span class="nc" id="L132">  }</span>
+
+  /**
+   * @param serverPort the port to bind to
+   * @since 2.8
+   */
+  public HTTPServerConfig(int serverPort) {
+<span class="nc" id="L139">    this(serverPort, false);</span>
+<span class="nc" id="L140">  }</span>
+
+  /**
+   * @param serverPort the port to bind to
+   * @param verbose when set to &lt;tt&gt;true&lt;/tt&gt;, the input text will be logged in case there is an exception
+   */
+<span class="nc" id="L146">  public HTTPServerConfig(int serverPort, boolean verbose) {</span>
+<span class="nc" id="L147">    this.port = serverPort;</span>
+<span class="nc" id="L148">    this.verbose = verbose;</span>
+<span class="nc" id="L149">  }</span>
+
+  /**
+   * Parse command line options.
+   */
+<span class="fc" id="L154">  public HTTPServerConfig(String[] args) {</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">    for (int i = 0; i &lt; args.length; i++) {</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">      if (args[i].matches(&quot;--[a-zA-Z]+=.+&quot;)) {</span>
+<span class="nc" id="L157">        System.err.println(&quot;WARNING: use `--option value`, not `--option=value`, parameters will be ignored otherwise: &quot; + args[i]);</span>
+      }
+<span class="pc bpc" id="L159" title="9 of 10 branches missed.">      switch (args[i]) {</span>
+        case &quot;--config&quot;:
+<span class="nc bnc" id="L161" title="All 2 branches missed.">          parseConfigFile(new File(args[++i]), !ArrayUtils.contains(args, LANGUAGE_MODEL_OPTION),</span>
+<span class="nc bnc" id="L162" title="All 4 branches missed.">            !ArrayUtils.contains(args, WORD2VEC_MODEL_OPTION), !ArrayUtils.contains(args, NN_MODEL_OPTION));</span>
+<span class="nc" id="L163">          break;</span>
+        case &quot;-p&quot;:
+        case &quot;--port&quot;:
+<span class="fc" id="L166">          port = Integer.parseInt(args[++i]);</span>
+<span class="fc" id="L167">          break;</span>
+        case &quot;-v&quot;:
+        case &quot;--verbose&quot;:
+<span class="nc" id="L170">          verbose = true;</span>
+<span class="nc" id="L171">          break;</span>
+        case &quot;--public&quot;:
+<span class="nc" id="L173">          publicAccess = true;</span>
+<span class="nc" id="L174">          break;</span>
+        case &quot;--allow-origin&quot;:
+          try {
+<span class="nc" id="L177">            allowOriginUrl = args[++i];</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">            if (allowOriginUrl.startsWith(&quot;--&quot;)) {</span>
+<span class="nc" id="L179">              throw new IllegalArgumentException(&quot;Missing argument for '--allow-origin' (e.g. an URL or '*')&quot;);</span>
+            }
+<span class="nc" id="L181">          } catch (ArrayIndexOutOfBoundsException e) {</span>
+<span class="nc" id="L182">            throw new IllegalArgumentException(&quot;Missing argument for '--allow-origin' (e.g. an URL or '*')&quot;);</span>
+<span class="nc" id="L183">          }</span>
+          break;
+        case LANGUAGE_MODEL_OPTION:
+<span class="nc" id="L186">          setLanguageModelDirectory(args[++i]);</span>
+<span class="nc" id="L187">          break;</span>
+        case WORD2VEC_MODEL_OPTION:
+<span class="nc" id="L189">          setWord2VecModelDirectory(args[++i]);</span>
+<span class="nc" id="L190">          break;</span>
+        case NN_MODEL_OPTION:
+<span class="nc" id="L192">          setNeuralNetworkModelDir(args[++i]);</span>
+<span class="nc" id="L193">          break;</span>
+        case &quot;--stoppable&quot;:  // internal only, doesn't need to be documented
+<span class="nc" id="L195">          stoppable = true;</span>
+<span class="nc" id="L196">          break;</span>
+        default:
+<span class="nc bnc" id="L198" title="All 2 branches missed.">          if (args[i].contains(&quot;=&quot;)) {</span>
+<span class="nc" id="L199">            System.out.println(&quot;WARNING: unknown option: &quot; + args[i] +</span>
+                    &quot; - please note that parameters are given as '--arg param', i.e. without '=' between argument and parameter&quot;);
+          } else {
+<span class="nc" id="L202">            System.out.println(&quot;WARNING: unknown option: &quot; + args[i]);</span>
+          }
+      }
+    }
+<span class="fc" id="L206">  }</span>
+
+  private void parseConfigFile(File file, boolean loadLangModel, boolean loadWord2VecModel, boolean loadNeuralNetworkModel) {
+    try {
+<span class="nc" id="L210">      Properties props = new Properties();</span>
+<span class="nc" id="L211">      try (FileInputStream fis = new FileInputStream(file)) {</span>
+<span class="nc" id="L212">        props.load(fis);</span>
+<span class="nc" id="L213">        maxTextLength = Integer.parseInt(getOptionalProperty(props, &quot;maxTextLength&quot;, Integer.toString(Integer.MAX_VALUE)));</span>
+<span class="nc" id="L214">        maxTextLengthWithApiKey = Integer.parseInt(getOptionalProperty(props, &quot;maxTextLengthWithApiKey&quot;, Integer.toString(Integer.MAX_VALUE)));</span>
+<span class="nc" id="L215">        maxTextHardLength = Integer.parseInt(getOptionalProperty(props, &quot;maxTextHardLength&quot;, Integer.toString(Integer.MAX_VALUE)));</span>
+<span class="nc" id="L216">        secretTokenKey = getOptionalProperty(props, &quot;secretTokenKey&quot;, null);</span>
+<span class="nc" id="L217">        maxCheckTimeMillis = Long.parseLong(getOptionalProperty(props, &quot;maxCheckTimeMillis&quot;, &quot;-1&quot;));</span>
+<span class="nc" id="L218">        maxCheckTimeWithApiKeyMillis = Long.parseLong(getOptionalProperty(props, &quot;maxCheckTimeWithApiKeyMillis&quot;, &quot;-1&quot;));</span>
+<span class="nc" id="L219">        requestLimit = Integer.parseInt(getOptionalProperty(props, &quot;requestLimit&quot;, &quot;0&quot;));</span>
+<span class="nc" id="L220">        requestLimitInBytes = Integer.parseInt(getOptionalProperty(props, &quot;requestLimitInBytes&quot;, &quot;0&quot;));</span>
+<span class="nc" id="L221">        timeoutRequestLimit = Integer.parseInt(getOptionalProperty(props, &quot;timeoutRequestLimit&quot;, &quot;0&quot;));</span>
+<span class="nc" id="L222">        pipelineCaching = Boolean.parseBoolean(getOptionalProperty(props, &quot;pipelineCaching&quot;, &quot;false&quot;).trim());</span>
+<span class="nc" id="L223">        pipelinePrewarming = Boolean.parseBoolean(getOptionalProperty(props, &quot;pipelinePrewarming&quot;, &quot;false&quot;).trim());</span>
+<span class="nc" id="L224">        maxPipelinePoolSize = Integer.parseInt(getOptionalProperty(props, &quot;maxPipelinePoolSize&quot;, &quot;5&quot;));</span>
+<span class="nc" id="L225">        pipelineExpireTime = Integer.parseInt(getOptionalProperty(props, &quot;pipelineExpireTimeInSeconds&quot;, &quot;10&quot;));</span>
+<span class="nc" id="L226">        requestLimitPeriodInSeconds = Integer.parseInt(getOptionalProperty(props, &quot;requestLimitPeriodInSeconds&quot;, &quot;0&quot;));</span>
+<span class="nc" id="L227">        ipFingerprintFactor = Integer.parseInt(getOptionalProperty(props, &quot;ipFingerprintFactor&quot;, &quot;1&quot;));</span>
+<span class="nc" id="L228">        trustXForwardForHeader = Boolean.valueOf(getOptionalProperty(props, &quot;trustXForwardForHeader&quot;, &quot;false&quot;).trim());</span>
+<span class="nc" id="L229">        maxWorkQueueSize = Integer.parseInt(getOptionalProperty(props, &quot;maxWorkQueueSize&quot;, &quot;0&quot;));</span>
+<span class="nc bnc" id="L230" title="All 2 branches missed.">        if (maxWorkQueueSize &lt; 0) {</span>
+<span class="nc" id="L231">          throw new IllegalArgumentException(&quot;maxWorkQueueSize must be &gt;= 0: &quot; + maxWorkQueueSize);</span>
+        }
+<span class="nc" id="L233">        String url = getOptionalProperty(props, &quot;serverURL&quot;, null);</span>
+<span class="nc" id="L234">        setServerURL(url);</span>
+<span class="nc" id="L235">        String langModel = getOptionalProperty(props, &quot;languageModel&quot;, null);</span>
+<span class="nc bnc" id="L236" title="All 4 branches missed.">        if (langModel != null &amp;&amp; loadLangModel) {</span>
+<span class="nc" id="L237">          setLanguageModelDirectory(langModel);</span>
+        }
+<span class="nc" id="L239">        String word2vecModel = getOptionalProperty(props, &quot;word2vecModel&quot;, null);</span>
+<span class="nc bnc" id="L240" title="All 4 branches missed.">        if (word2vecModel != null &amp;&amp; loadWord2VecModel) {</span>
+<span class="nc" id="L241">          setWord2VecModelDirectory(word2vecModel);</span>
+        }
+<span class="nc" id="L243">        String neuralNetworkModel = getOptionalProperty(props, &quot;neuralNetworkModel&quot;, null);</span>
+<span class="nc bnc" id="L244" title="All 4 branches missed.">        if (neuralNetworkModel != null &amp;&amp; loadNeuralNetworkModel) {</span>
+<span class="nc" id="L245">          setNeuralNetworkModelDir(neuralNetworkModel);</span>
+        }
+<span class="nc" id="L247">        String fasttextModel = getOptionalProperty(props, &quot;fasttextModel&quot;, null);</span>
+<span class="nc" id="L248">        String fasttextBinary = getOptionalProperty(props, &quot;fasttextBinary&quot;, null);</span>
+<span class="nc bnc" id="L249" title="All 4 branches missed.">        if (fasttextBinary != null &amp;&amp; fasttextModel != null) {</span>
+<span class="nc" id="L250">          setFasttextPaths(fasttextModel, fasttextBinary);</span>
+        }
+<span class="nc" id="L252">        maxCheckThreads = Integer.parseInt(getOptionalProperty(props, &quot;maxCheckThreads&quot;, &quot;10&quot;));</span>
+<span class="nc bnc" id="L253" title="All 2 branches missed.">        if (maxCheckThreads &lt; 1) {</span>
+<span class="nc" id="L254">          throw new IllegalArgumentException(&quot;Invalid value for maxCheckThreads, must be &gt;= 1: &quot; + maxCheckThreads);</span>
+        }
+<span class="nc" id="L256">        boolean atdMode = getOptionalProperty(props, &quot;mode&quot;, &quot;LanguageTool&quot;).equalsIgnoreCase(&quot;AfterTheDeadline&quot;);</span>
+<span class="nc bnc" id="L257" title="All 2 branches missed.">        if (atdMode) {</span>
+<span class="nc" id="L258">          throw new IllegalArgumentException(&quot;The AfterTheDeadline mode is not supported anymore in LanguageTool 3.8 or later&quot;);</span>
+        }
+<span class="nc" id="L260">        String rulesConfigFilePath = getOptionalProperty(props, &quot;rulesFile&quot;, null);</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">        if (rulesConfigFilePath != null) {</span>
+<span class="nc" id="L262">          rulesConfigFile = new File(rulesConfigFilePath);</span>
+<span class="nc bnc" id="L263" title="All 4 branches missed.">          if (!rulesConfigFile.exists() || !rulesConfigFile.isFile()) {</span>
+<span class="nc" id="L264">            throw new RuntimeException(&quot;Rules Configuration file cannot be found: &quot; + rulesConfigFile);</span>
+          }
+        }
+<span class="nc" id="L267">        String remoteRulesConfigFilePath = getOptionalProperty(props, &quot;remoteRulesFile&quot;, null);</span>
+<span class="nc bnc" id="L268" title="All 2 branches missed.">        if (remoteRulesConfigFilePath != null) {</span>
+<span class="nc" id="L269">          remoteRulesConfigFile = new File(remoteRulesConfigFilePath);</span>
+<span class="nc bnc" id="L270" title="All 4 branches missed.">          if (!remoteRulesConfigFile.exists() || !remoteRulesConfigFile.isFile()) {</span>
+<span class="nc" id="L271">            throw new RuntimeException(&quot;Remote rules configuration file cannot be found: &quot; + remoteRulesConfigFile);</span>
+          }
+        }
+<span class="nc" id="L274">        cacheSize = Integer.parseInt(getOptionalProperty(props, &quot;cacheSize&quot;, &quot;0&quot;));</span>
+<span class="nc bnc" id="L275" title="All 2 branches missed.">        if (cacheSize &lt; 0) {</span>
+<span class="nc" id="L276">          throw new IllegalArgumentException(&quot;Invalid value for cacheSize: &quot; + cacheSize + &quot;, use 0 to deactivate cache&quot;);</span>
+        }
+<span class="nc bnc" id="L278" title="All 4 branches missed.">        if (props.containsKey(&quot;cacheTTLSeconds&quot;) &amp;&amp; !props.containsKey(&quot;cacheSize&quot;)) {</span>
+<span class="nc" id="L279">          throw new IllegalArgumentException(&quot;Use of cacheTTLSeconds without also setting cacheSize has no effect.&quot;);</span>
+        }
+<span class="nc" id="L281">        cacheTTLSeconds = Integer.parseInt(getOptionalProperty(props, &quot;cacheTTLSeconds&quot;, &quot;300&quot;));</span>
+<span class="nc bnc" id="L282" title="All 2 branches missed.">        if (props.containsKey(&quot;warmUp&quot;)) {</span>
+<span class="nc" id="L283">          System.err.println(&quot;Setting ignored: 'warmUp'. Look into using pipelineCaching and pipelinePrewarming instead.&quot;);</span>
+        }
+<span class="nc" id="L285">        maxErrorsPerWordRate = Float.parseFloat(getOptionalProperty(props, &quot;maxErrorsPerWordRate&quot;, &quot;0&quot;));</span>
+<span class="nc" id="L286">        maxSpellingSuggestions = Integer.parseInt(getOptionalProperty(props, &quot;maxSpellingSuggestions&quot;, &quot;0&quot;));</span>
+<span class="nc" id="L287">        blockedReferrers = Arrays.asList(getOptionalProperty(props, &quot;blockedReferrers&quot;, &quot;&quot;).split(&quot;,\\s*&quot;));</span>
+<span class="nc" id="L288">        hiddenMatchesServer = getOptionalProperty(props, &quot;hiddenMatchesServer&quot;, null);</span>
+<span class="nc" id="L289">        hiddenMatchesServerTimeout = Integer.parseInt(getOptionalProperty(props, &quot;hiddenMatchesServerTimeout&quot;, &quot;1000&quot;));</span>
+<span class="nc" id="L290">        hiddenMatchesServerFailTimeout = Integer.parseInt(getOptionalProperty(props, &quot;hiddenMatchesServerFailTimeout&quot;, &quot;10000&quot;));</span>
+<span class="nc" id="L291">        hiddenMatchesServerFall = Integer.parseInt(getOptionalProperty(props, &quot;hiddenMatchesServerFall&quot;, &quot;1&quot;));</span>
+<span class="nc" id="L292">        String langCodes = getOptionalProperty(props, &quot;hiddenMatchesLanguages&quot;, &quot;&quot;);</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">        for (String code : langCodes.split(&quot;,\\s*&quot;)) {</span>
+<span class="nc bnc" id="L294" title="All 2 branches missed.">          if (!code.isEmpty()) {</span>
+<span class="nc" id="L295">            hiddenMatchesLanguages.add(Languages.getLanguageForShortCode(code));</span>
+          }
+        }
+<span class="nc" id="L298">        dbDriver = getOptionalProperty(props, &quot;dbDriver&quot;, null);</span>
+<span class="nc" id="L299">        dbUrl = getOptionalProperty(props, &quot;dbUrl&quot;, null);</span>
+<span class="nc" id="L300">        dbUsername = getOptionalProperty(props, &quot;dbUsername&quot;, null);</span>
+<span class="nc" id="L301">        dbPassword = getOptionalProperty(props, &quot;dbPassword&quot;, null);</span>
+<span class="nc" id="L302">        dbLogging = Boolean.valueOf(getOptionalProperty(props, &quot;dbLogging&quot;, &quot;false&quot;).trim());</span>
+<span class="nc" id="L303">        prometheusMonitoring = Boolean.valueOf(getOptionalProperty(props, &quot;prometheusMonitoring&quot;, &quot;false&quot;).trim());</span>
+<span class="nc" id="L304">        prometheusPort = Integer.parseInt(getOptionalProperty(props, &quot;prometheusPort&quot;, &quot;9301&quot;));</span>
+<span class="nc" id="L305">        skipLoggingRuleMatches = Boolean.valueOf(getOptionalProperty(props, &quot;skipLoggingRuleMatches&quot;, &quot;false&quot;).trim());</span>
+<span class="nc" id="L306">        skipLoggingChecks = Boolean.valueOf(getOptionalProperty(props, &quot;skipLoggingChecks&quot;, &quot;false&quot;).trim());</span>
+<span class="nc bnc" id="L307" title="All 10 branches missed.">        if (dbLogging &amp;&amp; (dbDriver == null || dbUrl == null || dbUsername == null || dbPassword == null)) {</span>
+<span class="nc" id="L308">          throw new IllegalArgumentException(&quot;dbLogging can only be true if dbDriver, dbUrl, dbUsername, and dbPassword are all set&quot;);</span>
+        }
+<span class="nc" id="L310">        slowRuleLoggingThreshold = Integer.valueOf(getOptionalProperty(props, &quot;slowRuleLoggingThreshold&quot;, &quot;-1&quot;));</span>
+<span class="nc" id="L311">        disabledRuleIds = Arrays.asList(getOptionalProperty(props, &quot;disabledRuleIds&quot;, &quot;&quot;).split(&quot;,\\s*&quot;));</span>
+<span class="nc" id="L312">        globalConfig.setGrammalecteServer(getOptionalProperty(props, &quot;grammalecteServer&quot;, null));</span>
+<span class="nc" id="L313">        globalConfig.setGrammalecteUser(getOptionalProperty(props, &quot;grammalecteUser&quot;, null));</span>
+<span class="nc" id="L314">        globalConfig.setGrammalectePassword(getOptionalProperty(props, &quot;grammalectePassword&quot;, null));</span>
+<span class="nc" id="L315">        String beolingusFile = getOptionalProperty(props, &quot;beolingusFile&quot;, null);</span>
+<span class="nc bnc" id="L316" title="All 2 branches missed.">        if (beolingusFile != null) {</span>
+<span class="nc bnc" id="L317" title="All 2 branches missed.">          if (new File(beolingusFile).exists()) {</span>
+<span class="nc" id="L318">            globalConfig.setBeolingusFile(new File(beolingusFile));</span>
+          } else {
+<span class="nc" id="L320">            throw new IllegalArgumentException(&quot;beolingusFile not found: &quot; + beolingusFile);</span>
+          }
+        }
+<span class="nc bnc" id="L323" title="All 2 branches missed.">        for (Object o : props.keySet()) {</span>
+<span class="nc" id="L324">          String key = (String)o;</span>
+<span class="nc bnc" id="L325" title="All 6 branches missed.">          if (!KNOWN_OPTION_KEYS.contains(key) &amp;&amp; !key.matches(&quot;lang-[a-z]+-dictPath&quot;) &amp;&amp; !key.matches(&quot;lang-[a-z]+&quot;)) {</span>
+<span class="nc" id="L326">            System.err.println(&quot;***** WARNING: ****&quot;);</span>
+<span class="nc" id="L327">            System.err.println(&quot;Key '&quot; + key + &quot;' from configuration file '&quot; + file + &quot;' is unknown. Please check the key's spelling (case is significant).&quot;);</span>
+<span class="nc" id="L328">            System.err.println(&quot;Known keys: &quot; + KNOWN_OPTION_KEYS);</span>
+          }
+<span class="nc" id="L330">        }</span>
+
+<span class="nc" id="L332">        addDynamicLanguages(props);</span>
+<span class="nc" id="L333">        setAbTest(getOptionalProperty(props, &quot;abTest&quot;, null));</span>
+<span class="nc" id="L334">        setAbTestClients(getOptionalProperty(props, &quot;abTestClients&quot;, null));</span>
+<span class="nc" id="L335">        setAbTestRollout(Integer.parseInt(getOptionalProperty(props, &quot;abTestRollout&quot;, &quot;100&quot;)));</span>
+      }
+<span class="nc" id="L337">    } catch (IOException e) {</span>
+<span class="nc" id="L338">      throw new RuntimeException(&quot;Could not load properties from '&quot; + file + &quot;'&quot;, e);</span>
+<span class="nc" id="L339">    }</span>
+<span class="nc" id="L340">  }</span>
+
+  private void addDynamicLanguages(Properties props) throws IOException {
+<span class="nc bnc" id="L343" title="All 2 branches missed.">    for (Object keyObj : props.keySet()) {</span>
+<span class="nc" id="L344">      String key = (String)keyObj;</span>
+<span class="nc bnc" id="L345" title="All 4 branches missed.">      if (key.startsWith(&quot;lang-&quot;) &amp;&amp; !key.contains(&quot;-dictPath&quot;)) {</span>
+<span class="nc" id="L346">        String code = key.substring(&quot;lang-&quot;.length());</span>
+<span class="nc bnc" id="L347" title="All 6 branches missed.">        if (!code.contains(&quot;-&quot;) &amp;&amp; code.length() != 2 &amp;&amp; code.length() != 3) {</span>
+<span class="nc" id="L348">          throw new IllegalArgumentException(&quot;code is supposed to be a 2 (or rarely 3) character code (unless it uses a format with variant, like xx-YY): '&quot; + code + &quot;'&quot;);</span>
+        }
+<span class="nc" id="L350">        String nameKey = &quot;lang-&quot; + code;</span>
+<span class="nc" id="L351">        String name = props.getProperty(nameKey);</span>
+<span class="nc" id="L352">        String dictPathKey = &quot;lang-&quot; + code + &quot;-dictPath&quot;;</span>
+<span class="nc" id="L353">        String dictPath = props.getProperty(dictPathKey);</span>
+<span class="nc bnc" id="L354" title="All 2 branches missed.">        if (dictPath == null) {</span>
+<span class="nc" id="L355">          throw new IllegalArgumentException(dictPathKey + &quot; must be set&quot;);</span>
+        }
+<span class="nc" id="L357">        File dictPathFile = new File(dictPath);</span>
+<span class="nc bnc" id="L358" title="All 4 branches missed.">        if (!dictPathFile.exists() || !dictPathFile.isFile()) {</span>
+<span class="nc" id="L359">          throw new IllegalArgumentException(&quot;dictionary file does not exist or is not a file: '&quot; + dictPath + &quot;'&quot;);</span>
+        }
+<span class="nc" id="L361">        ServerTools.print(&quot;Adding dynamic spell checker language &quot; + name + &quot;, code: &quot; + code + &quot;, dictionary: &quot; + dictPath);</span>
+<span class="nc" id="L362">        Language lang = Languages.addLanguage(name, code, new File(dictPath));</span>
+        // better fail early in case of misconfiguration, so use the language now:
+<span class="nc bnc" id="L364" title="All 2 branches missed.">        if (!new File(lang.getCommonWordsPath()).exists()) {</span>
+<span class="nc" id="L365">          throw new IllegalArgumentException(&quot;Common words path not found: '&quot; + lang.getCommonWordsPath() + &quot;'&quot;);</span>
+        }
+<span class="nc" id="L367">        JLanguageTool lt = new JLanguageTool(lang);</span>
+<span class="nc" id="L368">        lt.check(&quot;test&quot;);</span>
+      }
+<span class="nc" id="L370">    }</span>
+<span class="nc" id="L371">  }</span>
+
+  public void setLanguageModelDirectory(String langModelDir) {
+<span class="nc" id="L374">    SuggestionsOrdererConfig.setNgramsPath(langModelDir);</span>
+<span class="nc" id="L375">    languageModelDir = new File(langModelDir);</span>
+<span class="nc bnc" id="L376" title="All 4 branches missed.">    if (!languageModelDir.exists() || !languageModelDir.isDirectory()) {</span>
+<span class="nc" id="L377">      throw new RuntimeException(&quot;LanguageModel directory not found or is not a directory: &quot; + languageModelDir);</span>
+    }
+<span class="nc" id="L379">  }</span>
+
+  private void setWord2VecModelDirectory(String w2vModelDir) {
+<span class="nc" id="L382">    word2vecModelDir = new File(w2vModelDir);</span>
+<span class="nc bnc" id="L383" title="All 4 branches missed.">    if (!word2vecModelDir.exists() || !word2vecModelDir.isDirectory()) {</span>
+<span class="nc" id="L384">      throw new RuntimeException(&quot;Word2Vec directory not found or is not a directory: &quot; + word2vecModelDir);</span>
+    }
+<span class="nc" id="L386">  }</span>
+
+  private void setNeuralNetworkModelDir(String nnModelDir) {
+<span class="nc" id="L389">    neuralNetworkModelDir = new File(nnModelDir);</span>
+<span class="nc bnc" id="L390" title="All 4 branches missed.">    if (!neuralNetworkModelDir.exists() || !neuralNetworkModelDir.isDirectory()) {</span>
+<span class="nc" id="L391">      throw new RuntimeException(&quot;Neural network model directory not found or is not a directory: &quot; + neuralNetworkModelDir);</span>
+    }
+<span class="nc" id="L393">  }</span>
+
+  private void setFasttextPaths(String fasttextModelPath, String fasttextBinaryPath) {
+<span class="nc" id="L396">    fasttextModel = new File(fasttextModelPath);</span>
+<span class="nc" id="L397">    fasttextBinary = new File(fasttextBinaryPath);</span>
+<span class="nc bnc" id="L398" title="All 4 branches missed.">    if (!fasttextModel.exists() || fasttextModel.isDirectory()) {</span>
+<span class="nc" id="L399">      throw new RuntimeException(&quot;Fasttext model path not valid (file doesn't exist or is a directory): &quot; + fasttextModelPath);</span>
+    }
+<span class="nc bnc" id="L401" title="All 6 branches missed.">    if (!fasttextBinary.exists() || fasttextBinary.isDirectory() || !fasttextBinary.canExecute()) {</span>
+<span class="nc" id="L402">      throw new RuntimeException(&quot;Fasttext binary path not valid (file doesn't exist, is a directory or not executable): &quot; + fasttextBinaryPath);</span>
+    }
+<span class="nc" id="L404">  }</span>
+
+  /*
+   * @param verbose if true, the text to be checked will be displayed in case of exceptions
+   */
+  public boolean isVerbose() {
+<span class="fc" id="L410">    return verbose;</span>
+  }
+
+  public boolean isPublicAccess() {
+<span class="fc" id="L414">    return publicAccess;</span>
+  }
+
+  public int getPort() {
+<span class="fc" id="L418">    return port;</span>
+  }
+
+  /**
+   * Value to set as the &quot;Access-Control-Allow-Origin&quot; http header. {@code null}
+   * will not return that header at all. With {@code *} your server can be used from any other web site
+   * from Javascript/Ajax (search Cross-origin resource sharing (CORS) for details).
+   */
+  @Nullable
+  public String getAllowOriginUrl() {
+<span class="fc" id="L428">    return allowOriginUrl;</span>
+  }
+
+  /**
+   * @since 4.2
+   */
+  public void setAllowOriginUrl(String allowOriginUrl) {
+<span class="nc" id="L435">    this.allowOriginUrl = allowOriginUrl;</span>
+<span class="nc" id="L436">  }</span>
+
+  /**
+   * @since 4.8
+   * @return prefix / base URL for API requests
+   */
+  @Nullable
+  public URI getServerURL() {
+<span class="fc" id="L444">    return serverURL;</span>
+  }
+
+  /**
+   * @since 4.8
+   * @param url prefix / base URL for API requests
+   */
+  public void setServerURL(@Nullable String url) {
+<span class="nc bnc" id="L452" title="All 2 branches missed.">    if (url != null) {</span>
+      try {
+        // ignore different protocols, ports,... just use path for relative requests
+<span class="nc" id="L455">        serverURL = new URI(new URI(url).getPath());</span>
+<span class="nc" id="L456">      } catch (URISyntaxException e) {</span>
+<span class="nc" id="L457">        throw new IllegalArgumentException(&quot;Could not parse provided serverURL: '&quot; + url + &quot;'&quot;, e);</span>
+<span class="nc" id="L458">      }</span>
+    } else {
+<span class="nc" id="L460">      serverURL = null;</span>
+    }
+<span class="nc" id="L462">  }</span>
+
+  /**
+   * @param len the maximum text length allowed (in number of characters), texts that are longer
+   *            will cause an exception when being checked, unless the user can provide
+   *            a JWT 'token' parameter with a 'maxTextLength' claim          
+   */
+  public void setMaxTextLength(int len) {
+<span class="nc" id="L470">    this.maxTextLength = len;</span>
+<span class="nc" id="L471">  }</span>
+
+  /**
+   * @param len the maximum text length allowed (in number of characters), texts that are longer
+   *            will cause an exception when being checked even if the user can provide a JWT token
+   * @since 3.9
+   */
+  public void setMaxTextHardLength(int len) {
+<span class="nc" id="L479">    this.maxTextHardLength = len;</span>
+<span class="nc" id="L480">  }</span>
+
+  int getMaxTextLength() {
+<span class="nc" id="L483">    return maxTextLength;</span>
+  }
+
+  /**
+   * Maximum text length for users that can identify themselves with an API key.
+   * @since 4.2
+   */
+  int getMaxTextLengthWithApiKey() {
+<span class="nc" id="L491">    return maxTextLengthWithApiKey;</span>
+  }
+
+  /**
+   * Limit for maximum text length - text cannot be longer than this, even if user has valid secret token.
+   * @since 3.9
+   */
+  int getMaxTextHardLength() {
+<span class="fc" id="L499">    return maxTextHardLength;</span>
+  }
+
+  /**
+   * Optional JWT token key. Can be used to circumvent the maximum text length (but not maxTextHardLength).
+   * @since 3.9
+   */
+  @Nullable
+  String getSecretTokenKey() {
+<span class="fc" id="L508">    return secretTokenKey;</span>
+  }
+
+  /**
+   * @since 4.0
+   */
+  void setSecretTokenKey(String secretTokenKey) {
+<span class="nc" id="L515">    this.secretTokenKey = secretTokenKey;</span>
+<span class="nc" id="L516">  }</span>
+
+  int getRequestLimit() {
+<span class="fc" id="L519">    return requestLimit;</span>
+  }
+
+  /** @since 4.0 */
+  int getTimeoutRequestLimit() {
+<span class="fc" id="L524">    return timeoutRequestLimit;</span>
+  }
+
+  /** @since 4.0 */
+  int getRequestLimitInBytes() {
+<span class="fc" id="L529">    return requestLimitInBytes;</span>
+  }
+
+  int getRequestLimitPeriodInSeconds() {
+<span class="fc" id="L533">    return requestLimitPeriodInSeconds;</span>
+  }
+
+  /** since 4.4 */
+  int getIpFingerprintFactor() {
+<span class="fc" id="L538">    return ipFingerprintFactor;</span>
+  }
+
+  /**
+   * @param maxCheckTimeMillis The maximum duration allowed for a single check in milliseconds, checks that take longer
+   *                      will stop with an exception. Use {@code -1} for no limit.
+   * @since 2.6
+   */
+  void setMaxCheckTimeMillis(int maxCheckTimeMillis) {
+<span class="nc" id="L547">    this.maxCheckTimeMillis = maxCheckTimeMillis;</span>
+<span class="nc" id="L548">  }</span>
+
+  /** @since 2.6 */
+  long getMaxCheckTimeMillis() {
+<span class="nc" id="L552">    return maxCheckTimeMillis;</span>
+  }
+
+  /** @since 4.2 */
+  long getMaxCheckTimeWithApiKeyMillis() {
+<span class="nc" id="L557">    return maxCheckTimeWithApiKeyMillis;</span>
+  }
+
+  /**
+   * Get language model directory (which contains '3grams' sub directory) or {@code null}.
+   * @since 2.7
+   */
+  @Nullable
+  File getLanguageModelDir() {
+<span class="fc" id="L566">    return languageModelDir;</span>
+  }
+
+  /**
+   * Get word2vec model directory (which contains 'en' sub directories and final_embeddings.txt and dictionary.txt) or {@code null}.
+   * @since 4.0
+   */
+  @Nullable
+  File getWord2VecModelDir() {
+<span class="fc" id="L575">    return word2vecModelDir;</span>
+  }
+
+  /**
+   * Get base directory for neural network models or {@code null}
+   * @since 4.4
+   */
+  @Deprecated
+  public File getNeuralNetworkModelDir() {
+<span class="nc" id="L584">    return neuralNetworkModelDir;</span>
+  }
+
+
+  /**
+   * Get model path for fasttext language detection
+   * @since 4.3
+   */
+  @Nullable
+  public File getFasttextModel() {
+<span class="fc" id="L594">    return fasttextModel;</span>
+  }
+
+  /**
+   * Set model path for fasttext language detection
+   * @since 4.4
+   */
+  public void setFasttextModel(File model) {
+<span class="nc" id="L602">    fasttextModel = Objects.requireNonNull(model);</span>
+<span class="nc" id="L603">  }</span>
+
+  /**
+   * Get binary path for fasttext language detection
+   * @since 4.3
+   */
+  @Nullable
+  public File getFasttextBinary() {
+<span class="fc" id="L611">    return fasttextBinary;</span>
+  }
+
+  /**
+   * Set binary path for fasttext language detection
+   * @since 4.4
+   */
+  public void setFasttextBinary(File binary) {
+<span class="nc" id="L619">    fasttextBinary = Objects.requireNonNull(binary);</span>
+<span class="nc" id="L620">  }</span>
+
+  /** @since 2.7 */
+  Mode getMode() {
+<span class="nc" id="L624">    return mode;</span>
+  }
+
+  /**
+   * @param maxCheckThreads The maximum number of threads serving requests running at the same time.
+   * If there are more requests, they will be queued until a thread can work on them.
+   * @since 2.7
+   */
+  void setMaxCheckThreads(int maxCheckThreads) {
+<span class="nc" id="L633">    this.maxCheckThreads = maxCheckThreads;</span>
+<span class="nc" id="L634">  }</span>
+
+  /** @since 2.7 */
+  int getMaxCheckThreads() {
+<span class="fc" id="L638">    return maxCheckThreads;</span>
+  }
+
+  /**
+   * Set to {@code true} if this is running behind a (reverse) proxy which
+   * sets the {@code X-forwarded-for} HTTP header. The last IP address (but not local IP addresses)
+   * in that header will then be used for enforcing a request limitation.
+   * @since 2.8
+   */
+  void setTrustXForwardForHeader(boolean trustXForwardForHeader) {
+<span class="nc" id="L648">    this.trustXForwardForHeader = trustXForwardForHeader;</span>
+<span class="nc" id="L649">  }</span>
+
+  /** @since 2.8 */
+  boolean getTrustXForwardForHeader() {
+<span class="fc" id="L653">    return trustXForwardForHeader;</span>
+  }
+
+  /** @since 2.9 */
+  int getMaxWorkQueueSize() {
+<span class="fc" id="L658">    return maxWorkQueueSize;</span>
+  }
+
+
+  /**
+   * @since 4.4
+   * Cache initialized JLanguageTool instances and share between non-parallel requests with identical parameters.
+   * Improves response time (especially when dealing with many small requests without specific settings),
+   * but increases memory usage
+   */
+  public boolean isPipelineCachingEnabled() {
+<span class="fc" id="L669">    return pipelineCaching;</span>
+  }
+
+  /**
+   * @since 4.4
+   * Before starting to listen for requests, create a few pipelines for frequently used request settings
+   * and run simple checks on them; prevents long response time / request overload on the first real incoming requests
+   */
+  public boolean isPipelinePrewarmingEnabled() {
+<span class="fc" id="L678">    return pipelinePrewarming;</span>
+  }
+
+  /**
+   * @since 4.4
+   * Keep pipelines ready for this many different request settings
+   */
+  public int getMaxPipelinePoolSize() {
+<span class="fc" id="L686">    return maxPipelinePoolSize;</span>
+  }
+
+  /**
+   * @since 4.4
+   * Expire pipelines for a specific request setting after this many seconds without any matching request elapsed
+   */
+  public int getPipelineExpireTime() {
+<span class="fc" id="L694">    return pipelineExpireTime;</span>
+  }
+
+
+  /** @since 4.4 */
+  public void setPipelineCaching(boolean pipelineCaching) {
+<span class="nc" id="L700">    this.pipelineCaching = pipelineCaching;</span>
+<span class="nc" id="L701">  }</span>
+
+  /** @since 4.4 */
+  public void setPipelinePrewarming(boolean pipelinePrewarming) {
+<span class="nc" id="L705">    this.pipelinePrewarming = pipelinePrewarming;</span>
+<span class="nc" id="L706">  }</span>
+
+  /** @since 4.4 */
+  public void setMaxPipelinePoolSize(int maxPipelinePoolSize) {
+<span class="nc" id="L710">    this.maxPipelinePoolSize = maxPipelinePoolSize;</span>
+<span class="nc" id="L711">  }</span>
+
+  /** @since 4.4 */
+  public void setPipelineExpireTime(int pipelineExpireTime) {
+<span class="nc" id="L715">    this.pipelineExpireTime = pipelineExpireTime;</span>
+<span class="nc" id="L716">  }</span>
+
+  /**
+   * Cache size (in number of sentences).
+   * @since 3.7
+   */
+  int getCacheSize() {
+<span class="fc" id="L723">    return cacheSize;</span>
+  }
+
+  /** 
+   * Set cache size (in number of sentences).
+   * @since 4.2
+   */
+  void setCacheSize(int sentenceCacheSize) {
+<span class="nc" id="L731">    this.cacheSize = sentenceCacheSize;</span>
+<span class="nc" id="L732">  }</span>
+
+  /**
+   * Cache entry TTL; refreshed on access; in seconds
+   * @since 4.6
+   */
+  long getCacheTTLSeconds() {
+<span class="nc" id="L739">    return cacheTTLSeconds;</span>
+  }
+
+  /**
+   * Set cache entry TTL in seconds
+   * @since 4.6
+   */
+  void setCacheTTLSeconds(long cacheTTLSeconds) {
+<span class="nc" id="L747">    this.cacheTTLSeconds = cacheTTLSeconds;</span>
+<span class="nc" id="L748">  }</span>
+
+  /**
+   * Maximum errors per word rate, checking will stop if the rate is higher.
+   * For example, with a rate of 0.33, the checking would stop if the user's
+   * text has so many errors that more than every 3rd word causes a rule match.
+   * Note that this may not apply for very short texts.
+   * @since 4.0
+   */
+  float getMaxErrorsPerWordRate() {
+<span class="fc" id="L758">    return maxErrorsPerWordRate;</span>
+  }
+
+  /**
+   * Maximum number of spelling errors for which a suggestion will be generated
+   * per check. It makes sense to limit this as generating suggestions is a CPU-heavy task.
+   * @since 4.2
+   */
+  int getMaxSpellingSuggestions() {
+<span class="fc" id="L767">    return maxSpellingSuggestions;</span>
+  }
+
+  /**
+   * A list of HTTP referrers that are blocked and will only get an error message.
+   * @since 4.2
+   */
+  @NotNull
+  List&lt;String&gt; getBlockedReferrers() {
+<span class="fc" id="L776">    return blockedReferrers;</span>
+  }
+
+  /**
+   * @since 4.2
+   */
+  void setBlockedReferrers(List&lt;String&gt; blockedReferrers) {
+<span class="nc" id="L783">    this.blockedReferrers = Objects.requireNonNull(blockedReferrers);</span>
+<span class="nc" id="L784">  }</span>
+  
+  /**
+   * URL of server that is queried to add additional (but hidden) matches to the result.
+   * @since 4.0
+   */
+  @Nullable
+  String getHiddenMatchesServer() {
+<span class="fc" id="L792">    return hiddenMatchesServer;</span>
+  }
+
+  /**
+   * Timeout in milliseconds for querying {@link #getHiddenMatchesServer()}.
+   * @since 4.0
+   */
+  int getHiddenMatchesServerTimeout() {
+<span class="nc" id="L800">    return hiddenMatchesServerTimeout;</span>
+  }
+
+  /**
+   * Period to skip requests to hidden matches server after a timeout (in milliseconds)
+   * @since 4.5
+   */
+  int getHiddenMatchesServerFailTimeout() {
+<span class="nc" id="L808">    return hiddenMatchesServerFailTimeout;</span>
+  }
+
+  /**
+   * Languages for which {@link #getHiddenMatchesServer()} will be queried.
+   * @since 4.0
+   */
+  List&lt;Language&gt; getHiddenMatchesLanguages() {
+<span class="nc" id="L816">    return hiddenMatchesLanguages;</span>
+  }
+
+  /**
+   * Number of failed/timed out requests after which server gets marked as down
+   * @since 5.1
+   */
+  @Experimental
+  int getHiddenMatchesServerFall() {
+<span class="nc" id="L825">    return hiddenMatchesServerFall;</span>
+  }
+
+  /**
+   * @return the file from which server rules configuration should be loaded, or {@code null}
+   * @since 3.0
+   */
+  @Nullable
+  File getRulesConfigFile() {
+<span class="fc" id="L834">    return rulesConfigFile;</span>
+  }
+
+  /**
+   * @return the file from which remote rules should be configured, or {@code null}
+   * @since 4.9
+   */
+  @Nullable
+  File getRemoteRulesConfigFile() {
+<span class="fc" id="L843">    return remoteRulesConfigFile;</span>
+  }
+
+  /**
+   * @return the database driver name like {@code org.mariadb.jdbc.Driver}, or {@code null}
+   * @since 4.2
+   */
+  @Nullable
+  String getDatabaseDriver() {
+<span class="fc" id="L852">    return dbDriver;</span>
+  }
+  
+  /**
+   * @since 4.2
+   */
+  void setDatabaseDriver(String dbDriver) {
+<span class="nc" id="L859">    this.dbDriver = dbDriver;</span>
+<span class="nc" id="L860">  }</span>
+
+  /**
+   * @return the database url like {@code jdbc:mysql://localhost:3306/languagetool}, or {@code null}
+   * @since 4.2
+   */
+  @Nullable
+  String getDatabaseUrl() {
+<span class="nc" id="L868">    return dbUrl;</span>
+  }
+
+  /**
+   * @since 4.2
+   */
+  void setDatabaseUrl(String dbUrl) {
+<span class="nc" id="L875">    this.dbUrl = dbUrl;</span>
+<span class="nc" id="L876">  }</span>
+  
+  /**
+   * @return the database username, or {@code null}
+   * @since 4.2
+   */
+  @Nullable
+  String getDatabaseUsername() {
+<span class="nc" id="L884">    return dbUsername;</span>
+  }
+
+  /**
+   * @since 4.2
+   */
+  void setDatabaseUsername(String dbUsername) {
+<span class="nc" id="L891">    this.dbUsername = dbUsername;</span>
+<span class="nc" id="L892">  }</span>
+  
+  /**
+   * @return the database password matching {@link #getDatabaseUsername()}, or {@code null}
+   * @since 4.2
+   */
+  @Nullable
+  String getDatabasePassword() {
+<span class="nc" id="L900">    return dbPassword;</span>
+  }
+
+  /**
+   * @since 4.2
+   */
+  void setDatabasePassword(String dbPassword) {
+<span class="nc" id="L907">    this.dbPassword = dbPassword;</span>
+<span class="nc" id="L908">  }</span>
+  
+  /**
+   * Whether meta data about each search (like in the logfile) should be logged to the database.
+   * @since 4.4
+   */
+  void setDatabaseLogging(boolean logging) {
+<span class="nc" id="L915">    this.dbLogging = logging;</span>
+<span class="nc" id="L916">  }</span>
+
+  /**
+   * @since 4.4
+   */
+  boolean getDatabaseLogging() {
+<span class="nc" id="L922">    return this.dbLogging;</span>
+  }
+
+
+  /**
+   * @since 4.6
+   */
+  public boolean isPrometheusMonitoring() {
+<span class="fc" id="L930">    return prometheusMonitoring;</span>
+  }
+
+  /**
+   * @since 4.6
+   */
+  public int getPrometheusPort() {
+<span class="nc" id="L937">    return prometheusPort;</span>
+  }
+
+  /**
+   * @since 4.5
+   * @return threshold for rule computation time until a warning gets logged, in milliseconds
+   */
+  public int getSlowRuleLoggingThreshold() {
+<span class="nc" id="L945">    return slowRuleLoggingThreshold;</span>
+  }
+
+  /**
+   * @since 4.5
+   */
+  boolean isSkipLoggingRuleMatches() {
+<span class="fc" id="L952">    return this.skipLoggingRuleMatches;</span>
+  }
+
+
+  /**
+   * @since 4.6
+   */
+  public boolean isSkipLoggingChecks() {
+<span class="fc" id="L960">    return skipLoggingChecks;</span>
+  }
+
+  /**
+   * @since 4.7
+   */
+  public List&lt;String&gt; getDisabledRuleIds() {
+<span class="fc" id="L967">    return disabledRuleIds;</span>
+  }
+
+  /**
+   * Whether the server can be stopped by sending a command (useful for tests only).
+   */
+  boolean isStoppable() {
+<span class="nc" id="L974">    return stoppable;</span>
+  }
+
+  /**
+   * @since 4.4
+   * See if a specific A/B-Test is to be run
+   */
+  @Nullable
+  public String getAbTest() {
+<span class="fc" id="L983">    return abTest;</span>
+  }
+
+  /**
+   * @since 4.4
+   * Enable a specific A/B-Test to be run (or null to disable all tests)
+   */
+  public void setAbTest(@Nullable String abTest) {
+<span class="nc bnc" id="L991" title="All 4 branches missed.">    if (abTest != null &amp;&amp; abTest.trim().isEmpty()) {</span>
+<span class="nc" id="L992">      this.abTest = null;</span>
+    } else {
+<span class="nc" id="L994">      this.abTest = abTest;</span>
+    }
+<span class="nc" id="L996">  }</span>
+
+  /**
+   * Clients that a A/B test runs on; null -&amp;gt; disabled
+   * @since 4.9
+   */
+  @Experimental
+  @Nullable
+  public Pattern getAbTestClients() {
+<span class="fc" id="L1005">    return abTestClients;</span>
+  }
+
+  /**
+   * Clients that a A/B test runs on; null -&amp;gt; disabled
+   * @since 4.9
+   */
+  @Experimental
+  public void setAbTestClients(@Nullable String pattern) {
+<span class="nc bnc" id="L1014" title="All 2 branches missed.">    if (pattern == null) {</span>
+<span class="nc" id="L1015">      this.abTestClients = null;</span>
+    } else {
+<span class="nc" id="L1017">      this.abTestClients = Pattern.compile(pattern);</span>
+    }
+<span class="nc" id="L1019">  }</span>
+
+  /**
+   * @param abTestRollout percentage [0,100] of users to include in ab test rollout
+   * @since 4.9
+   */
+  @Experimental
+  public void setAbTestRollout(int abTestRollout) {
+<span class="nc" id="L1027">    this.abTestRollout = abTestRollout;</span>
+<span class="nc" id="L1028">  }</span>
+
+  /**
+   * @since 4.9
+   */
+  @Experimental
+  public int getAbTestRollout() {
+<span class="nc" id="L1035">    return abTestRollout;</span>
+  }
+
+  /**
+   * @throws IllegalConfigurationException if property is not set 
+   */
+  protected String getProperty(Properties props, String propertyName, File config) {
+<span class="nc" id="L1042">    String propertyValue = (String)props.get(propertyName);</span>
+<span class="nc bnc" id="L1043" title="All 4 branches missed.">    if (propertyValue == null || propertyValue.trim().isEmpty()) {</span>
+<span class="nc" id="L1044">      throw new IllegalConfigurationException(&quot;Property '&quot; + propertyName + &quot;' must be set in &quot; + config);</span>
+    }
+<span class="nc" id="L1046">    return propertyValue;</span>
+  }
+
+  protected String getOptionalProperty(Properties props, String propertyName, String defaultValue) {
+<span class="nc" id="L1050">    String propertyValue = (String)props.get(propertyName);</span>
+<span class="nc bnc" id="L1051" title="All 2 branches missed.">    if (propertyValue == null) {</span>
+<span class="nc" id="L1052">      return defaultValue;</span>
+    }
+<span class="nc" id="L1054">    return propertyValue;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

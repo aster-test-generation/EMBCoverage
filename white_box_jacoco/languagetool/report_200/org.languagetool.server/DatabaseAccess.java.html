@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DatabaseAccess.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.server</a> &gt; <span class="el_source">DatabaseAccess.java</span></div><h1>DatabaseAccess.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2018 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.server;
+
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.ibatis.datasource.pooled.PooledDataSource;
+import org.apache.ibatis.exceptions.PersistenceException;
+import org.apache.ibatis.io.Resources;
+import org.apache.ibatis.jdbc.SQL;
+import org.apache.ibatis.session.RowBounds;
+import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.apache.ibatis.session.SqlSessionFactoryBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+
+import static org.languagetool.server.ServerTools.print;
+
+/**
+ * Encapsulate database access. Will do nothing if database access is not configured.
+ * @since 4.2
+ */
+public class DatabaseAccess {
+
+  private static DatabaseAccess instance;
+  private static SqlSessionFactory sqlSessionFactory;
+<span class="fc" id="L57">  private static final Logger logger = LoggerFactory.getLogger(DatabaseAccess.class);</span>
+
+<span class="fc" id="L59">  private final Cache&lt;Long, List&lt;UserDictEntry&gt;&gt; userDictCache = CacheBuilder.newBuilder()</span>
+<span class="fc" id="L60">          .maximumSize(1000)</span>
+<span class="fc" id="L61">          .expireAfterWrite(24, TimeUnit.HOURS)</span>
+<span class="fc" id="L62">          .build();</span>
+
+<span class="fc" id="L64">  private final Cache&lt;String, Long&gt; dbLoggingCache = CacheBuilder.newBuilder()</span>
+<span class="fc" id="L65">    .expireAfterAccess(1, TimeUnit.HOURS)</span>
+<span class="fc" id="L66">    .maximumSize(5000)</span>
+<span class="fc" id="L67">    .build();</span>
+
+<span class="fc" id="L69">  private DatabaseAccess(HTTPServerConfig config) {</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">    if (config.getDatabaseDriver() != null) {</span>
+      try {
+<span class="nc" id="L72">        logger.info(&quot;Setting up database access, URL &quot; + config.getDatabaseUrl() + &quot;, driver: &quot; + config.getDatabaseDriver() + &quot;, user: &quot; + config.getDatabaseUsername());</span>
+<span class="nc" id="L73">        InputStream inputStream = Resources.getResourceAsStream(&quot;org/languagetool/server/mybatis-config.xml&quot;);</span>
+<span class="nc" id="L74">        Properties properties = new Properties();</span>
+<span class="nc" id="L75">        properties.setProperty(&quot;driver&quot;, config.getDatabaseDriver());</span>
+<span class="nc" id="L76">        properties.setProperty(&quot;url&quot;, config.getDatabaseUrl());</span>
+<span class="nc" id="L77">        properties.setProperty(&quot;username&quot;, config.getDatabaseUsername());</span>
+<span class="nc" id="L78">        properties.setProperty(&quot;password&quot;, config.getDatabasePassword());</span>
+<span class="nc" id="L79">        sqlSessionFactory = new SqlSessionFactoryBuilder().build(inputStream, properties);</span>
+
+        // try to close connections even on hard restart
+        // workaround as described in https://github.com/mybatis/mybatis-3/issues/821
+<span class="nc" id="L83">        Runtime.getRuntime().addShutdownHook(new Thread(() -&gt; ((PooledDataSource)sqlSessionFactory</span>
+<span class="nc" id="L84">          .getConfiguration().getEnvironment().getDataSource()).forceCloseAll()));</span>
+
+<span class="nc" id="L86">        DatabaseLogger.init(sqlSessionFactory);</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        if (!config.getDatabaseLogging()) {</span>
+<span class="nc" id="L88">          logger.info(&quot;dbLogging not set to true, turning off logging&quot;);</span>
+<span class="nc" id="L89">          DatabaseLogger.getInstance().disableLogging();</span>
+        }
+<span class="nc" id="L91">      } catch (IOException e) {</span>
+<span class="nc" id="L92">        throw new RuntimeException(e);</span>
+<span class="nc" id="L93">      }</span>
+    } else {
+<span class="fc" id="L95">      logger.info(&quot;Not setting up database access, dbDriver is not configured&quot;);</span>
+    }
+<span class="fc" id="L97">  }</span>
+  
+  public static synchronized void init(HTTPServerConfig config) {
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">    if (instance == null) {</span>
+<span class="fc" id="L101">      instance = new DatabaseAccess(config);</span>
+    }
+<span class="fc" id="L103">  }</span>
+
+  static synchronized DatabaseAccess getInstance() {
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">    if (instance == null) {</span>
+<span class="nc" id="L107">      throw new IllegalStateException(&quot;DatabaseAccess.init() has not been called yet&quot;);</span>
+    }
+<span class="fc" id="L109">    return instance;</span>
+  }
+
+  List&lt;String&gt; getUserDictWords(Long userId) {
+<span class="nc" id="L113">    List&lt;String&gt; dictEntries = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">    if (sqlSessionFactory == null) {</span>
+<span class="nc" id="L115">      return dictEntries;</span>
+    }
+<span class="nc" id="L117">    try (SqlSession session = sqlSessionFactory.openSession()) {</span>
+      try {
+<span class="nc" id="L119">        List&lt;UserDictEntry&gt; dict = session.selectList(&quot;org.languagetool.server.UserDictMapper.selectWordList&quot;, userId);</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        for (UserDictEntry userDictEntry : dict) {</span>
+<span class="nc" id="L121">          dictEntries.add(userDictEntry.getWord());</span>
+<span class="nc" id="L122">        }</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        if (dict.size() &lt;= 1000) {  // make sure users with huge dict don't blow up the cache</span>
+<span class="nc" id="L124">          userDictCache.put(userId, dict);</span>
+        } else {
+<span class="nc" id="L126">          logger.info(&quot;WARN: Large dict size &quot; + dict.size() + &quot; for user &quot; + userId + &quot; - will not put user's dict in cache&quot;);</span>
+        }
+<span class="nc" id="L128">      } catch (Exception e) {</span>
+        // try to be more robust when database is down, i.e. don't just crash but try to use cache:
+<span class="nc" id="L130">        List&lt;UserDictEntry&gt; cachedDictOrNull = userDictCache.getIfPresent(userId);</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">        if (cachedDictOrNull != null) {</span>
+<span class="nc" id="L132">          logger.error(&quot;ERROR: Could not get words from database for user &quot; + userId + &quot;: &quot; + e.getMessage() + &quot;, will use cached version (&quot; + cachedDictOrNull.size() + &quot; items). Full stack trace follows:&quot; + ExceptionUtils.getStackTrace(e));</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">          for (UserDictEntry userDictEntry : cachedDictOrNull) {</span>
+<span class="nc" id="L134">            dictEntries.add(userDictEntry.getWord());</span>
+<span class="nc" id="L135">          }</span>
+        } else {
+<span class="nc" id="L137">          logger.error(&quot;ERROR: Could not get words from database for user &quot; + userId + &quot;: &quot; + e.getMessage() + &quot; - also, could not use version from cache, user id not found in cache, will use empty dict. Full stack trace follows:&quot; + ExceptionUtils.getStackTrace(e));</span>
+        }
+<span class="nc" id="L139">      }</span>
+    }
+<span class="nc" id="L141">    return dictEntries;</span>
+  }
+
+  List&lt;UserDictEntry&gt; getWords(Long userId, int offset, int limit) {
+<span class="nc bnc" id="L145" title="All 2 branches missed.">    if (sqlSessionFactory == null) {</span>
+<span class="nc" id="L146">      return new ArrayList&lt;&gt;();</span>
+    }
+<span class="nc" id="L148">    try (SqlSession session = sqlSessionFactory.openSession(true)) {</span>
+<span class="nc" id="L149">      Map&lt;Object, Object&gt; map = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L150">      map.put(&quot;userId&quot;, userId);</span>
+<span class="nc" id="L151">      return session.selectList(&quot;org.languagetool.server.UserDictMapper.selectWordList&quot;, map, new RowBounds(offset, limit));</span>
+    }
+  }
+  
+  boolean addWord(String word, Long userId) {
+<span class="nc" id="L156">    validateWord(word);</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">    if (sqlSessionFactory == null) {</span>
+<span class="nc" id="L158">      return false;</span>
+    }
+<span class="nc" id="L160">    try (SqlSession session = sqlSessionFactory.openSession(true)) {</span>
+<span class="nc" id="L161">      Map&lt;Object, Object&gt; map = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L162">      map.put(&quot;word&quot;, word);</span>
+<span class="nc" id="L163">      map.put(&quot;userId&quot;, userId);</span>
+<span class="nc" id="L164">      List&lt;UserDictEntry&gt; existingWords = session.selectList(&quot;org.languagetool.server.UserDictMapper.selectWord&quot;, map);</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">      if (existingWords.size() &gt;= 1) {</span>
+<span class="nc" id="L166">        logger.info(&quot;Did not add '&quot; + word + &quot;' for user &quot; + userId + &quot; to list of ignored words, already exists&quot;);</span>
+<span class="nc" id="L167">        return false;</span>
+      } else {
+<span class="nc" id="L169">        Date now = new Date();</span>
+<span class="nc" id="L170">        map.put(&quot;created_at&quot;, now);</span>
+<span class="nc" id="L171">        map.put(&quot;updated_at&quot;, now);</span>
+<span class="nc" id="L172">        int affectedRows = session.insert(&quot;org.languagetool.server.UserDictMapper.addWord&quot;, map);</span>
+<span class="nc" id="L173">        logger.info(&quot;Added '&quot; + word + &quot;' for user &quot; + userId + &quot; to list of ignored words, affectedRows: &quot; + affectedRows);</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">        return affectedRows == 1;</span>
+      }
+    }
+  }
+
+  Long getUserId(String username, String apiKey) {
+<span class="pc bpc" id="L180" title="2 of 4 branches missed.">    if (username == null || username.trim().isEmpty()) {</span>
+<span class="nc" id="L181">      throw new IllegalArgumentException(&quot;username must be set&quot;);</span>
+    }
+<span class="pc bpc" id="L183" title="1 of 4 branches missed.">    if (apiKey == null || apiKey.trim().isEmpty()) {</span>
+<span class="fc" id="L184">      throw new IllegalArgumentException(&quot;apiKey must be set&quot;);</span>
+    }
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">    if (sqlSessionFactory ==  null) {</span>
+<span class="fc" id="L187">      throw new IllegalStateException(&quot;sqlSessionFactory not initialized - has the database been configured?&quot;);</span>
+    }
+    try {
+<span class="nc" id="L190">      Long value = dbLoggingCache.get(String.format(&quot;user_%s_%s&quot;, username, apiKey), () -&gt; {</span>
+<span class="nc" id="L191">        try (SqlSession session = sqlSessionFactory.openSession()) {</span>
+<span class="nc" id="L192">          Map&lt;Object, Object&gt; map = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L193">          map.put(&quot;username&quot;, username);</span>
+<span class="nc" id="L194">          map.put(&quot;apiKey&quot;, apiKey);</span>
+<span class="nc" id="L195">          Long id = session.selectOne(&quot;org.languagetool.server.UserDictMapper.getUserIdByApiKey&quot;, map);</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">          if (id == null) {</span>
+<span class="nc" id="L197">            return -1L;</span>
+          }
+<span class="nc" id="L199">          return id;</span>
+        }
+      });
+<span class="nc bnc" id="L202" title="All 2 branches missed.">      if (value == -1) {</span>
+<span class="nc" id="L203">        throw new IllegalArgumentException(&quot;No user found for given username '&quot; + username + &quot;' and given api key&quot;);</span>
+      } else {
+<span class="nc" id="L205">        return value;</span>
+      }
+<span class="nc" id="L207">    } catch (ExecutionException e) {</span>
+<span class="nc" id="L208">      throw new IllegalStateException(&quot;Could not fetch given user '&quot; + username + &quot;' from cache&quot;, e);</span>
+    }
+  }
+
+  boolean deleteWord(String word, Long userId) {
+<span class="nc bnc" id="L213" title="All 2 branches missed.">    if (sqlSessionFactory == null) {</span>
+<span class="nc" id="L214">      return false;</span>
+    }
+<span class="nc" id="L216">    try (SqlSession session = sqlSessionFactory.openSession(true)) {</span>
+<span class="nc" id="L217">      Map&lt;Object, Object&gt; map = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L218">      map.put(&quot;word&quot;, word);</span>
+<span class="nc" id="L219">      map.put(&quot;userId&quot;, userId);</span>
+<span class="nc" id="L220">      int count = session.delete(&quot;org.languagetool.server.UserDictMapper.selectWord&quot;, map);</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">      if (count == 0) {</span>
+<span class="nc" id="L222">        logger.info(&quot;Did not delete '&quot; + word + &quot;' for user &quot; + userId + &quot; from list of ignored words, does not exist&quot;);</span>
+<span class="nc" id="L223">        return false;</span>
+      } else {
+<span class="nc" id="L225">        int affectedRows = session.delete(&quot;org.languagetool.server.UserDictMapper.deleteWord&quot;, map);</span>
+<span class="nc" id="L226">        logger.info(&quot;Deleted '&quot; + word + &quot;' for user &quot; + userId + &quot; from list of ignored words, affectedRows: &quot; + affectedRows);</span>
+<span class="nc bnc" id="L227" title="All 2 branches missed.">        return affectedRows &gt;= 1;</span>
+      }
+    }
+  }
+
+  /**
+   * @since 4.3
+   */
+  Long getOrCreateServerId() {
+<span class="nc bnc" id="L236" title="All 2 branches missed.">    if (sqlSessionFactory == null) {</span>
+<span class="nc" id="L237">      return null;</span>
+    }
+    try {
+<span class="nc" id="L240">      String hostname = InetAddress.getLocalHost().getHostName();</span>
+<span class="nc" id="L241">      Long id = dbLoggingCache.get(&quot;server_&quot; + hostname, () -&gt; {</span>
+<span class="nc" id="L242">        try (SqlSession session = sqlSessionFactory.openSession(true)) {</span>
+<span class="nc" id="L243">          Map&lt;Object, Object&gt; parameters = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L244">          parameters.put(&quot;hostname&quot;, hostname);</span>
+<span class="nc" id="L245">          List&lt;Long&gt; result = session.selectList(&quot;org.languagetool.server.LogMapper.findServer&quot;, parameters);</span>
+<span class="nc bnc" id="L246" title="All 2 branches missed.">          if (result.size() &gt; 0) {</span>
+<span class="nc" id="L247">            return result.get(0);</span>
+          } else {
+<span class="nc" id="L249">            session.insert(&quot;org.languagetool.server.LogMapper.newServer&quot;, parameters);</span>
+<span class="nc" id="L250">            Object value = parameters.get(&quot;id&quot;);</span>
+<span class="nc bnc" id="L251" title="All 2 branches missed.">            if (value == null) {</span>
+              //System.err.println(&quot;Could not get new server id for this host.&quot;);
+<span class="nc" id="L253">              return -1L;</span>
+            } else {
+<span class="nc" id="L255">              return (Long) value;</span>
+            }
+          }
+<span class="nc" id="L258">        } catch (PersistenceException e) {</span>
+<span class="nc" id="L259">          logger.warn(&quot;Error: Could not fetch/register server id from database for server: &quot; + hostname, e);</span>
+<span class="nc" id="L260">          return -1L;</span>
+        }
+      });
+<span class="nc bnc" id="L263" title="All 2 branches missed.">      if (id == -1L) { // loaders can't return null, so using -1 instead</span>
+<span class="nc" id="L264">        return null;</span>
+      } else {
+<span class="nc" id="L266">        return id;</span>
+      }
+<span class="nc" id="L268">    } catch (UnknownHostException | ExecutionException e) {</span>
+<span class="nc" id="L269">      logger.warn(&quot;Error: Could not get hostname to fetch/register server id: &quot;, e);</span>
+<span class="nc" id="L270">      return null;</span>
+    }
+  }
+
+  /**
+   * @since 4.3
+   */
+  Long getOrCreateClientId(String client) {
+<span class="nc bnc" id="L278" title="All 4 branches missed.">    if (sqlSessionFactory == null || client == null) {</span>
+<span class="nc" id="L279">      return null;</span>
+    }
+    try {
+<span class="nc" id="L282">      Long id = dbLoggingCache.get(&quot;client_&quot; + client, () -&gt; {</span>
+<span class="nc" id="L283">        try (SqlSession session = sqlSessionFactory.openSession(true)) {</span>
+<span class="nc" id="L284">          Map&lt;Object, Object&gt; parameters = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L285">          parameters.put(&quot;name&quot;, client);</span>
+<span class="nc" id="L286">          List&lt;Long&gt; result = session.selectList(&quot;org.languagetool.server.LogMapper.findClient&quot;, parameters);</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">          if (result.size() &gt; 0) {</span>
+<span class="nc" id="L288">            return result.get(0);</span>
+          } else {
+<span class="nc" id="L290">            session.insert(&quot;org.languagetool.server.LogMapper.newClient&quot;, parameters);</span>
+<span class="nc" id="L291">            Object value = parameters.get(&quot;id&quot;);</span>
+<span class="nc bnc" id="L292" title="All 2 branches missed.">            if (value == null) {</span>
+              //System.err.println(&quot;Could not get/register id for this client.&quot;);
+<span class="nc" id="L294">              return -1L;</span>
+            } else {
+<span class="nc" id="L296">              return (Long) value;</span>
+            }
+          }
+<span class="nc" id="L299">        } catch (PersistenceException e) {</span>
+<span class="nc" id="L300">          logger.warn(&quot;Error: Could not get/register id for this client: &quot; + client, e);</span>
+<span class="nc" id="L301">          return -1L;</span>
+        }
+      });
+<span class="nc bnc" id="L304" title="All 2 branches missed.">      if (id == -1L) { // loaders can't return null, so using -1 instead</span>
+<span class="nc" id="L305">        return null;</span>
+      } else {
+<span class="nc" id="L307">        return id;</span>
+      }
+<span class="nc" id="L309">    } catch (ExecutionException e) {</span>
+<span class="nc" id="L310">      logger.warn(&quot;Failure in getOrCreateClientId with client '&quot; + client + &quot;': &quot;, e);</span>
+<span class="nc" id="L311">      return null;</span>
+    }
+  }
+  
+  private void validateWord(String word) {
+<span class="nc bnc" id="L316" title="All 4 branches missed.">    if (word == null || word.trim().isEmpty()) {</span>
+<span class="nc" id="L317">      throw new IllegalArgumentException(&quot;Invalid word, cannot be empty or whitespace only&quot;);</span>
+    }
+<span class="nc bnc" id="L319" title="All 2 branches missed.">    if (word.matches(&quot;.*\\s.*&quot;)) {</span>
+<span class="nc" id="L320">      throw new IllegalArgumentException(&quot;Invalid word, you can only words that don't contain spaces: '&quot; + word + &quot;'&quot;);</span>
+    }
+<span class="nc" id="L322">  }</span>
+
+  /** For unit tests only! */
+  public static void createAndFillTestTables() {
+<span class="nc" id="L326">    createAndFillTestTables(false);</span>
+<span class="nc" id="L327">  }</span>
+
+  /** For unit tests only! */
+  public static void createAndFillTestTables(boolean mysql) {
+<span class="nc" id="L331">    try (SqlSession session = sqlSessionFactory.openSession(true)) {</span>
+<span class="nc" id="L332">      System.out.println(&quot;Setting up tables and adding test user...&quot;);</span>
+<span class="nc" id="L333">      String[] statements = { &quot;org.languagetool.server.UserDictMapper.createUserTable&quot;,</span>
+        &quot;org.languagetool.server.UserDictMapper.createIgnoreWordTable&quot; };
+<span class="nc bnc" id="L335" title="All 2 branches missed.">      for (String statement : statements) {</span>
+<span class="nc bnc" id="L336" title="All 2 branches missed.">        if (mysql) {</span>
+<span class="nc" id="L337">          session.insert(statement + &quot;MySQL&quot;);</span>
+        } else {
+<span class="nc" id="L339">          session.insert(statement);</span>
+        }
+      }
+<span class="nc" id="L342">      session.insert(&quot;org.languagetool.server.UserDictMapper.createTestUser1&quot;);</span>
+<span class="nc" id="L343">      session.insert(&quot;org.languagetool.server.UserDictMapper.createTestUser2&quot;);</span>
+    }
+<span class="nc" id="L345">  }</span>
+  
+  /** For unit tests only! */
+  public static void deleteTestTables() {
+<span class="nc" id="L349">    try (SqlSession session = sqlSessionFactory.openSession(true)) {</span>
+<span class="nc" id="L350">      System.out.println(&quot;Deleting tables...&quot;);</span>
+<span class="nc" id="L351">      session.delete(&quot;org.languagetool.server.UserDictMapper.deleteUsersTable&quot;);</span>
+<span class="nc" id="L352">      session.delete(&quot;org.languagetool.server.UserDictMapper.deleteIgnoreWordsTable&quot;);</span>
+    }
+<span class="nc" id="L354">  }</span>
+
+  /** For unit tests only */
+  static ResultSet executeStatement(SQL sql) throws SQLException {
+<span class="nc" id="L358">    try (SqlSession session = sqlSessionFactory.openSession(true)) {</span>
+<span class="nc" id="L359">      try (Connection conn = session.getConnection()) {</span>
+<span class="nc" id="L360">        try (Statement stmt = conn.createStatement()) {</span>
+<span class="nc" id="L361">          return stmt.executeQuery(sql.toString());</span>
+        }
+      }
+    }
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

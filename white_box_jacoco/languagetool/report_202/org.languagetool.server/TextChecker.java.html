@@ -1,0 +1,817 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TextChecker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.server</a> &gt; <span class="el_source">TextChecker.java</span></div><h1>TextChecker.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2016 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.server;
+
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.sun.net.httpserver.HttpExchange;
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.languagetool.*;
+import org.languagetool.language.LanguageIdentifier;
+import org.languagetool.markup.AnnotatedText;
+import org.languagetool.markup.AnnotatedTextBuilder;
+import org.languagetool.rules.CategoryId;
+import org.languagetool.rules.DictionaryMatchFilter;
+import org.languagetool.rules.RemoteRule;
+import org.languagetool.rules.RuleMatch;
+import org.languagetool.rules.bitext.BitextRule;
+import org.languagetool.rules.spelling.morfologik.suggestions_ordering.SuggestionsOrdererConfig;
+import org.languagetool.tools.Tools;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+/**
+ * @since 3.4
+ */
+abstract class TextChecker {
+
+  private static final int PINGS_CLEAN_MILLIS = 60 * 1000;  // internal pings database will be cleaned this often
+  private static final int PINGS_MAX_SIZE = 5000;
+
+  protected abstract void setHeaders(HttpExchange httpExchange);
+  protected abstract String getResponse(AnnotatedText text, Language language, DetectedLanguage lang, Language motherTongue, List&lt;RuleMatch&gt; matches,
+                                        List&lt;RuleMatch&gt; hiddenMatches, String incompleteResultReason, int compactMode);
+  @NotNull
+  protected abstract List&lt;String&gt; getPreferredVariants(Map&lt;String, String&gt; parameters);
+  protected abstract DetectedLanguage getLanguage(String text, Map&lt;String, String&gt; parameters, List&lt;String&gt; preferredVariants,
+                                                  List&lt;String&gt; additionalDetectLangs, List&lt;String&gt; preferredLangs);
+  protected abstract boolean getLanguageAutoDetect(Map&lt;String, String&gt; parameters);
+  @NotNull
+  protected abstract List&lt;String&gt; getEnabledRuleIds(Map&lt;String, String&gt; parameters);
+  @NotNull
+  protected abstract List&lt;String&gt; getDisabledRuleIds(Map&lt;String, String&gt; parameters);
+    
+  protected static final int CONTEXT_SIZE = 40; // characters
+  protected static final int NUM_PIPELINES_PER_SETTING = 3; // for prewarming
+
+  protected final HTTPServerConfig config;
+<span class="fc" id="L78">  private static final Logger logger = LoggerFactory.getLogger(TextChecker.class);</span>
+
+  private static final String ENCODING = &quot;UTF-8&quot;;
+  private static final int CACHE_STATS_PRINT = 500; // print cache stats every n cache requests
+  
+<span class="fc" id="L83">  private final Map&lt;String,Integer&gt; languageCheckCounts = new HashMap&lt;&gt;();</span>
+  private Queue&lt;Runnable&gt; workQueue;
+  private RequestCounter reqCounter;
+  // keep track of timeouts of the hidden matches server, check health periodically;
+  // -1 =&gt; healthy, else =&gt; check timed out at given date, check back if time difference &gt; config.getHiddenMatchesFailTimeout()
+  private long lastHiddenMatchesServerTimeout;
+  // counter; mark as down if this reaches hidenMatchesServerFall
+<span class="fc" id="L90">  private long hiddenMatchesServerFailures = 0;</span>
+  private final LanguageIdentifier identifier;
+  private final ExecutorService executorService;
+  private final ResultCache cache;
+  private final DatabaseLogger databaseLogger;
+  private final Long logServerId;
+<span class="fc" id="L96">  private final Random random = new Random();</span>
+<span class="fc" id="L97">  private final Set&lt;DatabasePingLogEntry&gt; pings = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L98">  private long pingsCleanDateMillis = System.currentTimeMillis();</span>
+  PipelinePool pipelinePool; // mocked in test -&gt; package-private / not final
+
+<span class="fc" id="L101">  TextChecker(HTTPServerConfig config, boolean internalServer, Queue&lt;Runnable&gt; workQueue, RequestCounter reqCounter) {</span>
+<span class="fc" id="L102">    this.config = config;</span>
+<span class="fc" id="L103">    this.workQueue = workQueue;</span>
+<span class="fc" id="L104">    this.reqCounter = reqCounter;</span>
+<span class="fc" id="L105">    this.identifier = new LanguageIdentifier();</span>
+<span class="fc" id="L106">    this.identifier.enableFasttext(config.getFasttextBinary(), config.getFasttextModel());</span>
+<span class="fc" id="L107">    this.executorService = Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat(&quot;lt-textchecker-thread-%d&quot;).build());</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">    this.cache = config.getCacheSize() &gt; 0 ? new ResultCache(</span>
+<span class="pc" id="L109">      config.getCacheSize(), config.getCacheTTLSeconds(), TimeUnit.SECONDS) : null;</span>
+<span class="fc" id="L110">    this.databaseLogger = DatabaseLogger.getInstance();</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">    if (databaseLogger.isLogging()) {</span>
+<span class="nc" id="L112">      this.logServerId = DatabaseAccess.getInstance().getOrCreateServerId();</span>
+    } else {
+<span class="fc" id="L114">      this.logServerId = null;</span>
+    }
+
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">    ServerMetricsCollector.getInstance().logHiddenServerConfiguration(config.getHiddenMatchesServer() != null);</span>
+
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">    if (cache != null) {</span>
+<span class="nc" id="L120">      ServerMetricsCollector.getInstance().monitorCache(&quot;languagetool_matches_cache&quot;, cache.getMatchesCache());</span>
+<span class="nc" id="L121">      ServerMetricsCollector.getInstance().monitorCache(&quot;languagetool_remote_matches_cache&quot;, cache.getRemoteMatchesCache());</span>
+<span class="nc" id="L122">      ServerMetricsCollector.getInstance().monitorCache(&quot;languagetool_sentences_cache&quot;, cache.getSentenceCache());</span>
+<span class="nc" id="L123">      ServerMetricsCollector.getInstance().monitorCache(&quot;languagetool_remote_matches_cache&quot;, cache.getRemoteMatchesCache());</span>
+    }
+
+<span class="fc" id="L126">    pipelinePool = new PipelinePool(config, cache, internalServer);</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">    if (config.isPipelinePrewarmingEnabled()) {</span>
+<span class="nc" id="L128">      logger.info(&quot;Prewarming pipelines...&quot;);</span>
+<span class="nc" id="L129">      prewarmPipelinePool();</span>
+<span class="nc" id="L130">      logger.info(&quot;Prewarming finished.&quot;);</span>
+    }
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">    if (config.getAbTest() != null) {</span>
+<span class="nc" id="L133">      UserConfig.enableABTests();</span>
+<span class="nc" id="L134">      logger.info(&quot;A/B-Test enabled: &quot; + config.getAbTest());</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">      if (config.getAbTest().equals(&quot;SuggestionsOrderer&quot;)) {</span>
+<span class="nc" id="L136">        SuggestionsOrdererConfig.setMLSuggestionsOrderingEnabled(true);</span>
+      }
+    }
+<span class="fc" id="L139">  }</span>
+
+  private void prewarmPipelinePool() {
+    // setting + number of pipelines
+    // typical addon settings at the moment (2018-11-05)
+<span class="nc" id="L144">    Map&lt;PipelinePool.PipelineSettings, Integer&gt; prewarmSettings = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L145">    List&lt;Language&gt; prewarmLanguages = Stream.of(</span>
+      &quot;de-DE&quot;, &quot;en-US&quot;, &quot;en-GB&quot;, &quot;pt-BR&quot;, &quot;ru-RU&quot;, &quot;es&quot;, &quot;it&quot;, &quot;fr&quot;, &quot;pl-PL&quot;, &quot;uk-UA&quot;)
+<span class="nc" id="L147">      .map(Languages::getLanguageForShortCode)</span>
+<span class="nc" id="L148">      .collect(Collectors.toList());</span>
+<span class="nc" id="L149">    List&lt;String&gt; addonDisabledRules = Collections.singletonList(&quot;WHITESPACE_RULE&quot;);</span>
+<span class="nc" id="L150">    List&lt;JLanguageTool.Mode&gt; addonModes = Arrays.asList(JLanguageTool.Mode.TEXTLEVEL_ONLY, JLanguageTool.Mode.ALL_BUT_TEXTLEVEL_ONLY);</span>
+<span class="nc" id="L151">    UserConfig user = new UserConfig();</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">    for (Language language : prewarmLanguages) {</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">      for (JLanguageTool.Mode mode : addonModes) {</span>
+<span class="nc" id="L154">        QueryParams params = new QueryParams(Collections.emptyList(), Collections.emptyList(), addonDisabledRules,</span>
+<span class="nc" id="L155">          Collections.emptyList(), Collections.emptyList(), false, true,</span>
+          false, false, false, mode, JLanguageTool.Level.DEFAULT, null);
+<span class="nc" id="L157">        PipelinePool.PipelineSettings settings = new PipelinePool.PipelineSettings(language, null, params, config.globalConfig, user);</span>
+<span class="nc" id="L158">        prewarmSettings.put(settings, NUM_PIPELINES_PER_SETTING);</span>
+
+<span class="nc" id="L160">        PipelinePool.PipelineSettings settingsMotherTongueEqual = new PipelinePool.PipelineSettings(language, language, params, config.globalConfig, user);</span>
+<span class="nc" id="L161">        PipelinePool.PipelineSettings settingsMotherTongueEnglish = new PipelinePool.PipelineSettings(language,</span>
+<span class="nc" id="L162">          Languages.getLanguageForName(&quot;English&quot;), params, config.globalConfig, user);</span>
+<span class="nc" id="L163">        prewarmSettings.put(settingsMotherTongueEqual, NUM_PIPELINES_PER_SETTING);</span>
+<span class="nc" id="L164">        prewarmSettings.put(settingsMotherTongueEnglish, NUM_PIPELINES_PER_SETTING);</span>
+<span class="nc" id="L165">      }</span>
+<span class="nc" id="L166">    }</span>
+    try {
+<span class="nc bnc" id="L168" title="All 2 branches missed.">      for (Map.Entry&lt;PipelinePool.PipelineSettings, Integer&gt; prewarmSetting : prewarmSettings.entrySet()) {</span>
+<span class="nc" id="L169">          int numPipelines = prewarmSetting.getValue();</span>
+<span class="nc" id="L170">          PipelinePool.PipelineSettings setting = prewarmSetting.getKey();</span>
+
+          // request n pipelines first, return all afterwards -&gt; creates multiple for same setting
+<span class="nc" id="L173">          List&lt;Pipeline&gt; pipelines = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">          for (int i = 0; i &lt; numPipelines; i++) {</span>
+<span class="nc" id="L175">            Pipeline p = pipelinePool.getPipeline(setting);</span>
+<span class="nc" id="L176">            p.check(&quot;LanguageTool&quot;);</span>
+<span class="nc" id="L177">            pipelines.add(p);</span>
+          }
+<span class="nc bnc" id="L179" title="All 2 branches missed.">          for (Pipeline p : pipelines) {</span>
+<span class="nc" id="L180">            pipelinePool.returnPipeline(setting, p);</span>
+<span class="nc" id="L181">          }</span>
+<span class="nc" id="L182">      }</span>
+<span class="nc" id="L183">    } catch (Exception e) {</span>
+<span class="nc" id="L184">      throw new RuntimeException(&quot;Error while prewarming pipelines&quot;, e);</span>
+<span class="nc" id="L185">    }</span>
+<span class="nc" id="L186">  }</span>
+
+  void shutdownNow() {
+<span class="nc" id="L189">    executorService.shutdownNow();</span>
+<span class="nc" id="L190">    RemoteRule.shutdown();</span>
+<span class="nc" id="L191">  }</span>
+
+  void checkText(AnnotatedText aText, HttpExchange httpExchange, Map&lt;String, String&gt; parameters, ErrorRequestLimiter errorRequestLimiter,
+                 String remoteAddress) throws Exception {
+<span class="fc" id="L195">    checkParams(parameters);</span>
+<span class="fc" id="L196">    long timeStart = System.currentTimeMillis();</span>
+<span class="fc" id="L197">    UserLimits limits = ServerTools.getUserLimits(parameters, config);</span>
+
+    // logging information
+<span class="fc bfc" id="L200" title="All 2 branches covered.">    String agent = parameters.get(&quot;useragent&quot;) != null ? parameters.get(&quot;useragent&quot;) : &quot;-&quot;;</span>
+<span class="fc" id="L201">    Long agentId = null, userId = null;</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">    if (databaseLogger.isLogging()) {</span>
+<span class="nc" id="L203">      DatabaseAccess db = DatabaseAccess.getInstance();</span>
+<span class="nc" id="L204">      agentId = db.getOrCreateClientId(parameters.get(&quot;useragent&quot;));</span>
+<span class="nc" id="L205">      userId = limits.getPremiumUid();</span>
+    }
+<span class="fc" id="L207">    String referrer = httpExchange.getRequestHeaders().getFirst(&quot;Referer&quot;);</span>
+<span class="fc" id="L208">    String userAgent = httpExchange.getRequestHeaders().getFirst(&quot;User-Agent&quot;);</span>
+
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">    if (aText.getPlainText().length() &gt; limits.getMaxTextLength()) {</span>
+<span class="nc" id="L211">      String msg = &quot;limit: &quot; + limits.getMaxTextLength() + &quot;, size: &quot; + aText.getPlainText().length();</span>
+<span class="nc" id="L212">      databaseLogger.log(new DatabaseAccessLimitLogEntry(&quot;MaxCharacterSizeExceeded&quot;, logServerId, agentId, userId, msg, referrer, userAgent));</span>
+<span class="nc" id="L213">      ServerMetricsCollector.getInstance().logRequestError(ServerMetricsCollector.RequestErrorType.MAX_TEXT_SIZE);</span>
+<span class="nc" id="L214">      throw new TextTooLongException(&quot;Your text exceeds the limit of &quot; + limits.getMaxTextLength() +</span>
+<span class="nc" id="L215">              &quot; characters (it's &quot; + aText.getPlainText().length() + &quot; characters). Please submit a shorter text.&quot;);</span>
+    }
+
+<span class="fc" id="L218">    boolean filterDictionaryMatches = &quot;true&quot;.equals(parameters.get(&quot;filterDictionaryMatches&quot;));</span>
+
+<span class="fc" id="L220">    Long textSessionId = null;</span>
+    try {
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">      if (parameters.containsKey(&quot;textSessionId&quot;)) {</span>
+<span class="nc" id="L223">        String textSessionIdStr = parameters.get(&quot;textSessionId&quot;);</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">        if (textSessionIdStr.contains(&quot;:&quot;)) { // transitioning to new format used in chrome addon</span>
+          // format: &quot;{random number in 0..99999}:{unix time}&quot;
+          long random, timestamp;
+<span class="nc" id="L227">          int sepPos = textSessionIdStr.indexOf(':');</span>
+<span class="nc" id="L228">          random = Long.valueOf(textSessionIdStr.substring(0, sepPos));</span>
+<span class="nc" id="L229">          timestamp = Long.valueOf(textSessionIdStr.substring(sepPos + 1));</span>
+          // use random number to choose a slice in possible range of values
+          // then choose position in slice by timestamp
+<span class="nc" id="L232">          long maxRandom = 100000;</span>
+<span class="nc" id="L233">          long randomSegmentSize = (Long.MAX_VALUE - maxRandom) / maxRandom;</span>
+<span class="nc" id="L234">          long segmentOffset = random * randomSegmentSize;</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">          if (timestamp &gt; randomSegmentSize) {</span>
+<span class="nc" id="L236">            logger.warn(String.format(&quot;Could not transform textSessionId '%s'&quot;, textSessionIdStr));</span>
+          }
+<span class="nc" id="L238">          textSessionId = segmentOffset + timestamp;</span>
+<span class="nc" id="L239">        } else {</span>
+<span class="nc" id="L240">          textSessionId = Long.valueOf(textSessionIdStr);</span>
+        }
+      }
+<span class="nc" id="L243">    } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L244">      logger.warn(&quot;Could not parse textSessionId '&quot; + parameters.get(&quot;textSessionId&quot;) + &quot;' as long: &quot; + ex.getMessage());</span>
+<span class="fc" id="L245">    }</span>
+
+<span class="fc" id="L247">    String abTest = null;</span>
+<span class="pc bpc" id="L248" title="4 of 6 branches missed.">    if (agent != null &amp;&amp; config.getAbTestClients() != null &amp;&amp; config.getAbTestClients().matcher(agent).matches()) {</span>
+      boolean testRolledOut;
+      // partial rollout; deterministic if textSessionId given to make testing easier
+<span class="nc bnc" id="L251" title="All 2 branches missed.">      if (textSessionId != null) {</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">        testRolledOut = textSessionId % 100 &lt; config.getAbTestRollout();</span>
+      } else {
+<span class="nc bnc" id="L254" title="All 2 branches missed.">        testRolledOut = random.nextInt(100) &lt; config.getAbTestRollout();</span>
+      }
+<span class="nc bnc" id="L256" title="All 2 branches missed.">      if (testRolledOut) {</span>
+<span class="nc" id="L257">        abTest = config.getAbTest();</span>
+      }
+    }
+
+<span class="fc" id="L261">    UserConfig userConfig = new UserConfig(</span>
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">            limits.getPremiumUid() != null ? getUserDictWords(limits.getPremiumUid()) : Collections.emptyList(),</span>
+<span class="fc" id="L263">            getRuleValues(parameters), config.getMaxSpellingSuggestions(), null, null, filterDictionaryMatches,</span>
+      abTest, textSessionId);
+
+    //print(&quot;Check start: &quot; + text.length() + &quot; chars, &quot; + langParam);
+<span class="fc" id="L267">    boolean autoDetectLanguage = getLanguageAutoDetect(parameters);</span>
+<span class="fc" id="L268">    List&lt;String&gt; preferredVariants = getPreferredVariants(parameters);</span>
+<span class="pc bpc" id="L269" title="3 of 4 branches missed.">    if (parameters.get(&quot;noopLanguages&quot;) != null &amp;&amp; !autoDetectLanguage) {</span>
+<span class="nc" id="L270">      ServerMetricsCollector.getInstance().logRequestError(ServerMetricsCollector.RequestErrorType.INVALID_REQUEST);</span>
+<span class="nc" id="L271">      throw new IllegalArgumentException(&quot;You can specify 'noopLanguages' only when also using 'language=auto'&quot;);</span>
+    }
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">    List&lt;String&gt; noopLangs = parameters.get(&quot;noopLanguages&quot;) != null ?</span>
+<span class="pc" id="L274">            Arrays.asList(parameters.get(&quot;noopLanguages&quot;).split(&quot;,&quot;)) : Collections.emptyList();</span>
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">    List&lt;String&gt; preferredLangs = parameters.get(&quot;preferredLanguages&quot;) != null ?</span>
+<span class="pc" id="L276">            Arrays.asList(parameters.get(&quot;preferredLanguages&quot;).split(&quot;,&quot;)) : Collections.emptyList();</span>
+<span class="fc" id="L277">    DetectedLanguage detLang = getLanguage(aText.getPlainText(), parameters, preferredVariants, noopLangs, preferredLangs);</span>
+<span class="fc" id="L278">    Language lang = detLang.getGivenLanguage();</span>
+
+    // == temporary counting code ======================================
+    /*
+    if (httpExchange.getRequestHeaders() != null &amp;&amp; httpExchange.getRequestHeaders().get(&quot;Accept-Language&quot;) != null) {
+      List&lt;String&gt; langs = httpExchange.getRequestHeaders().get(&quot;Accept-Language&quot;);
+      if (langs.size() &gt; 0) {
+        String[] split = langs.get(0).split(&quot;,&quot;);
+        if (split.length &gt; 0 &amp;&amp; detLang.getDetectedLanguage() != null &amp;&amp; detLang.getDetectedLanguage().getShortCode().equals(&quot;en&quot;)) {
+          int theCount1 = StringUtils.countMatches(aText.toString(), &quot; the &quot;);
+          int theCount2 = StringUtils.countMatches(aText.toString(), &quot;The &quot;);
+          String browserLang = split[0];
+          System.out.println(&quot;STAT\t&quot; + detLang.getDetectedLanguage().getShortCode() + &quot;\t&quot; + detLang.getDetectionConfidence() + &quot;\t&quot; + aText.toString().length() + &quot;\t&quot; + browserLang + &quot;\t&quot; + theCount1 + &quot;\t&quot; + theCount2);
+        }
+      }
+    }
+    */
+    // ========================================
+
+<span class="fc" id="L297">    Integer count = languageCheckCounts.get(lang.getShortCodeWithCountryAndVariant());</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">    if (count == null) {</span>
+<span class="fc" id="L299">      count = 1;</span>
+    } else {
+<span class="fc" id="L301">      count++;</span>
+    }
+    //print(&quot;Starting check: &quot; + aText.getPlainText().length() + &quot; chars, #&quot; + count);
+<span class="fc" id="L304">    String motherTongueParam = parameters.get(&quot;motherTongue&quot;);</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">    Language motherTongue = motherTongueParam != null ? Languages.getLanguageForShortCode(motherTongueParam) : null;</span>
+<span class="pc bpc" id="L306" title="1 of 4 branches missed.">    boolean useEnabledOnly = &quot;yes&quot;.equals(parameters.get(&quot;enabledOnly&quot;)) || &quot;true&quot;.equals(parameters.get(&quot;enabledOnly&quot;));</span>
+<span class="fc" id="L307">    List&lt;Language&gt; altLanguages = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">    if (parameters.get(&quot;altLanguages&quot;) != null) {</span>
+<span class="fc" id="L309">      String[] altLangParams = parameters.get(&quot;altLanguages&quot;).split(&quot;,\\s*&quot;);</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">      for (String langCode : altLangParams) {</span>
+<span class="fc" id="L311">        Language altLang = Languages.getLanguageForShortCode(langCode);</span>
+<span class="fc" id="L312">        altLanguages.add(altLang);</span>
+<span class="pc bpc" id="L313" title="3 of 4 branches missed.">        if (altLang.hasVariant() &amp;&amp; !altLang.isVariant()) {</span>
+<span class="nc" id="L314">          ServerMetricsCollector.getInstance().logRequestError(ServerMetricsCollector.RequestErrorType.INVALID_REQUEST);</span>
+<span class="nc" id="L315">          throw new IllegalArgumentException(&quot;You specified altLanguage '&quot; + langCode + &quot;', but for this language you need to specify a variant, e.g. 'en-GB' instead of just 'en'&quot;);</span>
+        }
+      }
+    }
+<span class="fc" id="L319">    List&lt;String&gt; enabledRules = getEnabledRuleIds(parameters);</span>
+
+<span class="fc" id="L321">    List&lt;String&gt; disabledRules = getDisabledRuleIds(parameters);</span>
+<span class="fc" id="L322">    List&lt;CategoryId&gt; enabledCategories = getCategoryIds(&quot;enabledCategories&quot;, parameters);</span>
+<span class="fc" id="L323">    List&lt;CategoryId&gt; disabledCategories = getCategoryIds(&quot;disabledCategories&quot;, parameters);</span>
+
+<span class="pc bpc" id="L325" title="1 of 6 branches missed.">    if ((disabledRules.size() &gt; 0 || disabledCategories.size() &gt; 0) &amp;&amp; useEnabledOnly) {</span>
+<span class="fc" id="L326">      ServerMetricsCollector.getInstance().logRequestError(ServerMetricsCollector.RequestErrorType.INVALID_REQUEST);</span>
+<span class="fc" id="L327">      throw new IllegalArgumentException(&quot;You cannot specify disabled rules or categories using enabledOnly=true&quot;);</span>
+    }
+<span class="pc bpc" id="L329" title="5 of 6 branches missed.">    if (enabledRules.isEmpty() &amp;&amp; enabledCategories.isEmpty() &amp;&amp; useEnabledOnly) {</span>
+<span class="nc" id="L330">      ServerMetricsCollector.getInstance().logRequestError(ServerMetricsCollector.RequestErrorType.INVALID_REQUEST);</span>
+<span class="nc" id="L331">      throw new IllegalArgumentException(&quot;You must specify enabled rules or categories when using enabledOnly=true&quot;);</span>
+    }
+
+<span class="fc" id="L334">    boolean enableTempOffRules = &quot;true&quot;.equals(parameters.get(&quot;enableTempOffRules&quot;));</span>
+<span class="pc bpc" id="L335" title="3 of 4 branches missed.">    boolean useQuerySettings = enabledRules.size() &gt; 0 || disabledRules.size() &gt; 0 ||</span>
+<span class="pc bnc" id="L336" title="All 6 branches missed.">            enabledCategories.size() &gt; 0 || disabledCategories.size() &gt; 0 || enableTempOffRules;</span>
+<span class="fc" id="L337">    boolean allowIncompleteResults = &quot;true&quot;.equals(parameters.get(&quot;allowIncompleteResults&quot;));</span>
+<span class="fc" id="L338">    boolean enableHiddenRules = &quot;true&quot;.equals(parameters.get(&quot;enableHiddenRules&quot;));</span>
+<span class="fc" id="L339">    JLanguageTool.Mode mode = ServerTools.getMode(parameters);</span>
+<span class="fc" id="L340">    JLanguageTool.Level level = ServerTools.getLevel(parameters);</span>
+<span class="fc" id="L341">    String callback = parameters.get(&quot;callback&quot;);</span>
+    // allowed to log input on errors?
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">    boolean inputLogging = !parameters.getOrDefault(&quot;inputLogging&quot;, &quot;&quot;).equals(&quot;no&quot;);</span>
+<span class="fc" id="L344">    QueryParams params = new QueryParams(altLanguages, enabledRules, disabledRules,</span>
+      enabledCategories, disabledCategories, useEnabledOnly,
+      useQuerySettings, allowIncompleteResults, enableHiddenRules, enableTempOffRules, mode, level, callback, inputLogging);
+
+<span class="fc" id="L348">    int textSize = aText.getPlainText().length();</span>
+
+<span class="fc" id="L350">    List&lt;RuleMatch&gt; ruleMatchesSoFar = Collections.synchronizedList(new ArrayList&lt;&gt;());</span>
+
+<span class="fc" id="L352">    Future&lt;List&lt;RuleMatch&gt;&gt; future = executorService.submit(new Callable&lt;List&lt;RuleMatch&gt;&gt;() {</span>
+      @Override
+      public List&lt;RuleMatch&gt; call() throws Exception {
+        // use to fake OOM in thread for testing:
+        /*if (Math.random() &lt; 0.1) {
+          throw new OutOfMemoryError();
+        }*/
+<span class="fc" id="L359">        return getRuleMatches(aText, lang, motherTongue, parameters, params, userConfig, detLang, preferredLangs, preferredVariants, f -&gt; ruleMatchesSoFar.add(f));</span>
+      }
+    });
+<span class="fc" id="L362">    String incompleteResultReason = null;</span>
+    List&lt;RuleMatch&gt; matches;
+    try {
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">      if (limits.getMaxCheckTimeMillis() &lt; 0) {</span>
+<span class="fc" id="L366">        matches = future.get();</span>
+      } else {
+<span class="nc" id="L368">        matches = future.get(limits.getMaxCheckTimeMillis(), TimeUnit.MILLISECONDS);</span>
+      }
+<span class="nc" id="L370">    } catch (ExecutionException e) {</span>
+<span class="nc" id="L371">      future.cancel(true);</span>
+<span class="nc bnc" id="L372" title="All 2 branches missed.">      if (ExceptionUtils.getRootCause(e) instanceof ErrorRateTooHighException) {</span>
+<span class="nc" id="L373">        ServerMetricsCollector.getInstance().logRequestError(ServerMetricsCollector.RequestErrorType.TOO_MANY_ERRORS);</span>
+<span class="nc" id="L374">        databaseLogger.log(new DatabaseCheckErrorLogEntry(&quot;ErrorRateTooHigh&quot;, logServerId, agentId, userId, lang, detLang.getDetectedLanguage(), textSize, &quot;matches: &quot; + ruleMatchesSoFar.size()));</span>
+      }
+<span class="nc bnc" id="L376" title="All 4 branches missed.">      if (params.allowIncompleteResults &amp;&amp; ExceptionUtils.getRootCause(e) instanceof ErrorRateTooHighException) {</span>
+<span class="nc" id="L377">        logger.warn(e.getMessage() + &quot; - returning &quot; + ruleMatchesSoFar.size() + &quot; matches found so far. &quot; +</span>
+<span class="nc" id="L378">          &quot;Detected language: &quot; + detLang + &quot;, &quot; + ServerTools.getLoggingInfo(remoteAddress, null, -1, httpExchange,</span>
+<span class="nc" id="L379">          parameters, System.currentTimeMillis()-timeStart, reqCounter));</span>
+<span class="nc" id="L380">        matches = new ArrayList&lt;&gt;(ruleMatchesSoFar);  // threads might still be running, so make a copy</span>
+<span class="nc" id="L381">        incompleteResultReason = &quot;Results are incomplete: &quot; + ExceptionUtils.getRootCause(e).getMessage();</span>
+<span class="nc bnc" id="L382" title="All 4 branches missed.">      } else if (e.getCause() != null &amp;&amp; e.getCause() instanceof OutOfMemoryError) {</span>
+<span class="nc" id="L383">        throw (OutOfMemoryError)e.getCause();</span>
+      } else {
+<span class="nc" id="L385">        throw new RuntimeException(ServerTools.cleanUserTextFromMessage(e.getMessage(), parameters) + &quot;, detected: &quot; + detLang, e);</span>
+      }
+<span class="nc" id="L387">    } catch (TimeoutException e) {</span>
+<span class="nc" id="L388">      boolean cancelled = future.cancel(true);</span>
+<span class="nc" id="L389">      Path loadFile = Paths.get(&quot;/proc/loadavg&quot;);  // works in Linux only(?)</span>
+<span class="nc bnc" id="L390" title="All 2 branches missed.">      String loadInfo = loadFile.toFile().exists() ? Files.readAllLines(loadFile).toString() : &quot;(unknown)&quot;;</span>
+<span class="nc bnc" id="L391" title="All 2 branches missed.">      if (errorRequestLimiter != null) {</span>
+<span class="nc" id="L392">        errorRequestLimiter.logAccess(remoteAddress, httpExchange.getRequestHeaders(), parameters);</span>
+      }
+<span class="nc" id="L394">      String message = &quot;Text checking took longer than allowed maximum of &quot; + limits.getMaxCheckTimeMillis() +</span>
+                       &quot; milliseconds (cancelled: &quot; + cancelled +
+<span class="nc" id="L396">                       &quot;, lang: &quot; + lang.getShortCodeWithCountryAndVariant() +</span>
+                       &quot;, detected: &quot; + detLang +
+                       &quot;, #&quot; + count +
+<span class="nc" id="L399">                       &quot;, &quot; + aText.getPlainText().length() + &quot; characters of text&quot; +</span>
+<span class="nc" id="L400">                       &quot;, mode: &quot; + mode.toString().toLowerCase() +</span>
+<span class="nc" id="L401">                       &quot;, h: &quot; + reqCounter.getHandleCount() + &quot;, r: &quot; + reqCounter.getRequestCount() + &quot;, system load: &quot; + loadInfo + &quot;)&quot;;</span>
+<span class="nc bnc" id="L402" title="All 2 branches missed.">      if (params.allowIncompleteResults) {</span>
+<span class="nc" id="L403">        logger.info(message + &quot; - returning &quot; + ruleMatchesSoFar.size() + &quot; matches found so far&quot;);</span>
+<span class="nc" id="L404">        matches = new ArrayList&lt;&gt;(ruleMatchesSoFar);  // threads might still be running, so make a copy</span>
+<span class="nc" id="L405">        incompleteResultReason = &quot;Results are incomplete: text checking took longer than allowed maximum of &quot; +</span>
+<span class="nc" id="L406">                String.format(Locale.ENGLISH, &quot;%.2f&quot;, limits.getMaxCheckTimeMillis()/1000.0) + &quot; seconds&quot;;</span>
+      } else {
+<span class="nc" id="L408">        ServerMetricsCollector.getInstance().logRequestError(ServerMetricsCollector.RequestErrorType.MAX_CHECK_TIME);</span>
+<span class="nc" id="L409">        databaseLogger.log(new DatabaseCheckErrorLogEntry(&quot;MaxCheckTimeExceeded&quot;,</span>
+<span class="nc" id="L410">          logServerId, agentId, limits.getPremiumUid(), lang, detLang.getDetectedLanguage(), textSize, &quot;load: &quot;+ loadInfo));</span>
+<span class="nc" id="L411">        throw new RuntimeException(message, e);</span>
+      }
+<span class="pc" id="L413">    }</span>
+
+<span class="fc" id="L415">    setHeaders(httpExchange);</span>
+
+<span class="fc" id="L417">    List&lt;RuleMatch&gt; hiddenMatches = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L418" title="3 of 4 branches missed.">    if (config.getHiddenMatchesServer() != null &amp;&amp; params.enableHiddenRules &amp;&amp;</span>
+<span class="nc bnc" id="L419" title="All 2 branches missed.">      config.getHiddenMatchesLanguages().contains(lang)) {</span>
+<span class="nc bnc" id="L420" title="All 4 branches missed.">      if(config.getHiddenMatchesServerFailTimeout() &gt; 0 &amp;&amp; lastHiddenMatchesServerTimeout != -1 &amp;&amp;</span>
+<span class="nc bnc" id="L421" title="All 2 branches missed.">        System.currentTimeMillis() - lastHiddenMatchesServerTimeout &lt; config.getHiddenMatchesServerFailTimeout()) {</span>
+<span class="nc" id="L422">        ServerMetricsCollector.getInstance().logHiddenServerStatus(false);</span>
+<span class="nc" id="L423">        ServerMetricsCollector.getInstance().logHiddenServerRequest(false);</span>
+<span class="nc" id="L424">        logger.warn(&quot;Warn: Skipped querying hidden matches server at &quot; +</span>
+<span class="nc" id="L425">          config.getHiddenMatchesServer() + &quot; because of recent error/timeout (timeout=&quot; + config.getHiddenMatchesServerFailTimeout() + &quot;ms).&quot;);</span>
+      } else {
+<span class="nc" id="L427">        ResultExtender resultExtender = new ResultExtender(config.getHiddenMatchesServer(), config.getHiddenMatchesServerTimeout());</span>
+        try {
+<span class="nc" id="L429">          long start = System.currentTimeMillis();</span>
+<span class="nc" id="L430">          List&lt;RemoteRuleMatch&gt; extensionMatches = resultExtender.getExtensionMatches(aText.getPlainText(), parameters);</span>
+<span class="nc" id="L431">          hiddenMatches = resultExtender.getFilteredExtensionMatches(matches, extensionMatches);</span>
+<span class="nc" id="L432">          long end = System.currentTimeMillis();</span>
+<span class="nc" id="L433">          logger.info(&quot;Hidden matches: &quot; + extensionMatches.size() + &quot; -&gt; &quot; + hiddenMatches.size() + &quot; in &quot; + (end - start) + &quot;ms for &quot; + lang.getShortCodeWithCountryAndVariant());</span>
+<span class="nc" id="L434">          ServerMetricsCollector.getInstance().logHiddenServerStatus(true);</span>
+<span class="nc" id="L435">          lastHiddenMatchesServerTimeout = -1;</span>
+<span class="nc" id="L436">          hiddenMatchesServerFailures = 0;</span>
+<span class="nc" id="L437">          ServerMetricsCollector.getInstance().logHiddenServerRequest(true);</span>
+<span class="nc" id="L438">        } catch (Exception e) {</span>
+<span class="nc" id="L439">          ServerMetricsCollector.getInstance().logHiddenServerRequest(false);</span>
+<span class="nc" id="L440">          hiddenMatchesServerFailures++;</span>
+<span class="nc bnc" id="L441" title="All 2 branches missed.">          if (hiddenMatchesServerFailures &gt;= config.getHiddenMatchesServerFall()) {</span>
+<span class="nc" id="L442">            ServerMetricsCollector.getInstance().logHiddenServerStatus(false);</span>
+<span class="nc" id="L443">            logger.warn(&quot;Failed to query hidden matches server at &quot; + config.getHiddenMatchesServer() + &quot;: &quot; + e.getClass() + &quot;: &quot; + e.getMessage() + &quot;, input was &quot; + aText.getPlainText().length() + &quot; characters - marked as down now&quot;);</span>
+<span class="nc" id="L444">            lastHiddenMatchesServerTimeout = System.currentTimeMillis();</span>
+          } else {
+<span class="nc" id="L446">            logger.warn(&quot;Failed to query hidden matches server at &quot; + config.getHiddenMatchesServer() + &quot;: &quot; + e.getClass() + &quot;: &quot; + e.getMessage() + &quot;, input was &quot; + aText.getPlainText().length() + &quot; characters - &quot; + (config.getHiddenMatchesServerFall() - hiddenMatchesServerFailures) + &quot; errors until marked as down&quot;);</span>
+          }
+<span class="nc" id="L448">        }</span>
+      }
+    }
+<span class="fc" id="L451">    int compactMode = Integer.parseInt(parameters.getOrDefault(&quot;c&quot;, &quot;0&quot;));</span>
+<span class="fc" id="L452">    String response = getResponse(aText, lang, detLang, motherTongue, matches, hiddenMatches, incompleteResultReason, compactMode);</span>
+<span class="pc bpc" id="L453" title="1 of 2 branches missed.">    if (params.callback != null) {</span>
+      // JSONP - still needed today for the special case of hosting your own on-premise LT without SSL
+      // and using it from a local MS Word (not Online Word) - issue #89 in the add-in repo:
+<span class="nc" id="L456">      response = params.callback + &quot;(&quot; + response + &quot;);&quot;;</span>
+    }
+<span class="fc" id="L458">    String messageSent = &quot;sent&quot;;</span>
+<span class="fc" id="L459">    String languageMessage = lang.getShortCodeWithCountryAndVariant();</span>
+    try {
+<span class="fc" id="L461">      httpExchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, response.getBytes(ENCODING).length);</span>
+<span class="fc" id="L462">      httpExchange.getResponseBody().write(response.getBytes(ENCODING));</span>
+<span class="fc" id="L463">      ServerMetricsCollector.getInstance().logResponse(HttpURLConnection.HTTP_OK);</span>
+<span class="nc" id="L464">    } catch (IOException exception) {</span>
+      // the client is disconnected
+<span class="nc" id="L466">      messageSent = &quot;notSent: &quot; + exception.getMessage();</span>
+<span class="fc" id="L467">    }</span>
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">    if (motherTongue != null) {</span>
+<span class="fc" id="L469">      languageMessage += &quot; (mother tongue: &quot; + motherTongue.getShortCodeWithCountryAndVariant() + &quot;)&quot;;</span>
+    }
+<span class="fc bfc" id="L471" title="All 2 branches covered.">    if (autoDetectLanguage) {</span>
+<span class="fc" id="L472">      languageMessage += &quot;[auto]&quot;;</span>
+    }
+<span class="fc" id="L474">    languageCheckCounts.put(lang.getShortCodeWithCountryAndVariant(), count);</span>
+<span class="fc" id="L475">    int computationTime = (int) (System.currentTimeMillis() - timeStart);</span>
+<span class="pc bpc" id="L476" title="1 of 2 branches missed.">    String version = parameters.get(&quot;v&quot;) != null ? &quot;, v:&quot; + parameters.get(&quot;v&quot;) : &quot;&quot;;</span>
+<span class="pc bpc" id="L477" title="1 of 2 branches missed.">    String skipLimits = limits.getSkipLimits() ? &quot;, skipLimits&quot; : &quot;&quot;;</span>
+<span class="fc" id="L478">    logger.info(&quot;Check done: &quot; + aText.getPlainText().length() + &quot; chars, &quot; + languageMessage + &quot;, #&quot; + count + &quot;, &quot; + referrer + &quot;, &quot;</span>
+<span class="pc bpc" id="L479" title="1 of 2 branches missed.">            + matches.size() + &quot; matches, &quot;</span>
+            + computationTime + &quot;ms, agent:&quot; + agent + version
+<span class="pc" id="L481">            + &quot;, &quot; + messageSent + &quot;, q:&quot; + (workQueue != null ? workQueue.size() : &quot;?&quot;)</span>
+<span class="fc" id="L482">            + &quot;, h:&quot; + reqCounter.getHandleCount() + &quot;, dH:&quot; + reqCounter.getDistinctIps()</span>
+<span class="fc" id="L483">            + &quot;, m:&quot; + mode.toString().toLowerCase() + skipLimits);</span>
+
+<span class="fc" id="L485">    int matchCount = matches.size();</span>
+<span class="fc" id="L486">    Map&lt;String, Integer&gt; ruleMatchCount = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L487" title="All 2 branches covered.">    for (RuleMatch match : matches) {</span>
+<span class="fc" id="L488">      String ruleId = match.getRule().getId();</span>
+<span class="fc" id="L489">      ruleMatchCount.put(ruleId, ruleMatchCount.getOrDefault(ruleId, 0) + 1);</span>
+<span class="fc" id="L490">    }</span>
+
+<span class="fc" id="L492">    ServerMetricsCollector.getInstance().logCheck(</span>
+      lang, computationTime, textSize, matchCount, mode);
+
+<span class="pc bpc" id="L495" title="1 of 2 branches missed.">    if (!config.isSkipLoggingChecks()) {</span>
+<span class="fc" id="L496">      DatabaseCheckLogEntry logEntry = new DatabaseCheckLogEntry(userId, agentId, logServerId, textSize, matchCount,</span>
+<span class="fc" id="L497">        lang, detLang.getDetectedLanguage(), computationTime, textSessionId, mode.toString());</span>
+<span class="fc" id="L498">      logEntry.setRuleMatches(new DatabaseRuleMatchLogEntry(</span>
+<span class="pc bpc" id="L499" title="1 of 2 branches missed.">        config.isSkipLoggingRuleMatches() ? Collections.emptyMap() : ruleMatchCount));</span>
+<span class="fc" id="L500">      databaseLogger.log(logEntry);</span>
+    }
+
+<span class="pc bpc" id="L503" title="1 of 2 branches missed.">    if (databaseLogger.isLogging()) {</span>
+<span class="nc bnc" id="L504" title="All 4 branches missed.">      if (System.currentTimeMillis() - pingsCleanDateMillis &gt; PINGS_CLEAN_MILLIS &amp;&amp; pings.size() &lt; PINGS_MAX_SIZE) {</span>
+<span class="nc" id="L505">        logger.info(&quot;Cleaning pings DB (&quot; + pings.size() + &quot; items)&quot;);</span>
+<span class="nc" id="L506">        pings.clear();</span>
+<span class="nc" id="L507">        pingsCleanDateMillis = System.currentTimeMillis();</span>
+      }
+<span class="nc bnc" id="L509" title="All 4 branches missed.">      if (agentId != null &amp;&amp; userId != null) {</span>
+<span class="nc" id="L510">        DatabasePingLogEntry ping = new DatabasePingLogEntry(agentId, userId);</span>
+<span class="nc bnc" id="L511" title="All 2 branches missed.">        if (!pings.contains(ping)) {</span>
+<span class="nc" id="L512">          databaseLogger.log(ping);</span>
+<span class="nc bnc" id="L513" title="All 2 branches missed.">          if (pings.size() &gt;= PINGS_MAX_SIZE) {</span>
+            // prevent pings taking up unlimited amounts of memory
+<span class="nc" id="L515">            logger.warn(&quot;Pings DB has reached max size: &quot; + pings.size());</span>
+          } else {
+<span class="nc" id="L517">            pings.add(ping);</span>
+          }
+        }
+      }
+    }
+
+<span class="fc" id="L523">  }</span>
+  
+  private Map&lt;String, Integer&gt; getRuleValues(Map&lt;String, String&gt; parameters) {
+<span class="fc" id="L526">    Map&lt;String, Integer&gt; ruleValues = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L527">    String parameterString = parameters.get(&quot;ruleValues&quot;);</span>
+<span class="pc bpc" id="L528" title="1 of 2 branches missed.">    if(parameterString == null) {</span>
+<span class="fc" id="L529">      return ruleValues;</span>
+    }
+<span class="nc" id="L531">    String[] pairs = parameterString.split(&quot;[,]&quot;);</span>
+<span class="nc bnc" id="L532" title="All 2 branches missed.">    for (String pair : pairs) {</span>
+<span class="nc" id="L533">      String[] ruleAndValue  = pair.split(&quot;[:]&quot;);</span>
+<span class="nc" id="L534">      ruleValues.put(ruleAndValue[0], Integer.parseInt(ruleAndValue[1]));</span>
+    }
+<span class="nc" id="L536">    return ruleValues;</span>
+  }
+
+  private List&lt;String&gt; getUserDictWords(Long userId) {
+<span class="nc" id="L540">    DatabaseAccess db = DatabaseAccess.getInstance();</span>
+<span class="nc" id="L541">    return db.getUserDictWords(userId);</span>
+  }
+
+  protected void checkParams(Map&lt;String, String&gt; parameters) {
+<span class="pc bpc" id="L545" title="3 of 4 branches missed.">    if (parameters.get(&quot;text&quot;) == null &amp;&amp; parameters.get(&quot;data&quot;) == null) {</span>
+<span class="nc" id="L546">      throw new IllegalArgumentException(&quot;Missing 'text' or 'data' parameter&quot;);</span>
+    }
+<span class="fc" id="L548">  }</span>
+
+  private List&lt;RuleMatch&gt; getRuleMatches(AnnotatedText aText, Language lang,
+                                         Language motherTongue, Map&lt;String, String&gt; parameters, 
+                                         QueryParams params, UserConfig userConfig,
+                                         DetectedLanguage detLang,
+                                         List&lt;String&gt; preferredLangs, List&lt;String&gt; preferredVariants,
+                                         RuleMatchListener listener) throws Exception {
+<span class="pc bpc" id="L556" title="5 of 6 branches missed.">    if (cache != null &amp;&amp; cache.requestCount() &gt; 0 &amp;&amp; cache.requestCount() % CACHE_STATS_PRINT == 0) {</span>
+<span class="nc" id="L557">      double hitRate = cache.hitRate();</span>
+<span class="nc" id="L558">      String hitPercentage = String.format(Locale.ENGLISH, &quot;%.2f&quot;, hitRate * 100.0f);</span>
+<span class="nc" id="L559">      logger.info(&quot;Cache stats: &quot; + hitPercentage + &quot;% hit rate&quot;);</span>
+      //print(&quot;Matches    : &quot; + cache.getMatchesCache().stats().hitRate() + &quot; hit rate&quot;);
+      //print(&quot;Sentences  : &quot; + cache.getSentenceCache().stats().hitRate() + &quot; hit rate&quot;);
+      //print(&quot;Size       : &quot; + cache.getMatchesCache().size() + &quot; (matches cache), &quot; + cache.getSentenceCache().size() + &quot; (sentence cache)&quot;);
+      //logger.log(new DatabaseCacheStatsLogEntry(logServerId, (float) hitRate));
+    }
+
+<span class="pc bpc" id="L566" title="1 of 2 branches missed.">    if (parameters.get(&quot;sourceText&quot;) != null) {</span>
+<span class="nc bnc" id="L567" title="All 2 branches missed.">      if (parameters.get(&quot;sourceLanguage&quot;) == null) {</span>
+<span class="nc" id="L568">        throw new IllegalArgumentException(&quot;'sourceLanguage' parameter missing - must be set when 'sourceText' is set&quot;);</span>
+      }
+<span class="nc" id="L570">      Language sourceLanguage = Languages.getLanguageForShortCode(parameters.get(&quot;sourceLanguage&quot;));</span>
+<span class="nc" id="L571">      JLanguageTool sourceLt = new JLanguageTool(sourceLanguage);</span>
+<span class="nc" id="L572">      JLanguageTool targetLt = new JLanguageTool(lang);</span>
+<span class="nc bnc" id="L573" title="All 2 branches missed.">      if (userConfig.filterDictionaryMatches()) {</span>
+<span class="nc" id="L574">        targetLt.addMatchFilter(new DictionaryMatchFilter(userConfig));</span>
+      }
+<span class="nc" id="L576">      List&lt;BitextRule&gt; bitextRules = Tools.getBitextRules(sourceLanguage, lang);</span>
+<span class="nc" id="L577">      return Tools.checkBitext(parameters.get(&quot;sourceText&quot;), aText.getPlainText(), sourceLt, targetLt, bitextRules);</span>
+    } else {
+<span class="fc" id="L579">      List&lt;RuleMatch&gt; matches = new ArrayList&lt;&gt;();</span>
+
+<span class="pc bpc" id="L581" title="5 of 6 branches missed.">      if (preferredLangs.size() &lt; 2 || parameters.get(&quot;multilingual&quot;) == null || parameters.get(&quot;multilingual&quot;).equals(&quot;false&quot;)) {</span>
+<span class="fc" id="L582">        matches.addAll(getPipelineResults(aText, lang, motherTongue, params, userConfig, listener));</span>
+      } else {
+        // support for multilingual texts:
+        try {
+<span class="nc" id="L586">          Language mainLang = getLanguageVariantForCode(detLang.getDetectedLanguage().getShortCode(), preferredVariants);</span>
+<span class="nc" id="L587">          List&lt;Language&gt; secondLangs = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L588" title="All 2 branches missed.">          for (String preferredLangCode : preferredLangs) {</span>
+<span class="nc bnc" id="L589" title="All 2 branches missed.">            if (!preferredLangCode.equals(mainLang.getShortCode())) {</span>
+<span class="nc" id="L590">              secondLangs.add(getLanguageVariantForCode(preferredLangCode, preferredVariants));</span>
+<span class="nc" id="L591">              break;</span>
+            }
+<span class="nc" id="L593">          }</span>
+<span class="nc" id="L594">          LanguageAnnotator annotator = new LanguageAnnotator();</span>
+<span class="nc" id="L595">          List&lt;FragmentWithLanguage&gt; fragments = annotator.detectLanguages(aText.getPlainText(), mainLang, secondLangs);</span>
+<span class="nc" id="L596">          List&lt;Language&gt; langs = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L597">          langs.add(mainLang);</span>
+<span class="nc" id="L598">          langs.addAll(secondLangs);</span>
+<span class="nc" id="L599">          Map&lt;Language, AnnotatedTextBuilder&gt; lang2builder = getBuilderMap(fragments, new HashSet&lt;&gt;(langs));</span>
+<span class="nc bnc" id="L600" title="All 2 branches missed.">          for (Map.Entry&lt;Language, AnnotatedTextBuilder&gt; entry : lang2builder.entrySet()) {</span>
+<span class="nc" id="L601">            matches.addAll(getPipelineResults(entry.getValue().build(), entry.getKey(), motherTongue, params, userConfig, listener));</span>
+<span class="nc" id="L602">          }</span>
+<span class="nc" id="L603">        } catch (Exception e) {</span>
+<span class="nc" id="L604">          logger.error(&quot;Problem with multilingual mode (preferredLangs=&quot; + preferredLangs+ &quot;, preferredVariants=&quot; + preferredVariants + &quot;), &quot; +</span>
+            &quot;falling back to single language.&quot;, e);
+<span class="nc" id="L606">          matches.addAll(getPipelineResults(aText, lang, motherTongue, params, userConfig, listener));</span>
+<span class="nc" id="L607">        }</span>
+      }
+<span class="fc" id="L609">      return matches;</span>
+    }
+  }
+
+  private Language getLanguageVariantForCode(String langCode, List&lt;String&gt; preferredVariants) {
+<span class="nc bnc" id="L614" title="All 2 branches missed.">    for (String preferredVariant : preferredVariants) {</span>
+<span class="nc bnc" id="L615" title="All 2 branches missed.">      if (preferredVariant.startsWith(langCode + &quot;-&quot;)) {</span>
+<span class="nc" id="L616">        return Languages.getLanguageForShortCode(preferredVariant);</span>
+      }
+<span class="nc" id="L618">    }</span>
+<span class="nc" id="L619">    return Languages.getLanguageForShortCode(langCode);</span>
+  }
+
+  private List&lt;RuleMatch&gt; getPipelineResults(AnnotatedText aText, Language lang, Language motherTongue, QueryParams params, UserConfig userConfig, RuleMatchListener listener) throws Exception {
+<span class="fc" id="L623">    PipelinePool.PipelineSettings settings = null;</span>
+<span class="fc" id="L624">    Pipeline lt = null;</span>
+<span class="fc" id="L625">    List&lt;RuleMatch&gt; matches = new ArrayList&lt;&gt;();</span>
+    try {
+<span class="fc" id="L627">      settings = new PipelinePool.PipelineSettings(lang, motherTongue, params, config.globalConfig, userConfig);</span>
+<span class="fc" id="L628">      lt = pipelinePool.getPipeline(settings);</span>
+<span class="fc" id="L629">      matches.addAll(lt.check(aText, true, JLanguageTool.ParagraphHandling.NORMAL, listener, params.mode, params.level, executorService));</span>
+    } finally {
+<span class="pc bpc" id="L631" title="1 of 2 branches missed.">      if (lt != null) {</span>
+<span class="fc" id="L632">        pipelinePool.returnPipeline(settings, lt);</span>
+      }
+    }
+<span class="fc" id="L635">    return matches;</span>
+  }
+
+  @NotNull
+  private Map&lt;Language, AnnotatedTextBuilder&gt; getBuilderMap(List&lt;FragmentWithLanguage&gt; fragments, Set&lt;Language&gt; maybeUsedLangs) {
+<span class="nc" id="L640">    Map&lt;Language, AnnotatedTextBuilder&gt; lang2builder = new HashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L641" title="All 2 branches missed.">    for (Language usedLang : maybeUsedLangs) {</span>
+<span class="nc bnc" id="L642" title="All 2 branches missed.">      if (!lang2builder.containsKey(usedLang)) {</span>
+<span class="nc" id="L643">        lang2builder.put(usedLang, new AnnotatedTextBuilder());</span>
+      }
+<span class="nc" id="L645">      AnnotatedTextBuilder atb = lang2builder.get(usedLang);</span>
+<span class="nc bnc" id="L646" title="All 2 branches missed.">      for (FragmentWithLanguage fragment : fragments) {</span>
+<span class="nc bnc" id="L647" title="All 2 branches missed.">        if (usedLang.getShortCodeWithCountryAndVariant().equals(fragment.getLangCode())) {</span>
+<span class="nc" id="L648">          atb.addText(fragment.getFragment());</span>
+        } else {
+<span class="nc" id="L650">          atb.addMarkup(fragment.getFragment());  // markup = ignore this text</span>
+        }
+<span class="nc" id="L652">      }</span>
+<span class="nc" id="L653">    }</span>
+<span class="nc" id="L654">    return lang2builder;</span>
+  }
+
+  @NotNull
+  private List&lt;CategoryId&gt; getCategoryIds(String paramName, Map&lt;String, String&gt; parameters) {
+<span class="fc" id="L659">    List&lt;String&gt; stringIds = getCommaSeparatedStrings(paramName, parameters);</span>
+<span class="fc" id="L660">    List&lt;CategoryId&gt; ids = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L661" title="All 2 branches covered.">    for (String stringId : stringIds) {</span>
+<span class="fc" id="L662">      ids.add(new CategoryId(stringId));</span>
+<span class="fc" id="L663">    }</span>
+<span class="fc" id="L664">    return ids;</span>
+  }
+
+  @NotNull
+  protected List&lt;String&gt; getCommaSeparatedStrings(String paramName, Map&lt;String, String&gt; parameters) {
+<span class="fc" id="L669">    String disabledParam = parameters.get(paramName);</span>
+<span class="fc" id="L670">    List&lt;String&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L671" title="All 2 branches covered.">    if (disabledParam != null) {</span>
+<span class="fc" id="L672">      result.addAll(Arrays.asList(disabledParam.split(&quot;,&quot;)));</span>
+    }
+<span class="fc" id="L674">    return result;</span>
+  }
+
+  DetectedLanguage detectLanguageOfString(String text, String fallbackLanguage, List&lt;String&gt; preferredVariants,
+                                          List&lt;String&gt; noopLangs, List&lt;String&gt; preferredLangs) {
+<span class="fc" id="L679">    DetectedLanguage detected = identifier.detectLanguage(text, noopLangs, preferredLangs);</span>
+    Language lang;
+<span class="fc bfc" id="L681" title="All 2 branches covered.">    if (detected == null) {</span>
+<span class="pc bpc" id="L682" title="1 of 2 branches missed.">      lang = Languages.getLanguageForShortCode(fallbackLanguage != null ? fallbackLanguage : &quot;en&quot;);</span>
+    } else {
+<span class="fc" id="L684">      lang = detected.getDetectedLanguage();</span>
+    }
+<span class="fc bfc" id="L686" title="All 2 branches covered.">    if (preferredVariants.size() &gt; 0) {</span>
+<span class="pc bpc" id="L687" title="1 of 2 branches missed.">      for (String preferredVariant : preferredVariants) {</span>
+<span class="pc bpc" id="L688" title="1 of 2 branches missed.">        if (!preferredVariant.contains(&quot;-&quot;)) {</span>
+<span class="fc" id="L689">          throw new IllegalArgumentException(&quot;Invalid format for 'preferredVariants', expected a dash as in 'en-GB': '&quot; + preferredVariant + &quot;'&quot;);</span>
+        }
+<span class="nc" id="L691">        String preferredVariantLang = preferredVariant.split(&quot;-&quot;)[0];</span>
+<span class="nc bnc" id="L692" title="All 2 branches missed.">        if (preferredVariantLang.equals(lang.getShortCode())) {</span>
+<span class="nc" id="L693">          lang = Languages.getLanguageForShortCode(preferredVariant);</span>
+<span class="nc bnc" id="L694" title="All 2 branches missed.">          if (lang == null) {</span>
+<span class="nc" id="L695">            throw new IllegalArgumentException(&quot;Invalid 'preferredVariants', no such language/variant found: '&quot; + preferredVariant + &quot;'&quot;);</span>
+          }
+        }
+<span class="nc" id="L698">      }</span>
+    } else {
+<span class="fc bfc" id="L700" title="All 2 branches covered.">      if (lang.getDefaultLanguageVariant() != null) {</span>
+<span class="fc" id="L701">        lang = lang.getDefaultLanguageVariant();</span>
+      }
+    }
+<span class="fc bfc" id="L704" title="All 2 branches covered.">    return new DetectedLanguage(null, lang, detected != null ? detected.getDetectionConfidence() : 0f);</span>
+  }
+
+  static class QueryParams {
+    final List&lt;Language&gt; altLanguages;
+    final List&lt;String&gt; enabledRules;
+    final List&lt;String&gt; disabledRules;
+    final List&lt;CategoryId&gt; enabledCategories;
+    final List&lt;CategoryId&gt; disabledCategories;
+    final boolean useEnabledOnly;
+    final boolean useQuerySettings;
+    final boolean allowIncompleteResults;
+    final boolean enableHiddenRules;
+    final boolean enableTempOffRules;
+    final JLanguageTool.Mode mode;
+    final JLanguageTool.Level level;
+    final String callback;
+    /** allowed to log input with stack traces to reproduce errors? */
+    final boolean inputLogging;
+
+    QueryParams(List&lt;Language&gt; altLanguages, List&lt;String&gt; enabledRules, List&lt;String&gt; disabledRules, List&lt;CategoryId&gt; enabledCategories, List&lt;CategoryId&gt; disabledCategories,
+                boolean useEnabledOnly, boolean useQuerySettings, boolean allowIncompleteResults, boolean enableHiddenRules, boolean enableTempOffRules, JLanguageTool.Mode mode, JLanguageTool.Level level, @Nullable String callback) {
+<span class="nc" id="L726">      this(altLanguages, enabledRules, disabledRules, enabledCategories, disabledCategories, useEnabledOnly, useQuerySettings, allowIncompleteResults, enableHiddenRules, enableTempOffRules, mode, level, callback, true);</span>
+<span class="nc" id="L727">    }</span>
+
+    QueryParams(List&lt;Language&gt; altLanguages, List&lt;String&gt; enabledRules, List&lt;String&gt; disabledRules, List&lt;CategoryId&gt; enabledCategories, List&lt;CategoryId&gt; disabledCategories,
+<span class="fc" id="L730">                boolean useEnabledOnly, boolean useQuerySettings, boolean allowIncompleteResults, boolean enableHiddenRules, boolean enableTempOffRules, JLanguageTool.Mode mode, JLanguageTool.Level level, @Nullable String callback, boolean inputLogging) {</span>
+<span class="fc" id="L731">      this.altLanguages = Objects.requireNonNull(altLanguages);</span>
+<span class="fc" id="L732">      this.enabledRules = enabledRules;</span>
+<span class="fc" id="L733">      this.disabledRules = disabledRules;</span>
+<span class="fc" id="L734">      this.enabledCategories = enabledCategories;</span>
+<span class="fc" id="L735">      this.disabledCategories = disabledCategories;</span>
+<span class="fc" id="L736">      this.useEnabledOnly = useEnabledOnly;</span>
+<span class="fc" id="L737">      this.useQuerySettings = useQuerySettings;</span>
+<span class="fc" id="L738">      this.allowIncompleteResults = allowIncompleteResults;</span>
+<span class="fc" id="L739">      this.enableHiddenRules = enableHiddenRules;</span>
+<span class="fc" id="L740">      this.enableTempOffRules = enableTempOffRules;</span>
+<span class="fc" id="L741">      this.mode = Objects.requireNonNull(mode);</span>
+<span class="fc" id="L742">      this.level = Objects.requireNonNull(level);</span>
+<span class="pc bpc" id="L743" title="3 of 4 branches missed.">      if (callback != null &amp;&amp; !callback.matches(&quot;[a-zA-Z]+&quot;)) {</span>
+<span class="nc" id="L744">        throw new IllegalArgumentException(&quot;'callback' value must match [a-zA-Z]+: '&quot; + callback + &quot;'&quot;);</span>
+      }
+<span class="fc" id="L746">      this.callback = callback;</span>
+<span class="fc" id="L747">      this.inputLogging = inputLogging;</span>
+<span class="fc" id="L748">    }</span>
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L752">      return new HashCodeBuilder()</span>
+<span class="nc" id="L753">        .append(altLanguages)</span>
+<span class="nc" id="L754">        .append(enabledRules)</span>
+<span class="nc" id="L755">        .append(disabledRules)</span>
+<span class="nc" id="L756">        .append(enabledCategories)</span>
+<span class="nc" id="L757">        .append(disabledCategories)</span>
+<span class="nc" id="L758">        .append(useEnabledOnly)</span>
+<span class="nc" id="L759">        .append(useQuerySettings)</span>
+<span class="nc" id="L760">        .append(allowIncompleteResults)</span>
+<span class="nc" id="L761">        .append(enableHiddenRules)</span>
+<span class="nc" id="L762">        .append(enableTempOffRules)</span>
+<span class="nc" id="L763">        .append(mode)</span>
+<span class="nc" id="L764">        .append(level)</span>
+<span class="nc" id="L765">        .append(callback)</span>
+<span class="nc" id="L766">        .append(inputLogging)</span>
+<span class="nc" id="L767">        .toHashCode();</span>
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L772" title="All 2 branches missed.">      if (obj == this) return true;</span>
+<span class="nc bnc" id="L773" title="All 4 branches missed.">      if (obj == null || getClass() != obj.getClass()) {</span>
+<span class="nc" id="L774">        return false;</span>
+      }
+<span class="nc" id="L776">      QueryParams other = (QueryParams) obj;</span>
+<span class="nc" id="L777">      return new EqualsBuilder()</span>
+<span class="nc" id="L778">        .append(altLanguages, other.altLanguages)</span>
+<span class="nc" id="L779">        .append(enabledRules, other.enabledRules)</span>
+<span class="nc" id="L780">        .append(disabledRules, other.disabledRules)</span>
+<span class="nc" id="L781">        .append(enabledCategories, other.enabledCategories)</span>
+<span class="nc" id="L782">        .append(disabledCategories, other.disabledCategories)</span>
+<span class="nc" id="L783">        .append(useEnabledOnly, other.useEnabledOnly)</span>
+<span class="nc" id="L784">        .append(useQuerySettings, other.useQuerySettings)</span>
+<span class="nc" id="L785">        .append(allowIncompleteResults, other.allowIncompleteResults)</span>
+<span class="nc" id="L786">        .append(enableHiddenRules, other.enableHiddenRules)</span>
+<span class="nc" id="L787">        .append(enableTempOffRules, other.enableTempOffRules)</span>
+<span class="nc" id="L788">        .append(mode, other.mode)</span>
+<span class="nc" id="L789">        .append(level, other.level)</span>
+<span class="nc" id="L790">        .append(callback, other.callback)</span>
+<span class="nc" id="L791">        .append(inputLogging, other.inputLogging)</span>
+<span class="nc" id="L792">        .isEquals();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L797">      return new ToStringBuilder(this)</span>
+<span class="nc" id="L798">        .append(&quot;altLanguages&quot;, altLanguages)</span>
+<span class="nc" id="L799">        .append(&quot;enabledRules&quot;, enabledRules)</span>
+<span class="nc" id="L800">        .append(&quot;disabledRules&quot;, disabledRules)</span>
+<span class="nc" id="L801">        .append(&quot;enabledCategories&quot;, enabledCategories)</span>
+<span class="nc" id="L802">        .append(&quot;disabledCategories&quot;, disabledCategories)</span>
+<span class="nc" id="L803">        .append(&quot;useEnabledOnly&quot;, useEnabledOnly)</span>
+<span class="nc" id="L804">        .append(&quot;useQuerySettings&quot;, useQuerySettings)</span>
+<span class="nc" id="L805">        .append(&quot;allowIncompleteResults&quot;, allowIncompleteResults)</span>
+<span class="nc" id="L806">        .append(&quot;enableHiddenRules&quot;, enableHiddenRules)</span>
+<span class="nc" id="L807">        .append(&quot;enableTempOffRules&quot;, enableTempOffRules)</span>
+<span class="nc" id="L808">        .append(&quot;mode&quot;, mode)</span>
+<span class="nc" id="L809">        .append(&quot;level&quot;, level)</span>
+<span class="nc" id="L810">        .append(&quot;callback&quot;, callback)</span>
+<span class="nc" id="L811">        .append(&quot;inputLogging&quot;, inputLogging)</span>
+<span class="nc" id="L812">        .build();</span>
+    }
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,451 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LanguageToolHttpHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.server</a> &gt; <span class="el_source">LanguageToolHttpHandler.java</span></div><h1>LanguageToolHttpHandler.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2011 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.server;
+
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.languagetool.ErrorRateTooHighException;
+import org.languagetool.tools.StringTools;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
+import java.net.URI;
+import java.net.URLDecoder;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeoutException;
+
+import static java.net.HttpURLConnection.HTTP_UNAVAILABLE;
+import static org.languagetool.server.ServerTools.getHttpReferrer;
+import static org.languagetool.server.ServerTools.print;
+
+class LanguageToolHttpHandler implements HttpHandler {
+
+<span class="fc" id="L52">  private static final Logger logger = LoggerFactory.getLogger(LanguageToolHttpHandler.class);</span>
+
+  static final String API_DOC_URL = &quot;https://languagetool.org/http-api/swagger-ui/#/default&quot;;
+  
+  private static final String ENCODING = &quot;utf-8&quot;;
+
+  private final Set&lt;String&gt; allowedIps;  
+  private final RequestLimiter requestLimiter;
+  private final ErrorRequestLimiter errorRequestLimiter;
+  private final LinkedBlockingQueue&lt;Runnable&gt; workQueue;
+  private final Server httpServer;
+  private final TextChecker textCheckerV2;
+  private final HTTPServerConfig config;
+<span class="fc" id="L65">  private final RequestCounter reqCounter = new RequestCounter();</span>
+  
+<span class="fc" id="L67">  LanguageToolHttpHandler(HTTPServerConfig config, Set&lt;String&gt; allowedIps, boolean internal, RequestLimiter requestLimiter, ErrorRequestLimiter errorLimiter, LinkedBlockingQueue&lt;Runnable&gt; workQueue, Server httpServer) {</span>
+<span class="fc" id="L68">    this.config = config;</span>
+<span class="fc" id="L69">    this.allowedIps = allowedIps;</span>
+<span class="fc" id="L70">    this.requestLimiter = requestLimiter;</span>
+<span class="fc" id="L71">    this.errorRequestLimiter = errorLimiter;</span>
+<span class="fc" id="L72">    this.workQueue = workQueue;</span>
+<span class="fc" id="L73">    this.httpServer = httpServer;</span>
+<span class="fc" id="L74">    this.textCheckerV2 = new V2TextChecker(config, internal, workQueue, reqCounter);</span>
+<span class="fc" id="L75">  }</span>
+
+  /** @since 2.6 */
+  void shutdown() {
+<span class="nc" id="L79">    textCheckerV2.shutdownNow();</span>
+<span class="nc" id="L80">  }</span>
+
+  @Override
+  public void handle(HttpExchange httpExchange) throws IOException {
+<span class="fc" id="L84">    long startTime = System.currentTimeMillis();</span>
+<span class="fc" id="L85">    String remoteAddress = null;</span>
+<span class="fc" id="L86">    Map&lt;String, String&gt; parameters = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L87">    int reqId = reqCounter.incrementRequestCount();</span>
+<span class="fc" id="L88">    ServerMetricsCollector.getInstance().logRequest();</span>
+<span class="fc" id="L89">    boolean incrementHandleCount = false;</span>
+    try {
+<span class="fc" id="L91">      URI requestedUri = httpExchange.getRequestURI();</span>
+<span class="fc" id="L92">      String path = requestedUri.getRawPath();</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">      if (config.getServerURL() != null) {</span>
+<span class="nc" id="L94">        path = config.getServerURL().relativize(new URI(requestedUri.getPath())).getRawPath();</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        if (!path.startsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L96">          path = &quot;/&quot; + path;</span>
+        }
+      }
+<span class="pc bpc" id="L99" title="3 of 4 branches missed.">      if (path.startsWith(&quot;/v2/stop&quot;) &amp;&amp; config.isStoppable()) {</span>
+<span class="nc" id="L100">        logger.warn(&quot;Stopping server by external command&quot;);</span>
+<span class="nc" id="L101">        httpServer.stop();</span>
+<span class="nc" id="L102">        return;</span>
+      }
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">      if (path.startsWith(&quot;/v2/&quot;)) {</span>
+        // healthcheck should come before other limit checks (requests per time etc.), to be sure it works: 
+<span class="fc" id="L106">        String pathWithoutVersion = path.substring(&quot;/v2/&quot;.length());</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        if (pathWithoutVersion.equals(&quot;healthcheck&quot;)) {</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">          if (workQueueFull(httpExchange, parameters, &quot;Healthcheck failed: There are currently too many parallel requests.&quot;)) {</span>
+<span class="nc" id="L109">            ServerMetricsCollector.getInstance().logFailedHealthcheck();</span>
+<span class="nc" id="L110">            return;</span>
+          } else {
+<span class="nc" id="L112">            String ok = &quot;OK&quot;;</span>
+<span class="nc" id="L113">            httpExchange.getResponseHeaders().set(&quot;Content-Type&quot;, &quot;text/plain&quot;);</span>
+<span class="nc" id="L114">            httpExchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, ok.getBytes(ENCODING).length);</span>
+<span class="nc" id="L115">            httpExchange.getResponseBody().write(ok.getBytes(ENCODING));</span>
+<span class="nc" id="L116">            ServerMetricsCollector.getInstance().logResponse(HttpURLConnection.HTTP_OK);</span>
+<span class="nc" id="L117">            return;</span>
+          }
+        }
+      }
+<span class="fc" id="L121">      String referrer = httpExchange.getRequestHeaders().getFirst(&quot;Referer&quot;);</span>
+<span class="fc" id="L122">      String origin = httpExchange.getRequestHeaders().getFirst(&quot;Origin&quot;);   // Referer can be turned off with meta tags, so also check this</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">      for (String ref : config.getBlockedReferrers()) {</span>
+<span class="nc" id="L124">        String errorMessage = null;</span>
+<span class="nc bnc" id="L125" title="All 4 branches missed.">        if (ref != null &amp;&amp; !ref.isEmpty()) {</span>
+<span class="nc bnc" id="L126" title="All 4 branches missed.">          if (referrer != null &amp;&amp; siteMatches(referrer, ref)) {</span>
+<span class="nc" id="L127">            errorMessage = &quot;Error: Access with referrer &quot; + referrer + &quot; denied.&quot;;</span>
+<span class="nc bnc" id="L128" title="All 4 branches missed.">          } else if (origin != null &amp;&amp; siteMatches(origin, ref)) {</span>
+<span class="nc" id="L129">            errorMessage = &quot;Error: Access with origin &quot; + origin + &quot; denied.&quot;;</span>
+          }
+        }
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        if (errorMessage != null) {</span>
+<span class="nc" id="L133">          sendError(httpExchange, HttpURLConnection.HTTP_FORBIDDEN, errorMessage);</span>
+<span class="nc" id="L134">          logError(errorMessage, HttpURLConnection.HTTP_FORBIDDEN, parameters, httpExchange);</span>
+<span class="nc" id="L135">          ServerMetricsCollector.getInstance().logResponse(HttpURLConnection.HTTP_FORBIDDEN);</span>
+<span class="nc" id="L136">          return;</span>
+        }
+<span class="nc" id="L138">      }</span>
+<span class="fc" id="L139">      String origAddress = httpExchange.getRemoteAddress().getAddress().getHostAddress();</span>
+<span class="fc" id="L140">      String realAddressOrNull = getRealRemoteAddressOrNull(httpExchange);</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">      remoteAddress = realAddressOrNull != null ? realAddressOrNull : origAddress;</span>
+<span class="fc" id="L142">      reqCounter.incrementHandleCount(remoteAddress, reqId);</span>
+<span class="fc" id="L143">      incrementHandleCount = true;</span>
+      // According to the Javadoc, &quot;Closing an exchange without consuming all of the request body is
+      // not an error but may make the underlying TCP connection unusable for following exchanges.&quot;,
+      // so we consume the request now, even before checking for request limits:
+<span class="fc" id="L147">      parameters = getRequestQuery(httpExchange, requestedUri);</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">      if (requestLimiter != null) {</span>
+        try {
+<span class="nc" id="L150">          UserLimits userLimits = ServerTools.getUserLimits(parameters, config);</span>
+<span class="nc" id="L151">          requestLimiter.checkAccess(remoteAddress, parameters, httpExchange.getRequestHeaders(), userLimits);</span>
+<span class="nc" id="L152">        } catch (TooManyRequestsException e) {</span>
+<span class="nc" id="L153">          String errorMessage = &quot;Error: Access from &quot; + remoteAddress + &quot; denied: &quot; + e.getMessage();</span>
+<span class="nc" id="L154">          int code = HttpURLConnection.HTTP_FORBIDDEN;</span>
+<span class="nc" id="L155">          sendError(httpExchange, code, errorMessage);</span>
+          // already logged via DatabaseAccessLimitLogEntry
+<span class="nc" id="L157">          logError(errorMessage, code, parameters, httpExchange, false);</span>
+<span class="nc" id="L158">          return;</span>
+<span class="nc" id="L159">        }</span>
+      }
+<span class="pc bpc" id="L161" title="3 of 4 branches missed.">      if (errorRequestLimiter != null &amp;&amp; !errorRequestLimiter.wouldAccessBeOkay(remoteAddress, parameters, httpExchange.getRequestHeaders())) {</span>
+<span class="nc" id="L162">        String textSizeMessage = getTextOrDataSizeMessage(parameters);</span>
+<span class="nc" id="L163">        String errorMessage = &quot;Error: Access from &quot; + remoteAddress + &quot; denied - too many recent timeouts. &quot; +</span>
+                textSizeMessage +
+<span class="nc" id="L165">                &quot; Allowed maximum timeouts: &quot; + errorRequestLimiter.getRequestLimit() +</span>
+<span class="nc" id="L166">                &quot; per &quot; + errorRequestLimiter.getRequestLimitPeriodInSeconds() + &quot; seconds&quot;;</span>
+<span class="nc" id="L167">        int code = HttpURLConnection.HTTP_FORBIDDEN;</span>
+<span class="nc" id="L168">        sendError(httpExchange, code, errorMessage);</span>
+<span class="nc" id="L169">        logError(errorMessage, code, parameters, httpExchange);</span>
+<span class="nc" id="L170">        return;</span>
+      }
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">      if (workQueueFull(httpExchange, parameters, &quot;Error: There are currently too many parallel requests. Please try again later.&quot;)) {</span>
+<span class="nc" id="L173">        ServerMetricsCollector.getInstance().logRequestError(ServerMetricsCollector.RequestErrorType.QUEUE_FULL);</span>
+<span class="nc" id="L174">        return;</span>
+      }
+<span class="pc bpc" id="L176" title="2 of 4 branches missed.">      if (allowedIps == null || allowedIps.contains(origAddress)) {</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (path.startsWith(&quot;/v2/&quot;)) {</span>
+<span class="fc" id="L178">          ApiV2 apiV2 = new ApiV2(textCheckerV2, config.getAllowOriginUrl());</span>
+<span class="fc" id="L179">          String pathWithoutVersion = path.substring(&quot;/v2/&quot;.length());</span>
+<span class="fc" id="L180">          apiV2.handleRequest(pathWithoutVersion, httpExchange, parameters, errorRequestLimiter, remoteAddress, config);</span>
+<span class="pc bnc" id="L181" title="All 2 branches missed.">        } else if (path.endsWith(&quot;/Languages&quot;)) {</span>
+<span class="nc" id="L182">          throw new IllegalArgumentException(&quot;You're using an old version of our API that's not supported anymore. Please see https://languagetool.org/http-api/migration.php&quot;);</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">        } else if (path.equals(&quot;/&quot;)) {</span>
+<span class="nc" id="L184">          throw new IllegalArgumentException(&quot;Missing arguments for LanguageTool API. Please see &quot; + API_DOC_URL);</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">        } else if (path.contains(&quot;/v2/&quot;)) {</span>
+<span class="nc" id="L186">          throw new IllegalArgumentException(&quot;You have '/v2/' in your path, but not at the root. Try an URL like 'http://server/v2/...' &quot;);</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">        } else if (path.equals(&quot;/favicon.ico&quot;)) {</span>
+<span class="nc" id="L188">          sendError(httpExchange, HttpURLConnection.HTTP_NOT_FOUND, &quot;Not found&quot;);</span>
+        } else {
+<span class="nc" id="L190">          throw new IllegalArgumentException(&quot;This is the LanguageTool API. You have not specified any parameters. Please see &quot; + API_DOC_URL);</span>
+        }
+      } else {
+<span class="nc" id="L193">        String errorMessage = &quot;Error: Access from &quot; + StringTools.escapeXML(origAddress) + &quot; denied&quot;;</span>
+<span class="nc" id="L194">        sendError(httpExchange, HttpURLConnection.HTTP_FORBIDDEN, errorMessage);</span>
+<span class="nc" id="L195">        throw new RuntimeException(errorMessage);</span>
+      }
+<span class="fc" id="L197">    } catch (Exception e) {</span>
+      String response;
+      int errorCode;
+<span class="fc" id="L200">      boolean textLoggingAllowed = false;</span>
+<span class="fc" id="L201">      boolean logStacktrace = true;</span>
+<span class="fc" id="L202">      Throwable rootCause = ExceptionUtils.getRootCause(e);</span>
+<span class="pc bpc" id="L203" title="2 of 4 branches missed.">      if (e instanceof TextTooLongException || rootCause instanceof TextTooLongException) {</span>
+<span class="nc" id="L204">        errorCode = HttpURLConnection.HTTP_ENTITY_TOO_LARGE;</span>
+<span class="nc" id="L205">        response = e.getMessage();</span>
+<span class="nc" id="L206">        logStacktrace = false;</span>
+<span class="pc bpc" id="L207" title="2 of 4 branches missed.">      } else if (e instanceof ErrorRateTooHighException || rootCause instanceof ErrorRateTooHighException) {</span>
+<span class="nc" id="L208">        errorCode = HttpURLConnection.HTTP_BAD_REQUEST;</span>
+<span class="nc" id="L209">        response = ExceptionUtils.getRootCause(e).getMessage();</span>
+<span class="nc" id="L210">        logStacktrace = false;</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">      } else if (hasCause(e, AuthException.class)) {</span>
+<span class="nc" id="L212">        errorCode = HttpURLConnection.HTTP_FORBIDDEN;</span>
+<span class="nc" id="L213">        response = AuthException.class.getName() + &quot;: &quot; + e.getMessage();</span>
+<span class="nc" id="L214">        logStacktrace = false;</span>
+<span class="pc bpc" id="L215" title="1 of 4 branches missed.">      } else if (e instanceof IllegalArgumentException || rootCause instanceof IllegalArgumentException) {</span>
+<span class="fc" id="L216">        errorCode = HttpURLConnection.HTTP_BAD_REQUEST;</span>
+<span class="fc" id="L217">        response = e.getMessage();</span>
+<span class="pc bpc" id="L218" title="2 of 4 branches missed.">      } else if (e instanceof PathNotFoundException || rootCause instanceof PathNotFoundException) {</span>
+<span class="nc" id="L219">        errorCode = HttpURLConnection.HTTP_NOT_FOUND;</span>
+<span class="nc" id="L220">        response = e.getMessage();</span>
+<span class="pc bpc" id="L221" title="2 of 4 branches missed.">      } else if (e instanceof TimeoutException || rootCause instanceof TimeoutException) {</span>
+<span class="nc" id="L222">        errorCode = HttpURLConnection.HTTP_INTERNAL_ERROR;</span>
+<span class="nc" id="L223">        response = &quot;Checking took longer than &quot; + config.getMaxCheckTimeMillis()/1000.0f + &quot; seconds, which is this server's limit. &quot; +</span>
+                   &quot;Please make sure you have selected the proper language or consider submitting a shorter text.&quot;;
+      } else {
+<span class="fc" id="L226">        response = &quot;Internal Error: &quot; + e.getMessage();</span>
+<span class="fc" id="L227">        errorCode = HttpURLConnection.HTTP_INTERNAL_ERROR;</span>
+<span class="fc" id="L228">        textLoggingAllowed = true;</span>
+      }
+<span class="fc" id="L230">      long endTime = System.currentTimeMillis();</span>
+<span class="fc" id="L231">      logError(remoteAddress, e, errorCode, httpExchange, parameters, textLoggingAllowed, logStacktrace, endTime-startTime);</span>
+<span class="fc" id="L232">      sendError(httpExchange, errorCode, &quot;Error: &quot; + response);</span>
+
+    } finally {
+<span class="fc" id="L235">      httpExchange.close();</span>
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">      if (incrementHandleCount) {</span>
+<span class="fc" id="L237">        reqCounter.decrementHandleCount(reqId);</span>
+      }
+    }
+<span class="fc" id="L240">  }</span>
+
+  private boolean hasCause(Exception e, Class&lt;AuthException&gt; clazz) {
+<span class="fc bfc" id="L243" title="All 2 branches covered.">    for (Throwable throwable : ExceptionUtils.getThrowableList(e)) {</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">      if (throwable.getClass().equals(clazz)) {</span>
+<span class="nc" id="L245">        return true;</span>
+      }
+<span class="fc" id="L247">    }</span>
+<span class="fc" id="L248">    return false;</span>
+  }
+
+  private boolean siteMatches(String referrer, String blockedRef) {
+<span class="nc bnc" id="L252" title="All 2 branches missed.">    return referrer.startsWith(blockedRef) || </span>
+<span class="nc bnc" id="L253" title="All 4 branches missed.">           referrer.startsWith(&quot;http://&quot; + blockedRef) || referrer.startsWith(&quot;https://&quot; + blockedRef) ||</span>
+<span class="nc bnc" id="L254" title="All 4 branches missed.">           referrer.startsWith(&quot;http://www.&quot; + blockedRef) || referrer.startsWith(&quot;https://www.&quot; + blockedRef);</span>
+  }
+
+  private boolean workQueueFull(HttpExchange httpExchange, Map&lt;String, String&gt; parameters, String response) throws IOException {
+<span class="pc bpc" id="L258" title="3 of 4 branches missed.">    if (config.getMaxWorkQueueSize() != 0 &amp;&amp; workQueue.size() &gt; config.getMaxWorkQueueSize()) {</span>
+<span class="nc" id="L259">      String message = response + &quot; queue size: &quot; + workQueue.size() + &quot;, maximum size: &quot; + config.getMaxWorkQueueSize();</span>
+<span class="nc" id="L260">      logError(message, HTTP_UNAVAILABLE, parameters, httpExchange);</span>
+<span class="nc" id="L261">      sendError(httpExchange, HTTP_UNAVAILABLE, &quot;Error: &quot; + response);</span>
+<span class="nc" id="L262">      return true;</span>
+    }
+<span class="fc" id="L264">    return false;</span>
+  }
+
+  @NotNull
+  private String getTextOrDataSizeMessage(Map&lt;String, String&gt; parameters) {
+<span class="nc" id="L269">    String text = parameters.get(&quot;text&quot;);</span>
+<span class="nc bnc" id="L270" title="All 2 branches missed.">    if (text != null) {</span>
+<span class="nc" id="L271">      return &quot;Text size: &quot; + text.length() + &quot;.&quot;;</span>
+    } else {
+<span class="nc" id="L273">      String data = parameters.get(&quot;data&quot;);</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">      if (data != null) {</span>
+<span class="nc" id="L275">        return &quot;Data size: &quot; + data.length() + &quot;.&quot;;</span>
+      }
+    }
+<span class="nc" id="L278">    return &quot;&quot;;</span>
+  }
+
+  private void logError(String errorMessage, int code, Map&lt;String, String&gt; params, HttpExchange httpExchange) {
+<span class="nc" id="L282">    logError(errorMessage, code, params, httpExchange, true);</span>
+<span class="nc" id="L283">  }</span>
+
+  private void logError(String errorMessage, int code, Map&lt;String, String&gt; params, HttpExchange httpExchange, boolean logToDb) {
+<span class="nc" id="L286">    String message = errorMessage + &quot;, sending code &quot; + code + &quot; - useragent: &quot; + params.get(&quot;useragent&quot;) +</span>
+<span class="nc" id="L287">            &quot; - HTTP UserAgent: &quot; + ServerTools.getHttpUserAgent(httpExchange) + &quot;, r:&quot; + reqCounter.getRequestCount();</span>
+<span class="nc bnc" id="L288" title="All 2 branches missed.">    if (params.get(&quot;username&quot;) != null) {</span>
+<span class="nc" id="L289">      message += &quot;, user: &quot; + params.get(&quot;username&quot;);</span>
+    }
+<span class="nc bnc" id="L291" title="All 2 branches missed.">    if (params.get(&quot;apiKey&quot;) != null) {</span>
+<span class="nc" id="L292">      message += &quot;, apiKey: &quot; + params.get(&quot;apiKey&quot;);</span>
+    }
+<span class="nc bnc" id="L294" title="All 2 branches missed.">    if (logToDb) {</span>
+<span class="nc" id="L295">      logToDatabase(params, message);</span>
+    }
+    // TODO: might need more than 512 chars, thus not logged to DB:
+<span class="nc" id="L298">    message += &quot;, referrer: &quot; + getHttpReferrer(httpExchange);</span>
+<span class="nc" id="L299">    message += &quot;, language: &quot; + params.get(&quot;language&quot;);</span>
+<span class="nc" id="L300">    message += &quot;, &quot; + getTextOrDataSizeMessage(params);</span>
+<span class="nc" id="L301">    logger.error(message);</span>
+<span class="nc" id="L302">  }</span>
+
+  private void logError(String remoteAddress, Exception e, int errorCode, HttpExchange httpExchange, Map&lt;String, String&gt; params, 
+                        boolean textLoggingAllowed, boolean logStacktrace, long runtimeMillis) {
+<span class="fc" id="L306">    String message = ServerTools.getLoggingInfo(remoteAddress, e, errorCode, httpExchange, params, runtimeMillis, reqCounter);</span>
+<span class="fc" id="L307">    String text = params.get(&quot;text&quot;);</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">    if (text != null) {</span>
+<span class="fc" id="L309">      message += &quot;text length: &quot; + text.length() + &quot;, &quot;;</span>
+    }
+    try {
+<span class="fc" id="L312">      message += &quot;m: &quot; + ServerTools.getMode(params) + &quot;, &quot;;</span>
+<span class="fc" id="L313">    } catch (IllegalArgumentException ex) {</span>
+<span class="fc" id="L314">      message += &quot;m: invalid, &quot;;</span>
+<span class="fc" id="L315">    }</span>
+    try {
+<span class="fc" id="L317">      message += &quot;l: &quot; + ServerTools.getLevel(params) + &quot;, &quot;;</span>
+<span class="fc" id="L318">    } catch (IllegalArgumentException ex) {</span>
+<span class="fc" id="L319">      message += &quot;l: invalid, &quot;;</span>
+<span class="fc" id="L320">    }</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">    if (params.containsKey(&quot;instanceId&quot;)) {</span>
+<span class="fc" id="L322">      message += &quot;iID: &quot; + params.get(&quot;instanceId&quot;) + &quot;, &quot;;</span>
+    }
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">    if (logStacktrace) {</span>
+<span class="fc" id="L325">      message += &quot;Stacktrace follows:&quot;;</span>
+<span class="fc" id="L326">      String stackTrace = ExceptionUtils.getStackTrace(e);</span>
+<span class="fc" id="L327">      message += ServerTools.cleanUserTextFromMessage(stackTrace, params);</span>
+<span class="fc" id="L328">      logger.error(message);</span>
+<span class="fc" id="L329">    } else {</span>
+<span class="nc" id="L330">      message += &quot;(no stacktrace logged)&quot;;</span>
+<span class="nc" id="L331">      logger.error(message);</span>
+    }
+
+<span class="pc bpc" id="L334" title="2 of 4 branches missed.">    if (!(e instanceof TextTooLongException || e instanceof TooManyRequestsException ||</span>
+<span class="pc bpc" id="L335" title="2 of 4 branches missed.">        ExceptionUtils.getRootCause(e) instanceof ErrorRateTooHighException || e.getCause() instanceof TimeoutException)) {</span>
+<span class="pc bpc" id="L336" title="5 of 6 branches missed.">      if (config.isVerbose() &amp;&amp; text != null &amp;&amp; textLoggingAllowed) {</span>
+<span class="nc" id="L337">        print(&quot;Exception was caused by this text (&quot; + text.length() + &quot; chars, showing up to 500):\n&quot; +</span>
+<span class="nc" id="L338">          StringUtils.abbreviate(text, 500), System.err);</span>
+<span class="nc" id="L339">        logToDatabase(params, message + StringUtils.abbreviate(text, 500));</span>
+      } else {
+<span class="fc" id="L341">        logToDatabase(params, message);</span>
+      }
+    }
+<span class="fc" id="L344">  }</span>
+
+  private void logToDatabase(Map&lt;String, String&gt; params, String message) {
+<span class="fc" id="L347">    DatabaseLogger logger = DatabaseLogger.getInstance();</span>
+<span class="pc bpc" id="L348" title="1 of 2 branches missed.">    if (!logger.isLogging()) {</span>
+<span class="fc" id="L349">      return;</span>
+    }
+<span class="nc" id="L351">    DatabaseAccess db = DatabaseAccess.getInstance();</span>
+<span class="nc" id="L352">    Long server = db.getOrCreateServerId();</span>
+<span class="nc" id="L353">    Long client = db.getOrCreateClientId(params.get(&quot;agent&quot;));</span>
+<span class="nc" id="L354">    Long user = null;</span>
+    try {
+<span class="nc" id="L356">      user = db.getUserId(params.get(&quot;username&quot;), params.get(&quot;apiKey&quot;));</span>
+<span class="nc" id="L357">    } catch(IllegalArgumentException | IllegalStateException ignored) {</span>
+      // invalid username, api key or combination thereof - user stays null
+<span class="nc" id="L359">    }</span>
+<span class="nc" id="L360">    logger.log(new DatabaseMiscLogEntry(server, client, user, message));</span>
+<span class="nc" id="L361">  }</span>
+
+  /**
+   * A (reverse) proxy can set the 'X-forwarded-for' header so we can see a user's original IP.
+   * But that's just a common header than can also be set by the client. So we restrict access to this
+   * server to the load balancer, which should add the header originally with the user's own IP.
+   */
+  @Nullable
+  private String getRealRemoteAddressOrNull(HttpExchange httpExchange) {
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">    if (config.getTrustXForwardForHeader()) {</span>
+<span class="nc" id="L371">      List&lt;String&gt; forwardedIpsStr = httpExchange.getRequestHeaders().get(&quot;X-forwarded-for&quot;);</span>
+<span class="nc bnc" id="L372" title="All 4 branches missed.">      if (forwardedIpsStr != null &amp;&amp; forwardedIpsStr.size() &gt; 0) {</span>
+<span class="nc" id="L373">        return forwardedIpsStr.get(0);</span>
+      }
+    }
+<span class="fc" id="L376">    return null;</span>
+  }
+
+  private void sendError(HttpExchange httpExchange, int httpReturnCode, String response) throws IOException {
+<span class="fc" id="L380">    ServerTools.setAllowOrigin(httpExchange, config.getAllowOriginUrl());</span>
+<span class="fc" id="L381">    httpExchange.sendResponseHeaders(httpReturnCode, response.getBytes(ENCODING).length);</span>
+<span class="fc" id="L382">    httpExchange.getResponseBody().write(response.getBytes(ENCODING));</span>
+<span class="fc" id="L383">    ServerMetricsCollector.getInstance().logResponse(httpReturnCode);</span>
+<span class="fc" id="L384">  }</span>
+
+  private Map&lt;String, String&gt; getRequestQuery(HttpExchange httpExchange, URI requestedUri) throws IOException {
+<span class="fc" id="L387">    Map&lt;String, String&gt; params = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L388" title="All 2 branches covered.">    if (&quot;post&quot;.equalsIgnoreCase(httpExchange.getRequestMethod())) {</span>
+<span class="fc" id="L389">      try (InputStreamReader isr = new InputStreamReader(httpExchange.getRequestBody(), ENCODING)) {</span>
+<span class="fc" id="L390">        params.putAll(parseQuery(readerToString(isr, config.getMaxTextHardLength()), httpExchange));</span>
+<span class="fc" id="L391">        params.putAll(parseQuery(requestedUri.getRawQuery(), httpExchange));  // POST requests can have query parameters, too</span>
+<span class="fc" id="L392">        return params;</span>
+      }
+    } else {
+<span class="fc" id="L395">      return parseQuery(requestedUri.getRawQuery(), httpExchange);</span>
+    }
+  }
+
+  private String readerToString(Reader reader, int maxTextLength) throws IOException {
+<span class="fc" id="L400">    StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L401">    char[] chars = new char[4000];</span>
+    while (true) {
+<span class="fc" id="L403">      int readBytes = reader.read(chars, 0, 4000);</span>
+<span class="fc bfc" id="L404" title="All 2 branches covered.">      if (readBytes &lt;= 0) {</span>
+<span class="fc" id="L405">        break;</span>
+      }
+<span class="fc" id="L407">      int generousMaxLength = maxTextLength * 10;  // one character can be encoded as e.g. &quot;%D8&quot;, plus estimated space for sending data (JSON)</span>
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">      if (generousMaxLength &lt; 0) {  // might happen as it can overflow</span>
+<span class="fc" id="L409">        generousMaxLength = Integer.MAX_VALUE;</span>
+      }
+<span class="pc bpc" id="L411" title="3 of 4 branches missed.">      if (sb.length() &gt; 0 &amp;&amp; sb.length() &gt; generousMaxLength) {</span>
+        // don't stop at maxTextLength as that's the text length, but here also other parameters
+        // are included (still we need this check here so we don't OOM if someone posts a few hundred MB)...
+<span class="nc" id="L414">        throw new TextTooLongException(&quot;Your text's length exceeds this server's hard limit of &quot; + generousMaxLength + &quot; characters.&quot;);</span>
+      }
+<span class="fc" id="L416">      sb.append(new String(chars, 0, readBytes));</span>
+<span class="fc" id="L417">    }</span>
+<span class="fc" id="L418">    return sb.toString();</span>
+  }
+
+
+  private Map&lt;String, String&gt; parseQuery(String query, HttpExchange httpExchange) throws UnsupportedEncodingException {
+<span class="fc" id="L423">    Map&lt;String, String&gt; parameters = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L424" title="All 2 branches covered.">    if (query != null) {</span>
+<span class="fc" id="L425">      parameters.putAll(getParameterMap(query, httpExchange));</span>
+    }
+<span class="fc" id="L427">    return parameters;</span>
+  }
+
+  private Map&lt;String, String&gt; getParameterMap(String query, HttpExchange httpExchange) throws UnsupportedEncodingException {
+<span class="fc" id="L431">    String[] pairs = query.split(&quot;[&amp;]&quot;);</span>
+<span class="fc" id="L432">    Map&lt;String, String&gt; parameters = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L433" title="All 2 branches covered.">    for (String pair : pairs) {</span>
+<span class="fc" id="L434">      int delimPos = pair.indexOf('=');</span>
+<span class="pc bpc" id="L435" title="1 of 2 branches missed.">      if (delimPos != -1) {</span>
+<span class="fc" id="L436">        String param = pair.substring(0, delimPos);</span>
+<span class="fc" id="L437">        String key = URLDecoder.decode(param, ENCODING);</span>
+        try {
+<span class="fc" id="L439">          String value = URLDecoder.decode(pair.substring(delimPos + 1), ENCODING);</span>
+<span class="fc" id="L440">          parameters.put(key, value);</span>
+<span class="nc" id="L441">        } catch (IllegalArgumentException e) {</span>
+<span class="nc" id="L442">          throw new RuntimeException(&quot;Could not decode query. Query length: &quot; + query.length() +</span>
+<span class="nc" id="L443">                                     &quot; Request method: &quot; + httpExchange.getRequestMethod(), e);</span>
+<span class="fc" id="L444">        }</span>
+      }
+    }
+<span class="fc" id="L447">    return parameters;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

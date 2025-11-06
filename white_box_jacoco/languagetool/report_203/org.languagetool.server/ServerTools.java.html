@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ServerTools.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.server</a> &gt; <span class="el_source">ServerTools.java</span></div><h1>ServerTools.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2016 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.server;
+
+import com.sun.net.httpserver.HttpExchange;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.languagetool.JLanguageTool;
+
+import java.io.PrintStream;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Map;
+import java.util.TimeZone;
+import java.util.regex.Pattern;
+
+/**
+ * @since 3.4
+ */
+public final class ServerTools {
+
+<span class="fc" id="L39">  private final static Pattern sentContentPattern = Pattern.compile(&quot;&lt;sentcontent&gt;.*&lt;/sentcontent&gt;&quot;, Pattern.DOTALL);</span>
+
+  private ServerTools() {
+  }
+
+  @NotNull
+  static String getLoggingInfo(String remoteAddress, Exception e, int errorCode, HttpExchange httpExchange, Map&lt;String, String&gt; params, long runtimeMillis, RequestCounter reqCounter) {
+<span class="fc" id="L46">    String message = &quot;&quot;;</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">    if (e != null) {</span>
+<span class="fc" id="L48">      message += &quot;An error has occurred: '&quot; + ServerTools.cleanUserTextFromMessage(e.getMessage(), params) + &quot;', sending HTTP code &quot; + errorCode + &quot;. &quot;;</span>
+    }
+<span class="fc" id="L50">    message += &quot;Access from &quot; + remoteAddress + &quot;, &quot;;</span>
+<span class="fc" id="L51">    message += &quot;HTTP user agent: &quot; + getHttpUserAgent(httpExchange) + &quot;, &quot;;</span>
+<span class="fc" id="L52">    message += &quot;User agent param: &quot; + params.get(&quot;useragent&quot;) + &quot;, &quot;;</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">    if (params.get(&quot;v&quot;) != null) {</span>
+<span class="fc" id="L54">      message += &quot;v: &quot; + params.get(&quot;v&quot;) + &quot;, &quot;;</span>
+    }
+<span class="fc" id="L56">    message += &quot;Referrer: &quot; + getHttpReferrer(httpExchange) + &quot;, &quot;;</span>
+<span class="fc" id="L57">    message += &quot;language: &quot; + params.get(&quot;language&quot;) + &quot;, &quot;;</span>
+<span class="fc" id="L58">    message += &quot;h: &quot; + reqCounter.getHandleCount() + &quot;, &quot;;</span>
+<span class="fc" id="L59">    message += &quot;r: &quot; + reqCounter.getRequestCount() + &quot;, &quot;;</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">    if (params.get(&quot;username&quot;) != null) {</span>
+<span class="fc" id="L61">      message += &quot;user: &quot; + params.get(&quot;username&quot;) + &quot;, &quot;;</span>
+    }
+<span class="fc bfc" id="L63" title="All 2 branches covered.">    if (params.get(&quot;apiKey&quot;) != null) {</span>
+<span class="fc" id="L64">      message += &quot;apiKey: &quot; + params.get(&quot;apiKey&quot;) + &quot;, &quot;;</span>
+    }
+<span class="fc bfc" id="L66" title="All 2 branches covered.">    if (params.get(&quot;tokenV2&quot;) != null) {</span>
+<span class="fc" id="L67">      message += &quot;tokenV2: &quot; + params.get(&quot;tokenV2&quot;) + &quot;, &quot;;</span>
+    }
+<span class="fc" id="L69">    message += &quot;time: &quot; + runtimeMillis;</span>
+<span class="fc" id="L70">    return message;</span>
+  }
+
+  @Nullable
+  static String getHttpUserAgent(HttpExchange httpExchange) {
+<span class="fc" id="L75">    return httpExchange.getRequestHeaders().getFirst(&quot;User-Agent&quot;);</span>
+  }
+  
+  @Nullable
+  static String getHttpReferrer(HttpExchange httpExchange) {
+<span class="fc" id="L80">    return httpExchange.getRequestHeaders().getFirst(&quot;Referer&quot;);</span>
+  }
+  
+  static String getSQLDatetimeString(Calendar date) {
+<span class="nc" id="L84">    SimpleDateFormat dateFormat = new SimpleDateFormat(&quot;yyyy-MM-dd HH:mm:ss&quot;);</span>
+<span class="nc" id="L85">    dateFormat.setTimeZone(TimeZone.getTimeZone(&quot;UTC&quot;));</span>
+<span class="nc" id="L86">    return dateFormat.format(date.getTime());</span>
+  }
+
+  static String getSQLDateString(Calendar date) {
+<span class="nc" id="L90">    SimpleDateFormat dateFormat = new SimpleDateFormat(&quot;yyyy-MM-dd&quot;);</span>
+<span class="nc" id="L91">    dateFormat.setTimeZone(TimeZone.getTimeZone(&quot;UTC&quot;));</span>
+<span class="nc" id="L92">    return dateFormat.format(date.getTime());</span>
+  }
+
+  public static void print(String s) {
+<span class="fc" id="L96">    print(s, System.out);</span>
+<span class="fc" id="L97">  }</span>
+
+  /* replace with structured logging:
+  check done
+  cache stats
+
+  maybe: (could be combined in table)
+  Access denied: request size / rate limit / ...
+  more interesting:
+  error rate too high
+  text checking took longer than ...
+
+  misc.:
+  language code unknown
+  missing arguments
+  old api
+  blacklisted referrer
+  various other exceptions
+   */
+
+  static void print(String s, PrintStream outputStream) {
+<span class="fc" id="L118">    SimpleDateFormat dateFormat = new SimpleDateFormat(&quot;yyyy-MM-dd HH:mm:ss ZZ&quot;);</span>
+<span class="fc" id="L119">    dateFormat.setTimeZone(TimeZone.getTimeZone(&quot;UTC&quot;));</span>
+<span class="fc" id="L120">    String now = dateFormat.format(new Date());</span>
+<span class="fc" id="L121">    outputStream.println(now + &quot; &quot; + s);</span>
+<span class="fc" id="L122">  }</span>
+
+  static void setCommonHeaders(HttpExchange httpExchange, String contentType, String allowOriginUrl) {
+<span class="fc" id="L125">    httpExchange.getResponseHeaders().set(&quot;Content-Type&quot;, contentType);</span>
+<span class="fc" id="L126">    setAllowOrigin(httpExchange, allowOriginUrl);</span>
+<span class="fc" id="L127">  }</span>
+
+  static void setAllowOrigin(HttpExchange httpExchange, String allowOriginUrl) {
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">    if (allowOriginUrl != null) {</span>
+<span class="nc" id="L131">      httpExchange.getResponseHeaders().set(&quot;Access-Control-Allow-Origin&quot;, allowOriginUrl);</span>
+    }
+<span class="fc" id="L133">  }</span>
+
+  static UserLimits getUserLimits(Map&lt;String, String&gt; params, HTTPServerConfig config) {
+<span class="fc bfc" id="L136" title="All 2 branches covered.">    if (params.get(&quot;token&quot;) != null) {</span>
+<span class="nc" id="L137">      return UserLimits.getLimitsFromToken(config, params.get(&quot;token&quot;));</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">    } else if (params.get(&quot;username&quot;) != null) {</span>
+<span class="pc bpc" id="L139" title="1 of 4 branches missed.">      if (params.get(&quot;apiKey&quot;) != null &amp;&amp; params.get(&quot;password&quot;) != null) {</span>
+        // TODO: throw exception (but first log to see how often this happens)
+<span class="nc" id="L141">        print(&quot;WARN: apiKey AND password was set: &quot; + params.get(&quot;apiKey&quot;), System.err);</span>
+      }
+<span class="fc bfc" id="L143" title="All 2 branches covered.">      if (params.get(&quot;apiKey&quot;) != null) {</span>
+<span class="nc" id="L144">        return UserLimits.getLimitsByApiKey(config, params.get(&quot;username&quot;), params.get(&quot;apiKey&quot;));</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">      } else if (params.get(&quot;password&quot;) != null) {</span>
+<span class="nc" id="L146">        return UserLimits.getLimitsFromUserAccount(config, params.get(&quot;username&quot;), params.get(&quot;password&quot;));</span>
+      } else {
+<span class="fc" id="L148">        throw new IllegalArgumentException(&quot;With 'username' set, you also need to specify either 'apiKey' (recommended) or 'password'&quot;);</span>
+      }
+    } else {
+<span class="fc bfc" id="L151" title="All 2 branches covered.">      if (params.get(&quot;apiKey&quot;) != null) {</span>
+<span class="fc" id="L152">        throw new IllegalArgumentException(&quot;apiKey was set, but username was not: &quot; + params.get(&quot;apiKey&quot;));</span>
+      }
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">      if (params.get(&quot;password&quot;) != null) {</span>
+<span class="nc" id="L155">        throw new IllegalArgumentException(&quot;password was set, but username was not&quot;);</span>
+      }
+<span class="fc" id="L157">      return UserLimits.getDefaultLimits(config);</span>
+    }
+  }
+
+  @NotNull
+  static JLanguageTool.Mode getMode(Map&lt;String, String&gt; params) {
+    JLanguageTool.Mode mode;
+<span class="fc bfc" id="L164" title="All 2 branches covered.">    if (params.get(&quot;mode&quot;) != null) {</span>
+<span class="fc" id="L165">      String modeParam = params.get(&quot;mode&quot;);</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">      if (&quot;textLevelOnly&quot;.equals(modeParam)) {</span>
+<span class="fc" id="L167">        mode = JLanguageTool.Mode.TEXTLEVEL_ONLY;</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">      } else if (&quot;allButTextLevelOnly&quot;.equals(modeParam)) {</span>
+<span class="fc" id="L169">        mode = JLanguageTool.Mode.ALL_BUT_TEXTLEVEL_ONLY;</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">      } else if (&quot;all&quot;.equals(modeParam)) {</span>
+<span class="fc" id="L171">        mode = JLanguageTool.Mode.ALL;</span>
+      } else {
+<span class="fc" id="L173">        throw new IllegalArgumentException(&quot;Mode must be one of 'textLevelOnly', 'allButTextLevelOnly', or 'all' but was: '&quot; + modeParam + &quot;'&quot;);</span>
+      }
+<span class="fc" id="L175">    } else {</span>
+<span class="fc" id="L176">      mode = JLanguageTool.Mode.ALL;</span>
+    }
+<span class="fc" id="L178">    return mode;</span>
+  }
+
+  @NotNull
+  static JLanguageTool.Level getLevel(Map&lt;String, String&gt; params) {
+    JLanguageTool.Level level;
+<span class="fc bfc" id="L184" title="All 2 branches covered.">    if (params.get(&quot;level&quot;) != null) {</span>
+<span class="fc" id="L185">      String param = params.get(&quot;level&quot;);</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">      if (&quot;default&quot;.equals(param)) {</span>
+<span class="fc" id="L187">        level = JLanguageTool.Level.DEFAULT;</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">      } else if (&quot;picky&quot;.equals(param)) {</span>
+<span class="fc" id="L189">        level = JLanguageTool.Level.PICKY;</span>
+      } else {
+<span class="fc" id="L191">        throw new IllegalArgumentException(&quot;If 'level' is set, it must be set to 'default' or 'picky'&quot;);</span>
+      }
+<span class="fc" id="L193">    } else {</span>
+<span class="fc" id="L194">      level = JLanguageTool.Level.DEFAULT;</span>
+    }
+<span class="fc" id="L196">    return level;</span>
+  }
+
+  /**
+   * Remove user-content from message in case parameters require increased privacy.
+   * @since 5.0
+   */
+  public static String cleanUserTextFromMessage(String s, Map&lt;String, String&gt; params) {
+<span class="fc bfc" id="L204" title="All 2 branches covered.">    if (params.getOrDefault(&quot;inputLogging&quot;, &quot;&quot;).equals(&quot;no&quot;)) {</span>
+<span class="fc" id="L205">      return sentContentPattern.matcher(s).replaceAll(&quot;&lt;&lt; content removed &gt;&gt;&quot;);</span>
+    }
+<span class="fc" id="L207">    return s;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

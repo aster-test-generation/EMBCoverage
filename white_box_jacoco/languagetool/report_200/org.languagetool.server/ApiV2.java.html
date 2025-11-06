@@ -1,0 +1,465 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ApiV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.server</a> &gt; <span class="el_source">ApiV2.java</span></div><h1>ApiV2.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2016 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.server;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sun.net.httpserver.HttpExchange;
+import org.jetbrains.annotations.NotNull;
+import org.languagetool.JLanguageTool;
+import org.languagetool.Language;
+import org.languagetool.Languages;
+import org.languagetool.markup.AnnotatedText;
+import org.languagetool.markup.AnnotatedTextBuilder;
+import org.languagetool.rules.CorrectExample;
+import org.languagetool.rules.IncorrectExample;
+import org.languagetool.rules.Rule;
+import org.languagetool.rules.TextLevelRule;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.StringWriter;
+import java.net.HttpURLConnection;
+import java.nio.file.Files;
+import java.util.*;
+
+import static org.languagetool.server.LanguageToolHttpHandler.API_DOC_URL;
+
+/**
+ * Handle requests to {@code /v2/} of the HTTP API. 
+ * @since 3.4
+ */
+class ApiV2 {
+
+  private static final String JSON_CONTENT_TYPE = &quot;application/json&quot;;
+  private static final String TEXT_CONTENT_TYPE = &quot;text/plain&quot;;
+  private static final String ENCODING = &quot;UTF-8&quot;;
+
+  private final TextChecker textChecker;
+  private final String allowOriginUrl;
+<span class="fc" id="L58">  private final JsonFactory factory = new JsonFactory();</span>
+
+<span class="fc" id="L60">  private String swagger = null;</span>
+
+<span class="fc" id="L62">  ApiV2(TextChecker textChecker, String allowOriginUrl) {</span>
+<span class="fc" id="L63">    this.textChecker = textChecker;</span>
+<span class="fc" id="L64">    this.allowOriginUrl = allowOriginUrl;</span>
+    try {
+<span class="fc" id="L66">      this.swagger = new Scanner(ApiV2.class.getResourceAsStream(&quot;/swagger.json&quot;), &quot;UTF-8&quot;).useDelimiter(&quot;\\A&quot;).next();</span>
+<span class="nc" id="L67">    } catch (Exception e) {</span>
+<span class="nc" id="L68">      e.printStackTrace();</span>
+<span class="fc" id="L69">    }</span>
+<span class="fc" id="L70">  }</span>
+
+  void handleRequest(String path, HttpExchange httpExchange, Map&lt;String, String&gt; parameters, ErrorRequestLimiter errorRequestLimiter, String remoteAddress, HTTPServerConfig config) throws Exception {
+<span class="fc bfc" id="L73" title="All 2 branches covered.">    if (path.equals(&quot;languages&quot;)) {</span>
+<span class="fc" id="L74">      handleLanguagesRequest(httpExchange);</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">    } else if (path.equals(&quot;maxtextlength&quot;)) {</span>
+<span class="nc" id="L76">      handleMaxTextLengthRequest(httpExchange, config);</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">    } else if (path.equals(&quot;configinfo&quot;)) {</span>
+<span class="nc" id="L78">      handleGetConfigurationInfoRequest(httpExchange, parameters, config);</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">    } else if (path.equals(&quot;info&quot;)) {</span>
+<span class="nc" id="L80">      handleSoftwareInfoRequest(httpExchange, parameters, config);</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">    } else if (path.equals(&quot;check&quot;)) {</span>
+<span class="nc" id="L82">      handleCheckRequest(httpExchange, parameters, errorRequestLimiter, remoteAddress);</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">    } else if (path.equals(&quot;words&quot;)) {</span>
+<span class="nc" id="L84">      handleWordsRequest(httpExchange, parameters, config);</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">    } else if (path.equals(&quot;words/add&quot;)) {</span>
+<span class="nc" id="L86">      handleWordAddRequest(httpExchange, parameters, config);</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">    } else if (path.equals(&quot;words/delete&quot;)) {</span>
+<span class="nc" id="L88">      handleWordDeleteRequest(httpExchange, parameters, config);</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">    } else if (path.equals(&quot;rule/examples&quot;)) {</span>
+      // private (i.e. undocumented) API for our own use only
+<span class="nc" id="L91">      handleRuleExamplesRequest(httpExchange, parameters);</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">    } else if (path.equals(&quot;log&quot;)) {</span>
+      // private (i.e. undocumented) API for our own use only
+<span class="nc" id="L94">      handleLogRequest(httpExchange, parameters);</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">    } else if (path.equals(&quot;swagger&quot;)) {</span>
+<span class="fc" id="L96">      handleSwaggerRequest(httpExchange);</span>
+    } else {
+<span class="nc" id="L98">      throw new PathNotFoundException(&quot;Unsupported action: '&quot; + path + &quot;'. Please see &quot; + API_DOC_URL);</span>
+    }
+<span class="fc" id="L100">  }</span>
+
+  private void handleSwaggerRequest(HttpExchange httpExchange) throws IOException {
+<span class="fc" id="L103">    ServerTools.setCommonHeaders(httpExchange, JSON_CONTENT_TYPE, allowOriginUrl);</span>
+<span class="fc" id="L104">    httpExchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, swagger.getBytes(ENCODING).length);</span>
+<span class="fc" id="L105">    httpExchange.getResponseBody().write(swagger.getBytes(ENCODING));</span>
+<span class="fc" id="L106">    ServerMetricsCollector.getInstance().logResponse(HttpURLConnection.HTTP_OK);</span>
+<span class="fc" id="L107">  }</span>
+
+  private void handleLanguagesRequest(HttpExchange httpExchange) throws IOException {
+<span class="fc" id="L110">    String response = getLanguages();</span>
+<span class="fc" id="L111">    ServerTools.setCommonHeaders(httpExchange, JSON_CONTENT_TYPE, allowOriginUrl);</span>
+<span class="fc" id="L112">    httpExchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, response.getBytes(ENCODING).length);</span>
+<span class="fc" id="L113">    httpExchange.getResponseBody().write(response.getBytes(ENCODING));</span>
+<span class="fc" id="L114">    ServerMetricsCollector.getInstance().logResponse(HttpURLConnection.HTTP_OK);</span>
+<span class="fc" id="L115">  }</span>
+
+  private void handleMaxTextLengthRequest(HttpExchange httpExchange, HTTPServerConfig config) throws IOException {
+<span class="nc" id="L118">    String response = Integer.toString(config.maxTextLength);</span>
+<span class="nc" id="L119">    ServerTools.setCommonHeaders(httpExchange, TEXT_CONTENT_TYPE, allowOriginUrl);</span>
+<span class="nc" id="L120">    httpExchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, response.getBytes(ENCODING).length);</span>
+<span class="nc" id="L121">    httpExchange.getResponseBody().write(response.getBytes(ENCODING));</span>
+<span class="nc" id="L122">    ServerMetricsCollector.getInstance().logResponse(HttpURLConnection.HTTP_OK);</span>
+<span class="nc" id="L123">  }</span>
+
+  private void handleGetConfigurationInfoRequest(HttpExchange httpExchange, Map&lt;String, String&gt; parameters, HTTPServerConfig config) throws IOException {
+<span class="nc bnc" id="L126" title="All 2 branches missed.">    if (parameters.get(&quot;language&quot;) == null) {</span>
+<span class="nc" id="L127">      throw new IllegalArgumentException(&quot;'language' parameter missing&quot;);</span>
+    }
+<span class="nc" id="L129">    Language lang = Languages.getLanguageForShortCode(parameters.get(&quot;language&quot;));</span>
+<span class="nc" id="L130">    String response = getConfigurationInfo(lang, config);</span>
+<span class="nc" id="L131">    ServerTools.setCommonHeaders(httpExchange, JSON_CONTENT_TYPE, allowOriginUrl);</span>
+<span class="nc" id="L132">    httpExchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, response.getBytes(ENCODING).length);</span>
+<span class="nc" id="L133">    httpExchange.getResponseBody().write(response.getBytes(ENCODING));</span>
+<span class="nc" id="L134">    ServerMetricsCollector.getInstance().logResponse(HttpURLConnection.HTTP_OK);</span>
+<span class="nc" id="L135">  }</span>
+
+  private void handleSoftwareInfoRequest(HttpExchange httpExchange, Map&lt;String, String&gt; parameters, HTTPServerConfig config) throws IOException {
+<span class="nc" id="L138">    String response = getSoftwareInfo();</span>
+<span class="nc" id="L139">    ServerTools.setCommonHeaders(httpExchange, JSON_CONTENT_TYPE, allowOriginUrl);</span>
+<span class="nc" id="L140">    httpExchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, response.getBytes(ENCODING).length);</span>
+<span class="nc" id="L141">    httpExchange.getResponseBody().write(response.getBytes(ENCODING));</span>
+<span class="nc" id="L142">    ServerMetricsCollector.getInstance().logResponse(HttpURLConnection.HTTP_OK);</span>
+<span class="nc" id="L143">  }</span>
+
+  private void handleCheckRequest(HttpExchange httpExchange, Map&lt;String, String&gt; parameters, ErrorRequestLimiter errorRequestLimiter, String remoteAddress) throws Exception {
+    AnnotatedText aText;
+<span class="fc bfc" id="L147" title="All 4 branches covered.">    if (parameters.containsKey(&quot;text&quot;) &amp;&amp; parameters.containsKey(&quot;data&quot;)) {</span>
+<span class="fc" id="L148">      throw new IllegalArgumentException(&quot;Set only 'text' or 'data' parameter, not both&quot;);</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">    } else if (parameters.containsKey(&quot;text&quot;)) {</span>
+<span class="fc" id="L150">      aText = new AnnotatedTextBuilder().addText(parameters.get(&quot;text&quot;)).build();</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">    } else if (parameters.containsKey(&quot;data&quot;)) {</span>
+<span class="fc" id="L152">      ObjectMapper mapper = new ObjectMapper();</span>
+<span class="fc" id="L153">      JsonNode data = mapper.readTree(parameters.get(&quot;data&quot;));</span>
+<span class="pc bpc" id="L154" title="3 of 4 branches missed.">      if (data.get(&quot;text&quot;) != null &amp;&amp; data.get(&quot;annotation&quot;) != null) {</span>
+<span class="nc" id="L155">        throw new IllegalArgumentException(&quot;'data' key in JSON requires either 'text' or 'annotation' key, not both&quot;);</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">      } else if (data.get(&quot;text&quot;) != null) {</span>
+<span class="nc" id="L157">        aText = getAnnotatedTextFromString(data, data.get(&quot;text&quot;).asText());</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">      } else if (data.get(&quot;annotation&quot;) != null) {</span>
+<span class="nc" id="L159">        aText = getAnnotatedTextFromJson(data);</span>
+      } else {
+<span class="fc" id="L161">        throw new IllegalArgumentException(&quot;'data' key in JSON requires 'text' or 'annotation' key&quot;);</span>
+      }
+<span class="nc" id="L163">    } else {</span>
+<span class="fc" id="L164">      throw new IllegalArgumentException(&quot;Missing 'text' or 'data' parameter&quot;);</span>
+    }
+<span class="nc" id="L166">    textChecker.checkText(aText, httpExchange, parameters, errorRequestLimiter, remoteAddress);</span>
+<span class="nc" id="L167">  }</span>
+
+  private void handleWordsRequest(HttpExchange httpExchange, Map&lt;String, String&gt; params, HTTPServerConfig config) throws Exception {
+<span class="nc" id="L170">    ensureGetMethod(httpExchange, &quot;/words&quot;);</span>
+<span class="nc" id="L171">    UserLimits limits = getUserLimits(params, config);</span>
+<span class="nc" id="L172">    DatabaseAccess db = DatabaseAccess.getInstance();</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">    int offset = params.get(&quot;offset&quot;) != null ? Integer.parseInt(params.get(&quot;offset&quot;)) : 0;</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">    int limit = params.get(&quot;limit&quot;) != null ? Integer.parseInt(params.get(&quot;limit&quot;)) : 10;</span>
+<span class="nc" id="L175">    List&lt;UserDictEntry&gt; words = db.getWords(limits.getPremiumUid(), offset, limit);</span>
+<span class="nc" id="L176">    writeListResponse(&quot;words&quot;, words, httpExchange);</span>
+<span class="nc" id="L177">  }</span>
+  
+  private void handleWordAddRequest(HttpExchange httpExchange, Map&lt;String, String&gt; parameters, HTTPServerConfig config) throws Exception {
+<span class="nc" id="L180">    ensurePostMethod(httpExchange, &quot;/words/add&quot;);</span>
+<span class="nc" id="L181">    UserLimits limits = getUserLimits(parameters, config);</span>
+<span class="nc" id="L182">    DatabaseAccess db = DatabaseAccess.getInstance();</span>
+<span class="nc" id="L183">    boolean added = db.addWord(parameters.get(&quot;word&quot;), limits.getPremiumUid());</span>
+<span class="nc" id="L184">    writeResponse(&quot;added&quot;, added, httpExchange);</span>
+<span class="nc" id="L185">  }</span>
+
+  private void handleWordDeleteRequest(HttpExchange httpExchange, Map&lt;String, String&gt; parameters, HTTPServerConfig config) throws Exception {
+<span class="nc" id="L188">    ensurePostMethod(httpExchange, &quot;/words/delete&quot;);</span>
+<span class="nc" id="L189">    UserLimits limits = getUserLimits(parameters, config);</span>
+<span class="nc" id="L190">    DatabaseAccess db = DatabaseAccess.getInstance();</span>
+<span class="nc" id="L191">    boolean deleted = db.deleteWord(parameters.get(&quot;word&quot;), limits.getPremiumUid());</span>
+<span class="nc" id="L192">    writeResponse(&quot;deleted&quot;, deleted, httpExchange);</span>
+<span class="nc" id="L193">  }</span>
+
+  private void handleRuleExamplesRequest(HttpExchange httpExchange, Map&lt;String, String&gt; params) throws Exception {
+<span class="nc" id="L196">    ensureGetMethod(httpExchange, &quot;/rule/examples&quot;);</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">    if (params.get(&quot;lang&quot;) == null) {</span>
+<span class="nc" id="L198">      throw new IllegalArgumentException(&quot;'lang' parameter missing&quot;);</span>
+    }
+<span class="nc bnc" id="L200" title="All 2 branches missed.">    if (params.get(&quot;ruleId&quot;) == null) {</span>
+<span class="nc" id="L201">      throw new IllegalArgumentException(&quot;'ruleId' parameter missing&quot;);</span>
+    }
+<span class="nc" id="L203">    Language lang = Languages.getLanguageForShortCode(params.get(&quot;lang&quot;));</span>
+<span class="nc" id="L204">    JLanguageTool lt = new JLanguageTool(lang);</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">    if (textChecker.config.languageModelDir != null) {</span>
+<span class="nc" id="L206">      lt.activateLanguageModelRules(textChecker.config.languageModelDir);</span>
+    }
+<span class="nc" id="L208">    List&lt;Rule&gt; rules = lt.getAllRules();</span>
+<span class="nc" id="L209">    List&lt;Rule&gt; foundRules = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">    for (Rule rule : rules) {</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">      if (rule.getId().equals(params.get(&quot;ruleId&quot;))) {</span>
+<span class="nc" id="L212">        foundRules.add(rule);</span>
+      }
+<span class="nc" id="L214">    }</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">    if (foundRules.isEmpty()) {</span>
+<span class="nc" id="L216">      throw new PathNotFoundException(&quot;Rule '&quot; + params.get(&quot;ruleId&quot;) + &quot;' not found for language &quot; + lang +</span>
+<span class="nc" id="L217">              &quot; (LanguageTool version/date: &quot; + JLanguageTool.VERSION + &quot;/&quot; + JLanguageTool.BUILD_DATE + &quot;, total rules of language: &quot; + rules.size() + &quot;)&quot;);</span>
+    }
+<span class="nc" id="L219">    StringWriter sw = new StringWriter();</span>
+<span class="nc" id="L220">    try (JsonGenerator g = factory.createGenerator(sw)) {</span>
+<span class="nc" id="L221">      g.writeStartObject();</span>
+<span class="nc" id="L222">      g.writeArrayFieldStart(&quot;results&quot;);</span>
+<span class="nc" id="L223">      g.writeStartObject();</span>
+<span class="nc" id="L224">      g.writeStringField(&quot;warning&quot;, &quot;*** This is not a public API - it may change anytime ***&quot;);</span>
+<span class="nc" id="L225">      g.writeEndObject();</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">      for (Rule foundRule : foundRules) {</span>
+<span class="nc bnc" id="L227" title="All 2 branches missed.">        for (CorrectExample example : foundRule.getCorrectExamples()) {</span>
+<span class="nc" id="L228">          g.writeStartObject();</span>
+<span class="nc" id="L229">          g.writeStringField(&quot;status&quot;, &quot;correct&quot;);</span>
+<span class="nc" id="L230">          g.writeStringField(&quot;sentence&quot;, example.getExample());</span>
+<span class="nc" id="L231">          g.writeEndObject();</span>
+<span class="nc" id="L232">        }</span>
+<span class="nc bnc" id="L233" title="All 2 branches missed.">        for (IncorrectExample example : foundRule.getIncorrectExamples()) {</span>
+<span class="nc" id="L234">          g.writeStartObject();</span>
+<span class="nc" id="L235">          g.writeStringField(&quot;status&quot;, &quot;incorrect&quot;);</span>
+<span class="nc" id="L236">          g.writeStringField(&quot;sentence&quot;, example.getExample());</span>
+<span class="nc" id="L237">          g.writeArrayFieldStart(&quot;corrections&quot;);</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">          for (String s : example.getCorrections()) {</span>
+<span class="nc" id="L239">            g.writeString(s);</span>
+<span class="nc" id="L240">          }</span>
+<span class="nc" id="L241">          g.writeEndArray();</span>
+<span class="nc" id="L242">          g.writeEndObject();</span>
+<span class="nc" id="L243">        }</span>
+<span class="nc" id="L244">      }</span>
+<span class="nc" id="L245">      g.writeEndArray();</span>
+<span class="nc" id="L246">      g.writeEndObject();</span>
+    }
+<span class="nc" id="L248">    sendJson(httpExchange, sw);</span>
+<span class="nc" id="L249">  }</span>
+
+  private void ensureGetMethod(HttpExchange httpExchange, String url) {
+<span class="nc bnc" id="L252" title="All 2 branches missed.">    if (!httpExchange.getRequestMethod().equalsIgnoreCase(&quot;get&quot;)) {</span>
+<span class="nc" id="L253">      throw new IllegalArgumentException(url + &quot; needs to be called with GET&quot;);</span>
+    }
+<span class="nc" id="L255">  }</span>
+  
+  private void ensurePostMethod(HttpExchange httpExchange, String url) {
+<span class="nc bnc" id="L258" title="All 2 branches missed.">    if (!httpExchange.getRequestMethod().equalsIgnoreCase(&quot;post&quot;)) {</span>
+<span class="nc" id="L259">      throw new IllegalArgumentException(url + &quot; needs to be called with POST&quot;);</span>
+    }
+<span class="nc" id="L261">  }</span>
+
+  @NotNull
+  private UserLimits getUserLimits(Map&lt;String, String&gt; parameters, HTTPServerConfig config) {
+<span class="nc" id="L265">    UserLimits limits = ServerTools.getUserLimits(parameters, config);</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">    if (limits.getPremiumUid() == null) {</span>
+<span class="nc" id="L267">      throw new IllegalStateException(&quot;This end point needs a user id&quot;);</span>
+    }
+<span class="nc" id="L269">    return limits;</span>
+  }
+
+  private void writeResponse(String fieldName, boolean added, HttpExchange httpExchange) throws IOException {
+<span class="nc" id="L273">    StringWriter sw = new StringWriter();</span>
+<span class="nc" id="L274">    try (JsonGenerator g = factory.createGenerator(sw)) {</span>
+<span class="nc" id="L275">      g.writeStartObject();</span>
+<span class="nc" id="L276">      g.writeBooleanField(fieldName, added);</span>
+<span class="nc" id="L277">      g.writeEndObject();</span>
+    }
+<span class="nc" id="L279">    sendJson(httpExchange, sw);</span>
+<span class="nc" id="L280">  }</span>
+  
+  private void writeListResponse(String fieldName, List&lt;UserDictEntry&gt; words, HttpExchange httpExchange) throws IOException {
+<span class="nc" id="L283">    StringWriter sw = new StringWriter();</span>
+<span class="nc" id="L284">    try (JsonGenerator g = factory.createGenerator(sw)) {</span>
+<span class="nc" id="L285">      g.writeStartObject();</span>
+<span class="nc" id="L286">      g.writeArrayFieldStart(fieldName);</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">      for (UserDictEntry word : words) {</span>
+<span class="nc" id="L288">        g.writeString(word.getWord());</span>
+<span class="nc" id="L289">      }</span>
+<span class="nc" id="L290">      g.writeEndArray();</span>
+<span class="nc" id="L291">      g.writeEndObject();</span>
+    }
+<span class="nc" id="L293">    sendJson(httpExchange, sw);</span>
+<span class="nc" id="L294">  }</span>
+
+  private void sendJson(HttpExchange httpExchange, StringWriter sw) throws IOException {
+<span class="nc" id="L297">    String response = sw.toString();</span>
+<span class="nc" id="L298">    ServerTools.setCommonHeaders(httpExchange, JSON_CONTENT_TYPE, allowOriginUrl);</span>
+<span class="nc" id="L299">    httpExchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, response.getBytes(ENCODING).length);</span>
+<span class="nc" id="L300">    httpExchange.getResponseBody().write(response.getBytes(ENCODING));</span>
+<span class="nc" id="L301">    ServerMetricsCollector.getInstance().logResponse(HttpURLConnection.HTTP_OK);</span>
+<span class="nc" id="L302">  }</span>
+
+  private void handleLogRequest(HttpExchange httpExchange, Map&lt;String, String&gt; parameters) throws IOException {
+    // used so the client (especially the browser add-ons) can report internal issues:
+<span class="nc" id="L306">    String message = parameters.get(&quot;message&quot;);</span>
+<span class="nc bnc" id="L307" title="All 4 branches missed.">    if (message != null &amp;&amp; message.length() &gt; 250) {</span>
+<span class="nc" id="L308">      message = message.substring(0, 250) + &quot;...&quot;;</span>
+    }
+<span class="nc" id="L310">    ServerTools.print(&quot;Log message from client: &quot; + message + &quot; - User-Agent: &quot; + httpExchange.getRequestHeaders().getFirst(&quot;User-Agent&quot;));</span>
+<span class="nc" id="L311">    String response = &quot;OK&quot;;</span>
+<span class="nc" id="L312">    httpExchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, response.getBytes(ENCODING).length);</span>
+<span class="nc" id="L313">    httpExchange.getResponseBody().write(response.getBytes(ENCODING));</span>
+<span class="nc" id="L314">    ServerMetricsCollector.getInstance().logResponse(HttpURLConnection.HTTP_OK);</span>
+<span class="nc" id="L315">  }</span>
+
+  private AnnotatedText getAnnotatedTextFromString(JsonNode data, String text) {
+<span class="nc" id="L318">    AnnotatedTextBuilder textBuilder = new AnnotatedTextBuilder().addText(text);</span>
+<span class="nc bnc" id="L319" title="All 2 branches missed.">    if (data.has(&quot;metaData&quot;)) {</span>
+<span class="nc" id="L320">      JsonNode metaData = data.get(&quot;metaData&quot;);</span>
+<span class="nc" id="L321">      Iterator&lt;String&gt; it = metaData.fieldNames();</span>
+<span class="nc bnc" id="L322" title="All 2 branches missed.">      while (it.hasNext()) {</span>
+<span class="nc" id="L323">        String key = it.next();</span>
+<span class="nc" id="L324">        String val = metaData.get(key).asText();</span>
+        try {
+<span class="nc" id="L326">          AnnotatedText.MetaDataKey metaDataKey = AnnotatedText.MetaDataKey.valueOf(key);</span>
+<span class="nc" id="L327">          textBuilder.addGlobalMetaData(metaDataKey, val);</span>
+<span class="nc" id="L328">        } catch (IllegalArgumentException e) {</span>
+<span class="nc" id="L329">          textBuilder.addGlobalMetaData(key, val);</span>
+<span class="nc" id="L330">        }</span>
+<span class="nc" id="L331">      }</span>
+    }
+<span class="nc" id="L333">    return textBuilder.build();</span>
+  }
+
+  private AnnotatedText getAnnotatedTextFromJson(JsonNode data) {
+<span class="nc" id="L337">    AnnotatedTextBuilder atb = new AnnotatedTextBuilder();</span>
+    // Expected format:
+    // annotation: [
+    //   {text: 'text'},
+    //   {markup: '&lt;b&gt;'}
+    //   {text: 'more text'},
+    //   {markup: '&lt;/b&gt;'}
+    // ]
+    //
+<span class="nc bnc" id="L346" title="All 2 branches missed.">    for (JsonNode node : data.get(&quot;annotation&quot;)) {</span>
+<span class="nc bnc" id="L347" title="All 4 branches missed.">      if (node.get(&quot;text&quot;) != null &amp;&amp; node.get(&quot;markup&quot;) != null) {</span>
+<span class="nc" id="L348">        throw new IllegalArgumentException(&quot;Only either 'text' or 'markup' are supported in an object in 'annotation' list, not both: &quot; + node);</span>
+<span class="nc bnc" id="L349" title="All 4 branches missed.">      } else if (node.get(&quot;text&quot;) != null &amp;&amp; node.get(&quot;interpretAs&quot;) != null) {</span>
+<span class="nc" id="L350">        throw new IllegalArgumentException(&quot;'text' cannot be used with 'interpretAs' (only 'markup' can): &quot; + node);</span>
+<span class="nc bnc" id="L351" title="All 2 branches missed.">      } else if (node.get(&quot;text&quot;) != null) {</span>
+<span class="nc" id="L352">        atb.addText(node.get(&quot;text&quot;).asText());</span>
+<span class="nc bnc" id="L353" title="All 2 branches missed.">      } else if (node.get(&quot;markup&quot;) != null) {</span>
+<span class="nc bnc" id="L354" title="All 2 branches missed.">        if (node.get(&quot;interpretAs&quot;) != null) {</span>
+<span class="nc" id="L355">          atb.addMarkup(node.get(&quot;markup&quot;).asText(), node.get(&quot;interpretAs&quot;).asText());</span>
+        } else {
+<span class="nc" id="L357">          atb.addMarkup(node.get(&quot;markup&quot;).asText());</span>
+        }
+      } else {
+<span class="nc" id="L360">        throw new IllegalArgumentException(&quot;Only 'text' and 'markup' are supported in 'annotation' list: &quot; + node);</span>
+      }
+<span class="nc" id="L362">    }</span>
+<span class="nc" id="L363">    return atb.build();</span>
+  }
+
+  String getLanguages() throws IOException {
+<span class="fc" id="L367">    StringWriter sw = new StringWriter();</span>
+<span class="fc" id="L368">    try (JsonGenerator g = factory.createGenerator(sw)) {</span>
+<span class="fc" id="L369">      g.writeStartArray();</span>
+<span class="fc" id="L370">      List&lt;Language&gt; languages = new ArrayList&lt;&gt;(Languages.get());</span>
+<span class="fc" id="L371">      languages.sort(Comparator.comparing(Language::getName));</span>
+<span class="fc bfc" id="L372" title="All 2 branches covered.">      for (Language lang : languages) {</span>
+<span class="fc" id="L373">        g.writeStartObject();</span>
+<span class="fc" id="L374">        g.writeStringField(&quot;name&quot;, lang.getName());</span>
+<span class="fc" id="L375">        g.writeStringField(&quot;code&quot;, lang.getShortCode());</span>
+<span class="fc" id="L376">        g.writeStringField(&quot;longCode&quot;, lang.getShortCodeWithCountryAndVariant());</span>
+<span class="fc" id="L377">        g.writeEndObject();</span>
+<span class="fc" id="L378">      }</span>
+<span class="fc" id="L379">      g.writeEndArray();</span>
+    }
+<span class="fc" id="L381">    return sw.toString();</span>
+  }
+
+  String getSoftwareInfo() throws IOException {
+<span class="nc" id="L385">    StringWriter sw = new StringWriter();</span>
+<span class="nc" id="L386">    try (JsonGenerator g = factory.createGenerator(sw)) {</span>
+<span class="nc" id="L387">      g.writeStartObject();</span>
+<span class="nc" id="L388">      g.writeObjectFieldStart(&quot;software&quot;);</span>
+<span class="nc" id="L389">      g.writeStringField(&quot;name&quot;, &quot;LanguageTool&quot;);</span>
+<span class="nc" id="L390">      g.writeStringField(&quot;version&quot;, JLanguageTool.VERSION);</span>
+<span class="nc" id="L391">      g.writeStringField(&quot;buildDate&quot;, JLanguageTool.BUILD_DATE);</span>
+<span class="nc" id="L392">      g.writeStringField(&quot;commit&quot;, JLanguageTool.GIT_SHORT_ID);</span>
+<span class="nc" id="L393">      g.writeBooleanField(&quot;premium&quot;, JLanguageTool.isPremiumVersion());</span>
+<span class="nc" id="L394">      g.writeEndObject();</span>
+<span class="nc" id="L395">      g.writeEndObject();</span>
+    }
+<span class="nc" id="L397">    return sw.toString();</span>
+  }
+
+  String getConfigurationInfo(Language lang, HTTPServerConfig config) throws IOException {
+<span class="nc" id="L401">    StringWriter sw = new StringWriter();</span>
+<span class="nc" id="L402">    JLanguageTool lt = new JLanguageTool(lang);</span>
+<span class="nc bnc" id="L403" title="All 2 branches missed.">    if (textChecker.config.languageModelDir != null) {</span>
+<span class="nc" id="L404">      lt.activateLanguageModelRules(textChecker.config.languageModelDir);</span>
+    }
+<span class="nc bnc" id="L406" title="All 2 branches missed.">    if (textChecker.config.word2vecModelDir != null) {</span>
+<span class="nc" id="L407">      lt.activateWord2VecModelRules(textChecker.config.word2vecModelDir);</span>
+    }
+<span class="nc" id="L409">    List&lt;Rule&gt; rules = lt.getAllRules();</span>
+<span class="nc" id="L410">    try (JsonGenerator g = factory.createGenerator(sw)) {</span>
+<span class="nc" id="L411">      g.writeStartObject();</span>
+
+<span class="nc" id="L413">      g.writeObjectFieldStart(&quot;software&quot;);</span>
+<span class="nc" id="L414">      g.writeStringField(&quot;name&quot;, &quot;LanguageTool&quot;);</span>
+<span class="nc" id="L415">      g.writeStringField(&quot;version&quot;, JLanguageTool.VERSION);</span>
+<span class="nc" id="L416">      g.writeStringField(&quot;buildDate&quot;, JLanguageTool.BUILD_DATE);</span>
+<span class="nc" id="L417">      g.writeBooleanField(&quot;premium&quot;, JLanguageTool.isPremiumVersion());</span>
+<span class="nc" id="L418">      g.writeEndObject();</span>
+      
+<span class="nc" id="L420">      g.writeObjectFieldStart(&quot;parameter&quot;);</span>
+<span class="nc" id="L421">      g.writeNumberField(&quot;maxTextLength&quot;, config.maxTextLength);</span>
+<span class="nc" id="L422">      g.writeEndObject();</span>
+
+<span class="nc" id="L424">      g.writeArrayFieldStart(&quot;rules&quot;);</span>
+<span class="nc bnc" id="L425" title="All 2 branches missed.">      for (Rule rule : rules) {</span>
+<span class="nc" id="L426">        g.writeStartObject();</span>
+<span class="nc" id="L427">        g.writeStringField(&quot;ruleId&quot;, rule.getId());</span>
+<span class="nc" id="L428">        g.writeStringField(&quot;description&quot;, rule.getDescription());</span>
+<span class="nc bnc" id="L429" title="All 2 branches missed.">        if(rule.isDictionaryBasedSpellingRule()) {</span>
+<span class="nc" id="L430">          g.writeStringField(&quot;isDictionaryBasedSpellingRule&quot;, &quot;yes&quot;);</span>
+        }
+<span class="nc bnc" id="L432" title="All 2 branches missed.">        if(rule.isDefaultOff()) {</span>
+<span class="nc" id="L433">          g.writeStringField(&quot;isDefaultOff&quot;, &quot;yes&quot;);</span>
+        }
+<span class="nc bnc" id="L435" title="All 2 branches missed.">        if(rule.isOfficeDefaultOff()) {</span>
+<span class="nc" id="L436">          g.writeStringField(&quot;isOfficeDefaultOff&quot;, &quot;yes&quot;);</span>
+        }
+<span class="nc bnc" id="L438" title="All 2 branches missed.">        if(rule.isOfficeDefaultOn()) {</span>
+<span class="nc" id="L439">          g.writeStringField(&quot;isOfficeDefaultOn&quot;, &quot;yes&quot;);</span>
+        }
+<span class="nc bnc" id="L441" title="All 2 branches missed.">        if(rule.hasConfigurableValue()) {</span>
+<span class="nc" id="L442">          g.writeStringField(&quot;hasConfigurableValue&quot;, &quot;yes&quot;);</span>
+<span class="nc" id="L443">          g.writeStringField(&quot;configureText&quot;, rule.getConfigureText());</span>
+<span class="nc" id="L444">          g.writeStringField(&quot;maxConfigurableValue&quot;, Integer.toString(rule.getMaxConfigurableValue()));</span>
+<span class="nc" id="L445">          g.writeStringField(&quot;minConfigurableValue&quot;, Integer.toString(rule.getMinConfigurableValue()));</span>
+<span class="nc" id="L446">          g.writeStringField(&quot;defaultValue&quot;, Integer.toString(rule.getDefaultValue()));</span>
+        }
+<span class="nc" id="L448">        g.writeStringField(&quot;categoryId&quot;, rule.getCategory().getId().toString());</span>
+<span class="nc" id="L449">        g.writeStringField(&quot;categoryName&quot;, rule.getCategory().getName());</span>
+<span class="nc" id="L450">        g.writeStringField(&quot;locQualityIssueType&quot;, rule.getLocQualityIssueType().toString());</span>
+<span class="nc bnc" id="L451" title="All 2 branches missed.">        if(rule instanceof TextLevelRule) {</span>
+<span class="nc" id="L452">          g.writeStringField(&quot;isTextLevelRule&quot;, &quot;yes&quot;);</span>
+<span class="nc" id="L453">          g.writeStringField(&quot;minToCheckParagraph&quot;, Integer.toString(((TextLevelRule) rule).minToCheckParagraph()));</span>
+        }
+<span class="nc" id="L455">        g.writeEndObject();</span>
+<span class="nc" id="L456">      }</span>
+<span class="nc" id="L457">      g.writeEndArray();</span>
+
+<span class="nc" id="L459">      g.writeEndObject();</span>
+    }
+<span class="nc" id="L461">    return sw.toString();</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RequestLimiter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.server</a> &gt; <span class="el_source">RequestLimiter.java</span></div><h1>RequestLimiter.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2012 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.server;
+
+import org.languagetool.JLanguageTool;
+
+import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+/**
+ * Limit the maximum number of request per IP address for a given time range.
+ */
+class RequestLimiter {
+
+  // TODO: this only works if the period covered is larger than requestLimitPeriodInSeconds -
+  // we should add a sanity check that warns if that's not the case
+  static final int REQUEST_QUEUE_SIZE = 1000;
+
+<span class="nc" id="L35">  final List&lt;RequestEvent&gt; requestEvents = new CopyOnWriteArrayList&lt;&gt;();</span>
+  
+  private final int ipFingerprintFactor;
+  private final int requestLimit;
+  private final int requestLimitInBytes;
+  private final int requestLimitPeriodInSeconds;
+  private final Long server;
+  private final DatabaseLogger logger;
+
+  /**
+   * @param requestLimit the maximum number of request per &lt;tt&gt;requestLimitPeriodInSeconds&lt;/tt&gt;
+   * @param requestLimitPeriodInSeconds the time period over which requests are considered, in seconds
+   * @param ipFingerprintFactor allow limits x times larger per ip when fingerprints differ
+   *                            (i.e. assume there may be a maximum of x users behind the same ip)
+   */
+<span class="nc" id="L50">  RequestLimiter(int requestLimit, int requestLimitInBytes, int requestLimitPeriodInSeconds, int ipFingerprintFactor) {</span>
+<span class="nc" id="L51">    this.requestLimit = requestLimit;</span>
+<span class="nc" id="L52">    this.requestLimitInBytes = requestLimitInBytes;</span>
+<span class="nc" id="L53">    this.requestLimitPeriodInSeconds = requestLimitPeriodInSeconds;</span>
+<span class="nc" id="L54">    this.ipFingerprintFactor = ipFingerprintFactor;</span>
+<span class="nc" id="L55">    this.logger = DatabaseLogger.getInstance();</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">    if (this.logger.isLogging()) {</span>
+<span class="nc" id="L57">      DatabaseAccess db = DatabaseAccess.getInstance();</span>
+<span class="nc" id="L58">      this.server = db.getOrCreateServerId();</span>
+<span class="nc" id="L59">    } else {</span>
+<span class="nc" id="L60">      this.server = null;</span>
+    }
+<span class="nc" id="L62">  }</span>
+
+  RequestLimiter(int requestLimit, int requestLimitInBytes, int requestLimitPeriodInSeconds) {
+<span class="nc" id="L65">    this(requestLimit, requestLimitInBytes, requestLimitPeriodInSeconds, 1);</span>
+<span class="nc" id="L66">  }</span>
+
+  /**
+   * The maximum number of request per {@link #getRequestLimitPeriodInSeconds()}.
+   */
+  int getRequestLimit() {
+<span class="nc" id="L72">    return requestLimit;</span>
+  }
+
+  /**
+   * The maximum number of request bytes per {@link #getRequestLimitPeriodInSeconds()}.
+   * @since 4.0
+   */
+  int getRequestLimitInBytes() {
+<span class="nc" id="L80">    return requestLimitInBytes;</span>
+  }
+
+  /**
+   * The time period over which requests are considered, in seconds.
+   */
+  int getRequestLimitPeriodInSeconds() {
+<span class="nc" id="L87">    return requestLimitPeriodInSeconds;</span>
+  }
+
+  String computeFingerprint(Map&lt;String, List&lt;String&gt;&gt; httpHeader, Map&lt;String, String&gt; parameters) {
+<span class="nc" id="L91">    List&lt;String&gt; empty = Collections.singletonList(&quot;&quot;);</span>
+<span class="nc" id="L92">    String separator = &quot;|&quot;;</span>
+<span class="nc" id="L93">    List&lt;String&gt; fields = new LinkedList&lt;&gt;();</span>
+<span class="nc" id="L94">    fields.add(String.join(separator, httpHeader.getOrDefault(&quot;User-Agent&quot;, empty)));</span>
+<span class="nc" id="L95">    fields.add(String.join(separator, httpHeader.getOrDefault(&quot;Accept-Language&quot;, empty)));</span>
+<span class="nc" id="L96">    fields.add(String.join(separator, httpHeader.getOrDefault(&quot;Referer&quot;, empty)));</span>
+<span class="nc" id="L97">    fields.add(String.join(separator, parameters.getOrDefault(&quot;textSessionId&quot;, &quot;&quot;)));</span>
+<span class="nc" id="L98">    return String.join(separator, fields);</span>
+  }
+
+  /**
+   * @param ipAddress the client's IP address
+   * @throws TooManyRequestsException if access is not allowed because the request limit is reached
+   */
+  void checkAccess(String ipAddress, Map&lt;String, String&gt; params, Map&lt;String, List&lt;String&gt;&gt; httpHeader, UserLimits userLimits) {
+<span class="nc bnc" id="L106" title="All 2 branches missed.">    if (userLimits.getSkipLimits()) {</span>
+      // internal special case for e.g. nightly tests
+<span class="nc" id="L108">      return;</span>
+    }
+<span class="nc" id="L110">    int reqSize = getRequestSize(params);</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">    while (requestEvents.size() &gt; REQUEST_QUEUE_SIZE) {</span>
+<span class="nc" id="L112">      requestEvents.remove(0);</span>
+    }
+<span class="nc" id="L114">    requestEvents.add(new RequestEvent(ipAddress, new Date(), reqSize, computeFingerprint(httpHeader, params), ServerTools.getMode(params)));</span>
+<span class="nc" id="L115">    checkLimit(ipAddress, params, httpHeader);</span>
+<span class="nc" id="L116">  }</span>
+
+  private int getRequestSize(Map&lt;String, String&gt; params) {
+<span class="nc" id="L119">    String text = params.get(&quot;text&quot;);</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">    if (text != null) {</span>
+<span class="nc" id="L121">      return text.length();</span>
+    } else {
+<span class="nc" id="L123">      String data = params.get(&quot;data&quot;);</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">      if (data != null) {</span>
+<span class="nc" id="L125">        return data.length();</span>
+      }
+    }
+<span class="nc" id="L128">    return 0;</span>
+  }
+
+  private Long getClientId(Map&lt;String, String&gt; parameters) {
+<span class="nc bnc" id="L132" title="All 2 branches missed.">    if (logger.isLogging()) {</span>
+<span class="nc" id="L133">      DatabaseAccess db = DatabaseAccess.getInstance();</span>
+<span class="nc" id="L134">      String paramValue = parameters.get(&quot;useragent&quot;);</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">      if (paramValue == null) {</span>
+<span class="nc" id="L136">        return null;</span>
+      }
+<span class="nc" id="L138">      return db.getOrCreateClientId(paramValue);</span>
+    } else {
+<span class="nc" id="L140">      return null;</span>
+    }
+  }
+
+  private String getReferer(Map&lt;String, List&lt;String&gt;&gt; httpHeader) {
+<span class="nc" id="L145">    List&lt;String&gt; values = httpHeader.get(&quot;Referer&quot;);</span>
+<span class="nc bnc" id="L146" title="All 4 branches missed.">    if (values == null || values.isEmpty()) {</span>
+<span class="nc" id="L147">      return null;</span>
+    }
+<span class="nc" id="L149">    return values.get(0);</span>
+  }
+
+  private String getUserAgent(Map&lt;String, List&lt;String&gt;&gt; httpHeader) {
+<span class="nc" id="L153">    List&lt;String&gt; values = httpHeader.get(&quot;User-Agent&quot;);</span>
+<span class="nc bnc" id="L154" title="All 4 branches missed.">    if (values == null || values.isEmpty()) {</span>
+<span class="nc" id="L155">      return null;</span>
+    }
+<span class="nc" id="L157">    return values.get(0);</span>
+  }
+
+  void checkLimit(String ipAddress, Map&lt;String, String&gt; parameters, Map&lt;String, List&lt;String&gt;&gt; httpHeader) {
+<span class="nc" id="L161">    int requestsByIp = 0;</span>
+<span class="nc" id="L162">    int requestSizeByIp = 0;</span>
+<span class="nc" id="L163">    int requestsByFingerprint = 0;</span>
+<span class="nc" id="L164">    int requestSizeByFingerprint = 0;</span>
+    // all requests before this date are considered old:
+<span class="nc" id="L166">    Date thresholdDate = new Date(System.currentTimeMillis() - requestLimitPeriodInSeconds * 1000L);</span>
+<span class="nc" id="L167">    String fingerprint = computeFingerprint(httpHeader, parameters);</span>
+<span class="nc" id="L168">    String referer = getReferer(httpHeader);</span>
+<span class="nc" id="L169">    String userAgent = getUserAgent(httpHeader);</span>
+<span class="nc" id="L170">    Long clientId = getClientId(parameters);</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">    for (RequestEvent event : requestEvents) {</span>
+<span class="nc bnc" id="L172" title="All 4 branches missed.">      if (event.ip.equals(ipAddress) &amp;&amp; event.date.after(thresholdDate)) {</span>
+        // text level rules cause much less load, so count them accordingly
+<span class="nc bnc" id="L174" title="All 2 branches missed.">        float modeFactor = event.mode == JLanguageTool.Mode.TEXTLEVEL_ONLY ? 0.1f : 1f;</span>
+<span class="nc" id="L175">        requestsByIp++;</span>
+<span class="nc" id="L176">        requestSizeByIp += event.getSizeInBytes() * modeFactor;</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">        if (event.fingerprint.equals(fingerprint)) {</span>
+<span class="nc" id="L178">          requestsByFingerprint++;</span>
+<span class="nc" id="L179">          requestSizeByFingerprint += event.getSizeInBytes() * modeFactor;</span>
+        }
+<span class="nc bnc" id="L181" title="All 4 branches missed.">        if (requestLimit &gt; 0 &amp;&amp; requestsByFingerprint &gt; requestLimit) {</span>
+<span class="nc" id="L182">          String msg = &quot;limit: &quot; + requestLimit + &quot; / &quot; + requestLimitPeriodInSeconds + &quot;, requests: &quot;  + requestsByIp + &quot;, ip: &quot; + ipAddress + &quot;, fingerprint: &quot; + fingerprint;</span>
+<span class="nc" id="L183">          logger.log(new DatabaseAccessLimitLogEntry(&quot;MaxRequestPerPeriodFingerprint&quot;, server, clientId, null, msg, referer, userAgent));</span>
+<span class="nc" id="L184">          throw new TooManyRequestsException(&quot;Client request limit of &quot; + requestLimit + &quot; requests per &quot; +</span>
+            requestLimitPeriodInSeconds + &quot; seconds exceeded&quot;); }
+<span class="nc bnc" id="L186" title="All 4 branches missed.">        if (requestLimit &gt; 0 &amp;&amp; requestsByIp &gt; requestLimit * ipFingerprintFactor) {</span>
+<span class="nc" id="L187">          String msg = &quot;limit: &quot; + requestLimit * ipFingerprintFactor + &quot; / &quot; + requestLimitPeriodInSeconds + &quot;, requests: &quot;  + requestsByIp + &quot;, ip: &quot; + ipAddress + &quot;, fingerprint: &quot; + fingerprint;</span>
+<span class="nc" id="L188">          logger.log(new DatabaseAccessLimitLogEntry(&quot;MaxRequestPerPeriodIp&quot;, server, clientId, null, msg, referer, userAgent));</span>
+<span class="nc" id="L189">          throw new TooManyRequestsException(&quot;IP request limit of &quot; + requestLimit * ipFingerprintFactor + &quot; requests per &quot; +</span>
+            requestLimitPeriodInSeconds + &quot; seconds exceeded&quot;);
+        }
+<span class="nc bnc" id="L192" title="All 2 branches missed.">        if (event.mode == JLanguageTool.Mode.TEXTLEVEL_ONLY) {</span>
+<span class="nc bnc" id="L193" title="All 4 branches missed.">          if (requestLimitInBytes &gt; 0 &amp;&amp; requestSizeByFingerprint &gt; requestLimitInBytes) {</span>
+<span class="nc" id="L194">            String msg = &quot;limit in Mode.TEXTLEVEL_ONLY: &quot; + requestLimitInBytes + &quot; / &quot; + requestLimitPeriodInSeconds + &quot;, request size: &quot;  + requestSizeByIp + &quot;, ip: &quot; + ipAddress + &quot;, fingerprint: &quot; + fingerprint;</span>
+<span class="nc" id="L195">            logger.log(new DatabaseAccessLimitLogEntry(&quot;MaxRequestSizePerPeriodFingerprint&quot;, server, clientId, null, msg, referer, userAgent));</span>
+<span class="nc" id="L196">            throw new TooManyRequestsException(&quot;Client request size limit of &quot; + requestLimitInBytes + &quot; bytes per &quot; +</span>
+              requestLimitPeriodInSeconds + &quot; seconds exceeded in text-level checks&quot;);
+          }
+<span class="nc bnc" id="L199" title="All 4 branches missed.">          if (requestLimitInBytes &gt; 0 &amp;&amp; requestSizeByIp &gt; requestLimitInBytes * ipFingerprintFactor) {</span>
+<span class="nc" id="L200">            String msg = &quot;limit in Mode.TEXTLEVEL_ONLY: &quot; + requestLimitInBytes * ipFingerprintFactor + &quot; / &quot; + requestLimitPeriodInSeconds + &quot;, request size: &quot;  + requestSizeByIp + &quot;, ip: &quot; + ipAddress + &quot;, fingerprint: &quot; + fingerprint;</span>
+<span class="nc" id="L201">            logger.log(new DatabaseAccessLimitLogEntry(&quot;MaxRequestSizePerPeriodIp&quot;, server, clientId, null, msg, referer, userAgent));</span>
+<span class="nc" id="L202">            throw new TooManyRequestsException(&quot;IP request size limit of &quot; + requestLimitInBytes * ipFingerprintFactor + &quot; bytes per &quot; +</span>
+              requestLimitPeriodInSeconds + &quot; seconds exceeded in text-level checks&quot;);
+          }
+        } else {
+<span class="nc bnc" id="L206" title="All 4 branches missed.">          if (requestLimitInBytes &gt; 0 &amp;&amp; requestSizeByFingerprint &gt; requestLimitInBytes) {</span>
+<span class="nc" id="L207">            String msg = &quot;limit: &quot; + requestLimitInBytes + &quot; / &quot; + requestLimitPeriodInSeconds + &quot;, request size: &quot;  + requestSizeByIp + &quot;, ip: &quot; + ipAddress + &quot;, fingerprint: &quot; + fingerprint;</span>
+<span class="nc" id="L208">            logger.log(new DatabaseAccessLimitLogEntry(&quot;MaxRequestSizePerPeriodFingerprint&quot;, server, clientId, null, msg, referer, userAgent));</span>
+<span class="nc" id="L209">            throw new TooManyRequestsException(&quot;Client request size limit of &quot; + requestLimitInBytes + &quot; bytes per &quot; +</span>
+              requestLimitPeriodInSeconds + &quot; seconds exceeded&quot;);
+          }
+<span class="nc bnc" id="L212" title="All 4 branches missed.">          if (requestLimitInBytes &gt; 0 &amp;&amp; requestSizeByIp &gt; requestLimitInBytes * ipFingerprintFactor) {</span>
+<span class="nc" id="L213">            String msg = &quot;limit: &quot; + requestLimitInBytes * ipFingerprintFactor + &quot; / &quot; + requestLimitPeriodInSeconds + &quot;, request size: &quot;  + requestSizeByIp + &quot;, ip: &quot; + ipAddress + &quot;, fingerprint: &quot; + fingerprint;</span>
+<span class="nc" id="L214">            logger.log(new DatabaseAccessLimitLogEntry(&quot;MaxRequestSizePerPeriodIp&quot;, server, clientId, null, msg, referer, userAgent));</span>
+<span class="nc" id="L215">            throw new TooManyRequestsException(&quot;IP request size limit of &quot; + requestLimitInBytes * ipFingerprintFactor + &quot; bytes per &quot; +</span>
+              requestLimitPeriodInSeconds + &quot; seconds exceeded&quot;);
+          }
+        }
+      }
+<span class="nc" id="L220">    }</span>
+<span class="nc" id="L221">  }</span>
+  
+  protected static class RequestEvent {
+
+    private final String ip;
+    private final Date date;
+    private final int sizeInBytes;
+    private final String fingerprint;
+    private final JLanguageTool.Mode mode;
+
+<span class="nc" id="L231">    RequestEvent(String ip, Date date, int sizeInBytes, String fingerprint, JLanguageTool.Mode mode) {</span>
+<span class="nc" id="L232">      this.ip = ip;</span>
+<span class="nc" id="L233">      this.date = new Date(date.getTime());</span>
+<span class="nc" id="L234">      this.sizeInBytes = sizeInBytes;</span>
+<span class="nc" id="L235">      this.fingerprint = fingerprint;</span>
+<span class="nc" id="L236">      this.mode = mode;</span>
+<span class="nc" id="L237">    }</span>
+
+    protected Date getDate() {
+<span class="nc" id="L240">      return date;</span>
+    }
+    
+    int getSizeInBytes() {
+<span class="nc" id="L244">      return sizeInBytes;</span>
+    }
+
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

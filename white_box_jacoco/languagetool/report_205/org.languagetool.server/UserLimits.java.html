@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UserLimits.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.server</a> &gt; <span class="el_source">UserLimits.java</span></div><h1>UserLimits.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2017 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.server;
+
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.algorithms.Algorithm;
+import com.auth0.jwt.exceptions.JWTDecodeException;
+import com.auth0.jwt.interfaces.Claim;
+import com.auth0.jwt.interfaces.DecodedJWT;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.languagetool.tools.StringTools;
+
+import java.io.*;
+import java.net.*;
+import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * @since 4.0
+ */
+class UserLimits {
+
+  private int maxTextLength;
+  private long maxCheckTimeMillis;
+  private Long premiumUid;
+  private boolean skipLimits;
+
+<span class="fc" id="L51">  private static final LoadingCache&lt;Account, String&gt; cache = CacheBuilder.newBuilder()</span>
+<span class="fc" id="L52">          .expireAfterWrite(15, TimeUnit.MINUTES)</span>
+<span class="fc" id="L53">          .build(new CacheLoader&lt;Account, String&gt;() {</span>
+            @Override
+            public String load(@NotNull Account account) throws IOException {
+<span class="fc" id="L56">              return getTokenFromServer(account.username, account.password);</span>
+            }
+          });
+
+  static UserLimits getDefaultLimits(HTTPServerConfig config) {
+<span class="fc" id="L61">    return new UserLimits(config.maxTextLength, config.maxCheckTimeMillis, null);</span>
+  }
+  
+  /**
+   * Get limits from the JWT key itself, no database access needed.
+   */
+  static UserLimits getLimitsFromToken(HTTPServerConfig config, String jwtToken) {
+<span class="fc" id="L68">    Objects.requireNonNull(jwtToken);</span>
+<span class="fc" id="L69">    String secretKey = config.getSecretTokenKey();</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">    if (secretKey == null) {</span>
+<span class="fc" id="L71">      throw new RuntimeException(&quot;You specified a 'token' parameter but this server doesn't accept tokens&quot;);</span>
+    }
+<span class="nc" id="L73">    Algorithm algorithm = Algorithm.HMAC256(secretKey);</span>
+    DecodedJWT decodedToken;
+    try {
+<span class="nc" id="L76">      JWT.require(algorithm).build().verify(jwtToken);</span>
+<span class="nc" id="L77">      decodedToken = JWT.decode(jwtToken);</span>
+<span class="nc" id="L78">    } catch (JWTDecodeException e) {</span>
+<span class="nc" id="L79">      throw new AuthException(&quot;Could not decode token '&quot; + jwtToken + &quot;'&quot;, e);</span>
+<span class="nc" id="L80">    }</span>
+<span class="nc" id="L81">    Claim maxTextLengthClaim = decodedToken.getClaim(&quot;maxTextLength&quot;);</span>
+<span class="nc" id="L82">    Claim premiumClaim = decodedToken.getClaim(&quot;premium&quot;);</span>
+<span class="nc bnc" id="L83" title="All 4 branches missed.">    boolean hasPremium = !premiumClaim.isNull() &amp;&amp; premiumClaim.asBoolean();</span>
+<span class="nc" id="L84">    Claim uidClaim = decodedToken.getClaim(&quot;uid&quot;);</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">    long uid = uidClaim.isNull() ? -1 : uidClaim.asLong();</span>
+<span class="nc" id="L86">    UserLimits userLimits = new UserLimits(</span>
+<span class="nc bnc" id="L87" title="All 4 branches missed.">      maxTextLengthClaim.isNull() ? config.maxTextLength : maxTextLengthClaim.asInt(),</span>
+      config.maxCheckTimeMillis,
+<span class="nc" id="L89">      hasPremium ? uid : null);</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">    userLimits.skipLimits = decodedToken.getClaim(&quot;skipLimits&quot;).isNull() ? false : decodedToken.getClaim(&quot;skipLimits&quot;).asBoolean();</span>
+<span class="nc" id="L91">    return userLimits;</span>
+  }
+
+  /**
+   * Get limits from the api key itself, database access is needed.
+   */
+  public static UserLimits getLimitsByApiKey(HTTPServerConfig config, String username, String apiKey) {
+<span class="fc" id="L98">    DatabaseAccess db = DatabaseAccess.getInstance();</span>
+<span class="nc" id="L99">    Long id = db.getUserId(username, apiKey);</span>
+<span class="nc" id="L100">    return new UserLimits(config.maxTextLengthWithApiKey, config.maxCheckTimeWithApiKeyMillis, id);</span>
+  }
+
+  /**
+   * Special case that checks user on languagetoolplus.com.
+   */
+  static UserLimits getLimitsFromUserAccount(HTTPServerConfig config, String username, String password) {
+<span class="fc" id="L107">    Objects.requireNonNull(username);</span>
+<span class="fc" id="L108">    Objects.requireNonNull(password);</span>
+<span class="fc" id="L109">    String token = cache.getUnchecked(new Account(username, password));</span>
+<span class="nc" id="L110">    return getLimitsFromToken(config, token);</span>
+  }
+
+  @NotNull
+  private static String getTokenFromServer(String username, String password) {
+<span class="fc" id="L115">    String url = &quot;https://languagetoolplus.com/token&quot;;</span>
+    try {
+<span class="fc" id="L117">      Map&lt;String,Object&gt; params = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L118">      params.put(&quot;username&quot;, username);</span>
+<span class="fc" id="L119">      params.put(&quot;password&quot;, password);</span>
+<span class="fc" id="L120">      StringBuilder postData = new StringBuilder();</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">      for (Map.Entry&lt;String,Object&gt; param : params.entrySet()) {</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (postData.length() != 0) {</span>
+<span class="fc" id="L123">          postData.append('&amp;');</span>
+        }
+<span class="fc" id="L125">        postData.append(URLEncoder.encode(param.getKey(), &quot;UTF-8&quot;))</span>
+<span class="fc" id="L126">                .append('=')</span>
+<span class="fc" id="L127">                .append(URLEncoder.encode(String.valueOf(param.getValue()), &quot;UTF-8&quot;));</span>
+<span class="fc" id="L128">      }</span>
+<span class="fc" id="L129">      byte[] postDataBytes = postData.toString().getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L130">      HttpURLConnection conn = (HttpURLConnection)new URL(url).openConnection();</span>
+      try {
+<span class="fc" id="L132">        conn.setRequestMethod(&quot;POST&quot;);</span>
+<span class="fc" id="L133">        conn.setDoOutput(true);</span>
+<span class="fc" id="L134">        conn.getOutputStream().write(postDataBytes);</span>
+<span class="fc" id="L135">        return StringTools.streamToString(conn.getInputStream(), &quot;UTF-8&quot;);</span>
+<span class="nc" id="L136">      } catch (IOException e) {</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        if (conn.getResponseCode() == 403) {</span>
+<span class="nc" id="L138">          throw new AuthException(&quot;Could not get token for user '&quot; + username + &quot;' from &quot; + url + &quot;, invalid username or password (code: 403)&quot;, e);</span>
+        } else {
+<span class="nc" id="L140">          throw new RuntimeException(&quot;Could not get token for user '&quot; + username + &quot;' from &quot; + url, e);</span>
+        }
+      }
+<span class="nc" id="L143">    } catch (IOException e) {</span>
+<span class="nc" id="L144">      throw new RuntimeException(&quot;Could not get token for user '&quot; + username + &quot;' from &quot; + url, e);</span>
+    }
+  }
+
+<span class="fc" id="L148">  private UserLimits(int maxTextLength, long maxCheckTimeMillis, Long premiumUid) {</span>
+<span class="fc" id="L149">    this.maxTextLength = maxTextLength;</span>
+<span class="fc" id="L150">    this.maxCheckTimeMillis = maxCheckTimeMillis;</span>
+<span class="fc" id="L151">    this.premiumUid = premiumUid;</span>
+<span class="fc" id="L152">  }</span>
+
+  /**
+   * Special case for internal use to skip all limits.
+   */
+<span class="nc" id="L157">  UserLimits(boolean skipLimits) {</span>
+<span class="nc" id="L158">    this.skipLimits = skipLimits;</span>
+<span class="nc" id="L159">  }</span>
+
+  int getMaxTextLength() {
+<span class="fc" id="L162">    return maxTextLength;</span>
+  }
+
+  long getMaxCheckTimeMillis() {
+<span class="nc" id="L166">   return maxCheckTimeMillis;</span>
+  }
+
+  boolean getSkipLimits() {
+<span class="nc" id="L170">    return skipLimits;</span>
+  }
+
+  @Nullable
+  Long getPremiumUid() {
+<span class="fc" id="L175">    return premiumUid;</span>
+  }
+
+  @Override
+  public String toString() {
+<span class="nc" id="L180">    return &quot;premiumUid=&quot; + premiumUid + &quot;, maxTextLength=&quot; + maxTextLength +</span>
+            &quot;, maxCheckTimeMillis=&quot; + maxCheckTimeMillis;
+  }
+
+  static class Account {
+
+    private String username;
+    private String password;
+
+<span class="fc" id="L189">    Account(String username, String password) {</span>
+<span class="fc" id="L190">      this.username = Objects.requireNonNull(username);</span>
+<span class="fc" id="L191">      this.password = Objects.requireNonNull(password);</span>
+<span class="fc" id="L192">    }</span>
+
+    @Override
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">      if (this == o) return true;</span>
+<span class="pc bpc" id="L197" title="2 of 4 branches missed.">      if (o == null || getClass() != o.getClass()) return false;</span>
+<span class="fc" id="L198">      Account account = (Account) o;</span>
+<span class="pc bpc" id="L199" title="2 of 4 branches missed.">      return Objects.equals(username, account.username) &amp;&amp; Objects.equals(password, account.password);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="fc" id="L204">      return Objects.hash(username, password);</span>
+    }
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

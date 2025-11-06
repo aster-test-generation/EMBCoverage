@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PipelinePool.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.server</a> &gt; <span class="el_source">PipelinePool.java</span></div><h1>PipelinePool.java</h1><pre class="source lang-java linenums">/*
+ *  LanguageTool, a natural language style checker
+ *  * Copyright (C) 2018 Fabian Richter
+ *  *
+ *  * This library is free software; you can redistribute it and/or
+ *  * modify it under the terms of the GNU Lesser General Public
+ *  * License as published by the Free Software Foundation; either
+ *  * version 2.1 of the License, or (at your option) any later version.
+ *  *
+ *  * This library is distributed in the hope that it will be useful,
+ *  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *  * Lesser General Public License for more details.
+ *  *
+ *  * You should have received a copy of the GNU Lesser General Public
+ *  * License along with this library; if not, write to the Free Software
+ *  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ *  * USA
+ *
+ */
+
+package org.languagetool.server;
+
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.languagetool.*;
+import org.languagetool.gui.Configuration;
+import org.languagetool.rules.DictionaryMatchFilter;
+import org.languagetool.tools.Tools;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.HashSet;
+import java.util.List;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * Caches pre-configured JLanguageTool instances to avoid costly setup time of rules, etc.
+ * TODO: reimplement using apache commons KeyedObjectPool
+ */
+class PipelinePool {
+
+<span class="fc" id="L51">  private static final Logger logger = LoggerFactory.getLogger(PipelinePool.class);</span>
+
+  static final long PIPELINE_EXPIRE_TIME = 15 * 60 * 1000;
+
+  public static class PipelineSettings {
+    private final Language lang;
+    private final Language motherTongue;
+    private final TextChecker.QueryParams query;
+    private final UserConfig user;
+    private final GlobalConfig globalConfig;
+    
+<span class="nc" id="L62">    PipelineSettings(Language lang, Language motherTongue, TextChecker.QueryParams params, GlobalConfig globalConfig, UserConfig userConfig) {</span>
+<span class="nc" id="L63">      this.lang = lang;</span>
+<span class="nc" id="L64">      this.motherTongue = motherTongue;</span>
+<span class="nc" id="L65">      this.query = params;</span>
+<span class="nc" id="L66">      this.user = userConfig;</span>
+<span class="nc" id="L67">      this.globalConfig = globalConfig;</span>
+<span class="nc" id="L68">    }</span>
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L72">      return new HashCodeBuilder(17, 31)</span>
+<span class="nc" id="L73">        .append(lang)</span>
+<span class="nc" id="L74">        .append(motherTongue)</span>
+<span class="nc" id="L75">        .append(query)</span>
+<span class="nc" id="L76">        .append(globalConfig)</span>
+<span class="nc" id="L77">        .append(user)</span>
+<span class="nc" id="L78">        .toHashCode();</span>
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L83" title="All 2 branches missed.">      if (obj == this) return true;</span>
+<span class="nc bnc" id="L84" title="All 4 branches missed.">      if (obj == null || getClass() != obj.getClass()) {</span>
+<span class="nc" id="L85">        return false;</span>
+      }
+<span class="nc" id="L87">      PipelineSettings other = (PipelineSettings) obj;</span>
+<span class="nc" id="L88">      return new EqualsBuilder()</span>
+<span class="nc" id="L89">        .append(lang, other.lang)</span>
+<span class="nc" id="L90">        .append(motherTongue, other.motherTongue)</span>
+<span class="nc" id="L91">        .append(query, other.query)</span>
+<span class="nc" id="L92">        .append(globalConfig, other.globalConfig)</span>
+<span class="nc" id="L93">        .append(user, other.user)</span>
+<span class="nc" id="L94">        .isEquals();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L99">      return new ToStringBuilder(this)</span>
+<span class="nc" id="L100">        .append(&quot;lang&quot;, lang)</span>
+<span class="nc" id="L101">        .append(&quot;motherTongue&quot;, motherTongue)</span>
+<span class="nc" id="L102">        .append(&quot;query&quot;, query)</span>
+<span class="nc" id="L103">        .append(&quot;globalConfig&quot;, globalConfig)</span>
+<span class="nc" id="L104">        .append(&quot;user&quot;, user)</span>
+<span class="nc" id="L105">        .build();</span>
+    }
+  }
+
+  private final HTTPServerConfig config;
+  private final ResultCache cache;
+  private final LoadingCache&lt;PipelineSettings, ConcurrentLinkedQueue&lt;Pipeline&gt;&gt; pool;
+  private final boolean internalServer;
+
+  private long pipelineExpireCheckTimestamp;
+  // stats
+  private long pipelinesUsed;
+  private long requests;
+
+<span class="fc" id="L119">  PipelinePool(HTTPServerConfig config, ResultCache cache, boolean internalServer) {</span>
+<span class="fc" id="L120">    this.internalServer = internalServer;</span>
+<span class="fc" id="L121">    this.config = config;</span>
+<span class="fc" id="L122">    this.cache = cache;</span>
+<span class="fc" id="L123">    this.pipelineExpireCheckTimestamp = System.currentTimeMillis();</span>
+<span class="fc" id="L124">    int maxPoolSize = config.getMaxPipelinePoolSize();</span>
+<span class="fc" id="L125">    int expireTime = config.getPipelineExpireTime();</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">    if (config.isPipelineCachingEnabled()) {</span>
+<span class="nc" id="L127">      this.pool = CacheBuilder.newBuilder()</span>
+<span class="nc" id="L128">        .maximumSize(maxPoolSize)</span>
+<span class="nc" id="L129">        .expireAfterAccess(expireTime, TimeUnit.SECONDS)</span>
+<span class="nc" id="L130">        .build(new CacheLoader&lt;PipelineSettings, ConcurrentLinkedQueue&lt;Pipeline&gt;&gt;() {</span>
+          @Override
+          public ConcurrentLinkedQueue&lt;Pipeline&gt; load(PipelineSettings key) {
+<span class="nc" id="L133">            return new ConcurrentLinkedQueue&lt;&gt;();</span>
+          }
+        });
+    } else {
+<span class="fc" id="L137">      this.pool = null;</span>
+    }
+<span class="fc" id="L139">  }</span>
+
+  Pipeline getPipeline(PipelineSettings settings) throws Exception {
+<span class="nc bnc" id="L142" title="All 2 branches missed.">    if (pool != null) {</span>
+      // expire old pipelines in queues (where settings may be used, but some of the created pipelines are unused)
+<span class="nc" id="L144">      long expireCheckDelta = System.currentTimeMillis() - pipelineExpireCheckTimestamp;</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">      if (expireCheckDelta &gt; PIPELINE_EXPIRE_TIME) {</span>
+<span class="nc" id="L146">        AtomicInteger removed = new AtomicInteger();</span>
+<span class="nc" id="L147">        pipelineExpireCheckTimestamp = System.currentTimeMillis();</span>
+        //pool.asMap().forEach((s, queue) -&gt; queue.removeIf(Pipeline::isExpired));
+<span class="nc" id="L149">        pool.asMap().forEach((s, queue) -&gt; queue.removeIf(pipeline -&gt; {</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">          if (pipeline.isExpired()) {</span>
+<span class="nc" id="L151">            removed.getAndIncrement();</span>
+<span class="nc" id="L152">            return true;</span>
+          } else {
+<span class="nc" id="L154">            return false;</span>
+          }
+        }));
+<span class="nc" id="L157">        ServerTools.print(&quot;Removing &quot; + removed.get() + &quot; expired pipelines&quot;);</span>
+      }
+
+<span class="nc" id="L160">      requests++;</span>
+<span class="nc" id="L161">      ConcurrentLinkedQueue&lt;Pipeline&gt; pipelines = pool.get(settings);</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">      if (requests % 1000 == 0) {</span>
+<span class="nc" id="L163">        logger.info(String.format(&quot;Pipeline cache stats: %f hit rate&quot;, (double) pipelinesUsed / requests));</span>
+      }
+<span class="nc" id="L165">      Pipeline pipeline = pipelines.poll();</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">      if (pipeline == null) {</span>
+        //ServerTools.print(String.format(&quot;No prepared pipeline found for %s; creating one.&quot;, settings));
+<span class="nc" id="L168">        pipeline = createPipeline(settings.lang, settings.motherTongue, settings.query, settings.globalConfig, settings.user, config.getDisabledRuleIds());</span>
+      } else {
+<span class="nc" id="L170">        pipelinesUsed++;</span>
+        //ServerTools.print(String.format(&quot;Prepared pipeline found for %s; using it.&quot;, settings));
+      }
+<span class="nc" id="L173">      return pipeline;</span>
+    } else {
+<span class="nc" id="L175">      return createPipeline(settings.lang, settings.motherTongue, settings.query, settings.globalConfig, settings.user, config.getDisabledRuleIds());</span>
+    }
+  }
+
+  void returnPipeline(PipelineSettings settings, Pipeline pipeline) throws ExecutionException {
+<span class="nc bnc" id="L180" title="All 2 branches missed.">    if (pool == null) return;</span>
+<span class="nc" id="L181">    ConcurrentLinkedQueue&lt;Pipeline&gt; pipelines = pool.get(settings);</span>
+<span class="nc" id="L182">    pipeline.refreshExpireTimer();</span>
+<span class="nc" id="L183">    pipelines.add(pipeline);</span>
+<span class="nc" id="L184">  }</span>
+
+  /**
+   * Create a JLanguageTool instance for a specific language, mother tongue, and rule configuration.
+   * Uses Pipeline wrapper to safely share objects
+   *  @param lang the language to be used
+   * @param motherTongue the user's mother tongue or {@code null}
+   */
+  Pipeline createPipeline(Language lang, Language motherTongue, TextChecker.QueryParams params, GlobalConfig globalConfig,
+                          UserConfig userConfig, List&lt;String&gt; disabledRuleIds)
+    throws Exception { // package-private for mocking
+<span class="nc" id="L195">    Pipeline lt = new Pipeline(lang, params.altLanguages, motherTongue, cache, globalConfig, userConfig, params.inputLogging);</span>
+<span class="nc" id="L196">    lt.setMaxErrorsPerWordRate(config.getMaxErrorsPerWordRate());</span>
+<span class="nc" id="L197">    lt.disableRules(disabledRuleIds);</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">    if (config.getLanguageModelDir() != null) {</span>
+<span class="nc" id="L199">      lt.activateLanguageModelRules(config.getLanguageModelDir());</span>
+    }
+<span class="nc bnc" id="L201" title="All 2 branches missed.">    if (config.getWord2VecModelDir () != null) {</span>
+<span class="nc" id="L202">      lt.activateWord2VecModelRules(config.getWord2VecModelDir());</span>
+    }
+<span class="nc bnc" id="L204" title="All 2 branches missed.">    if (config.getRulesConfigFile() != null) {</span>
+<span class="nc" id="L205">      configureFromRulesFile(lt, lang);</span>
+    } else {
+<span class="nc" id="L207">      configureFromGUI(lt, lang);</span>
+    }
+<span class="nc" id="L209">    lt.activateRemoteRules(config.getRemoteRulesConfigFile());</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">    if (params.useQuerySettings) {</span>
+<span class="nc" id="L211">      Tools.selectRules(lt, new HashSet&lt;&gt;(params.disabledCategories), new HashSet&lt;&gt;(params.enabledCategories),</span>
+        new HashSet&lt;&gt;(params.disabledRules), new HashSet&lt;&gt;(params.enabledRules), params.useEnabledOnly, params.enableTempOffRules);
+    }
+<span class="nc bnc" id="L214" title="All 2 branches missed.">    if (userConfig.filterDictionaryMatches()) {</span>
+<span class="nc" id="L215">      lt.addMatchFilter(new DictionaryMatchFilter(userConfig));</span>
+    }
+<span class="nc bnc" id="L217" title="All 2 branches missed.">    if (pool != null) {</span>
+<span class="nc" id="L218">      lt.setupFinished();</span>
+    }
+<span class="nc" id="L220">    return lt;</span>
+  }
+
+  private void configureFromRulesFile(JLanguageTool langTool, Language lang) throws IOException {
+<span class="nc" id="L224">    ServerTools.print(&quot;Using options configured in &quot; + config.getRulesConfigFile());</span>
+    // If we are explicitly configuring from rules, ignore the useGUIConfig flag
+<span class="nc bnc" id="L226" title="All 2 branches missed.">    if (config.getRulesConfigFile() != null) {</span>
+<span class="nc" id="L227">      org.languagetool.gui.Tools.configureFromRules(langTool, new Configuration(config.getRulesConfigFile()</span>
+<span class="nc" id="L228">        .getCanonicalFile().getParentFile(), config.getRulesConfigFile().getName(), lang));</span>
+    } else {
+<span class="nc" id="L230">      throw new RuntimeException(&quot;config.getRulesConfigFile() is null&quot;);</span>
+    }
+<span class="nc" id="L232">  }</span>
+
+  private void configureFromGUI(JLanguageTool langTool, Language lang) throws IOException {
+<span class="nc" id="L235">    Configuration config = new Configuration(lang);</span>
+<span class="nc bnc" id="L236" title="All 4 branches missed.">    if (internalServer &amp;&amp; config.getUseGUIConfig()) {</span>
+<span class="nc" id="L237">      ServerTools.print(&quot;Using options configured in the GUI&quot;);</span>
+<span class="nc" id="L238">      org.languagetool.gui.Tools.configureFromRules(langTool, config);</span>
+    }
+<span class="nc" id="L240">  }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

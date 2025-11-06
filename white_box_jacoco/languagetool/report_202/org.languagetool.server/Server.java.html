@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Server.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.server</a> &gt; <span class="el_source">Server.java</span></div><h1>Server.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2012 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.server;
+
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.sun.net.httpserver.HttpServer;
+import org.jetbrains.annotations.Nullable;
+import org.languagetool.JLanguageTool;
+
+import java.util.*;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
+import static org.languagetool.server.HTTPServerConfig.DEFAULT_PORT;
+
+/**
+ * Super class for HTTP and HTTPS server.
+ *
+ * @since 2.0
+ */
+<span class="fc" id="L38">public abstract class Server {</span>
+
+  protected abstract String getProtocol();
+
+<span class="fc" id="L42">  public static final Set&lt;String&gt; DEFAULT_ALLOWED_IPS = new HashSet&lt;&gt;(Arrays.asList(</span>
+            &quot;0:0:0:0:0:0:0:1&quot;,     // Suse Linux IPv6 stuff
+            &quot;0:0:0:0:0:0:0:1%0&quot;,   // some(?) Mac OS X
+            &quot;127.0.0.1&quot;
+    ));
+
+  protected int port;
+  protected String host;
+  protected HttpServer server;
+  protected LanguageToolHttpHandler httpHandler;
+
+  private boolean isRunning;
+
+  /**
+   * Start the server.
+   */
+  public void run() {
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">    String hostName = host != null ? host : &quot;localhost&quot;;</span>
+<span class="fc" id="L60">    ServerTools.print(&quot;Starting LanguageTool &quot; + JLanguageTool.VERSION +</span>
+<span class="fc" id="L61">            &quot; (build date: &quot; + JLanguageTool.BUILD_DATE + &quot;, &quot; + JLanguageTool.GIT_SHORT_ID + &quot;) server on &quot; + getProtocol() + &quot;://&quot; + hostName + &quot;:&quot; + port  + &quot;...&quot;);</span>
+<span class="fc" id="L62">    server.start();</span>
+<span class="fc" id="L63">    isRunning = true;</span>
+<span class="fc" id="L64">    ServerTools.print(&quot;Server started&quot;);</span>
+<span class="fc" id="L65">  }</span>
+
+  public int getBoundPort() {
+<span class="nc" id="L68">    return server.getAddress().getPort();</span>
+  }
+
+  /**
+   * Stop the server. Once stopped, a server cannot be used again.
+   */
+  public void stop() {
+<span class="nc bnc" id="L75" title="All 2 branches missed.">    if (httpHandler != null) {</span>
+<span class="nc" id="L76">      httpHandler.shutdown();</span>
+    }
+<span class="nc bnc" id="L78" title="All 2 branches missed.">    if (server != null) {</span>
+<span class="nc" id="L79">      ServerTools.print(&quot;Stopping server...&quot;);</span>
+<span class="nc" id="L80">      server.stop(5);</span>
+<span class="nc" id="L81">      isRunning = false;</span>
+<span class="nc" id="L82">      ServerTools.print(&quot;Server stopped&quot;);</span>
+    }
+<span class="nc" id="L84">  }</span>
+
+  /**
+   * @return whether the server is running
+   * @since 2.0
+   */
+  public boolean isRunning() {
+<span class="nc" id="L91">    return isRunning;</span>
+  }
+
+  @Nullable
+  protected RequestLimiter getRequestLimiterOrNull(HTTPServerConfig config) {
+<span class="fc" id="L96">    int requestLimit = config.getRequestLimit();</span>
+<span class="fc" id="L97">    int requestLimitInBytes = config.getRequestLimitInBytes();</span>
+<span class="fc" id="L98">    int requestLimitPeriodInSeconds = config.getRequestLimitPeriodInSeconds();</span>
+<span class="fc" id="L99">    int ipFingerprintFactor = config.getIpFingerprintFactor();</span>
+<span class="pc bpc" id="L100" title="6 of 8 branches missed.">    if ((requestLimit &gt; 0 || requestLimitInBytes &gt; 0) &amp;&amp; requestLimitPeriodInSeconds &gt; 0 &amp;&amp; ipFingerprintFactor &gt;= 1) {</span>
+<span class="nc" id="L101">      return new RequestLimiter(requestLimit, requestLimitInBytes, requestLimitPeriodInSeconds, ipFingerprintFactor);</span>
+    }
+<span class="fc" id="L103">    return null;</span>
+  }
+
+  @Nullable
+  protected ErrorRequestLimiter getErrorRequestLimiterOrNull(HTTPServerConfig config) {
+<span class="fc" id="L108">    int requestLimit = config.getTimeoutRequestLimit();</span>
+<span class="fc" id="L109">    int requestLimitPeriodInSeconds = config.getRequestLimitPeriodInSeconds();</span>
+<span class="pc bpc" id="L110" title="3 of 4 branches missed.">    if (requestLimit &gt; 0 &amp;&amp; requestLimitPeriodInSeconds &gt; 0) {</span>
+<span class="nc" id="L111">      return new ErrorRequestLimiter(requestLimit, requestLimitPeriodInSeconds);</span>
+    }
+<span class="fc" id="L113">    return null;</span>
+  }
+
+  protected static boolean usageRequested(String[] args) {
+<span class="pc bpc" id="L117" title="5 of 6 branches missed.">    return args.length == 1 &amp;&amp; (args[0].equals(&quot;-h&quot;) || args[0].equals(&quot;--help&quot;));</span>
+  }
+
+  protected static void printCommonConfigFileOptions() {
+<span class="nc" id="L121">    System.out.println(&quot;                 'maxTextLength' - maximum text length, longer texts will cause an error (optional)&quot;);</span>
+<span class="nc" id="L122">    System.out.println(&quot;                 'maxTextHardLength' - maximum text length, applies even to users with a special secret 'token' parameter (optional)&quot;);</span>
+<span class="nc" id="L123">    System.out.println(&quot;                 'secretTokenKey' - secret JWT token key, if set by user and valid, maxTextLength can be increased by the user (optional)&quot;);</span>
+<span class="nc" id="L124">    System.out.println(&quot;                 'maxCheckTimeMillis' - maximum time in milliseconds allowed per check (optional)&quot;);</span>
+<span class="nc" id="L125">    System.out.println(&quot;                 'maxErrorsPerWordRate' - checking will stop with error if there are more rules matches per word (optional)&quot;);</span>
+<span class="nc" id="L126">    System.out.println(&quot;                 'maxSpellingSuggestions' - only this many spelling errors will have suggestions for performance reasons (optional,\n&quot; +</span>
+                       &quot;                                            affects Hunspell-based languages only)&quot;);
+<span class="nc" id="L128">    System.out.println(&quot;                 'maxCheckThreads' - maximum number of threads working in parallel (optional)&quot;);</span>
+<span class="nc" id="L129">    System.out.println(&quot;                 'cacheSize' - size of internal cache in number of sentences (optional, default: 0)&quot;);</span>
+<span class="nc" id="L130">    System.out.println(&quot;                 'requestLimit' - maximum number of requests per requestLimitPeriodInSeconds (optional)&quot;);</span>
+<span class="nc" id="L131">    System.out.println(&quot;                 'requestLimitInBytes' - maximum aggregated size of requests per requestLimitPeriodInSeconds (optional)&quot;);</span>
+<span class="nc" id="L132">    System.out.println(&quot;                 'timeoutRequestLimit' - maximum number of timeout request (optional)&quot;);</span>
+<span class="nc" id="L133">    System.out.println(&quot;                 'requestLimitPeriodInSeconds' - time period to which requestLimit and timeoutRequestLimit applies (optional)&quot;);</span>
+<span class="nc" id="L134">    System.out.println(&quot;                 'languageModel' - a directory with '1grams', '2grams', '3grams' sub directories which contain a Lucene index&quot;);</span>
+<span class="nc" id="L135">    System.out.println(&quot;                  each with ngram occurrence counts; activates the confusion rule if supported (optional)&quot;);</span>
+<span class="nc" id="L136">    System.out.println(&quot;                 'word2vecModel' - a directory with word2vec data (optional), see&quot;);</span>
+<span class="nc" id="L137">    System.out.println(&quot;                  https://github.com/languagetool-org/languagetool/blob/master/languagetool-standalone/CHANGES.md#word2vec&quot;);</span>
+<span class="nc" id="L138">    System.out.println(&quot;                 'fasttextModel' - a model file for better language detection (optional), see&quot;);</span>
+<span class="nc" id="L139">    System.out.println(&quot;                  https://fasttext.cc/docs/en/language-identification.html&quot;);</span>
+<span class="nc" id="L140">    System.out.println(&quot;                 'fasttextBinary' - compiled fasttext executable for language detection (optional), see&quot;);</span>
+<span class="nc" id="L141">    System.out.println(&quot;                  https://fasttext.cc/docs/en/support.html&quot;);</span>
+<span class="nc" id="L142">    System.out.println(&quot;                 'maxWorkQueueSize' - reject request if request queue gets larger than this (optional)&quot;);</span>
+<span class="nc" id="L143">    System.out.println(&quot;                 'rulesFile' - a file containing rules configuration, such as .langugagetool.cfg (optional)&quot;);</span>
+<span class="nc" id="L144">    System.out.println(&quot;                 'warmUp' - set to 'true' to warm up server at start, i.e. run a short check with all languages (optional)&quot;);</span>
+<span class="nc" id="L145">    System.out.println(&quot;                 'blockedReferrers' - a comma-separated list of HTTP referrers (and 'Origin' headers) that are blocked and will not be served (optional)&quot;);</span>
+<span class="nc" id="L146">    System.out.println(&quot;                 'disabledRuleIds' - a comma-separated list of rule ids that are turned off for this server (optional)&quot;);</span>
+<span class="nc" id="L147">    System.out.println(&quot;                 Spellcheck-only languages: You can add simple spellcheck-only support for languages that LT doesn't&quot;);</span>
+<span class="nc" id="L148">    System.out.println(&quot;                 support by defining two optional properties:&quot;);</span>
+<span class="nc" id="L149">    System.out.println(&quot;                   'lang-xx' - set name of the language, use language code instead of 'xx', e.g. lang-tr=Turkish&quot;);</span>
+<span class="nc" id="L150">    System.out.println(&quot;                   'lang-xx-dictPath' - absolute path to the hunspell .dic file, use language code instead of 'xx', e.g.&quot;);</span>
+<span class="nc" id="L151">    System.out.println(&quot;                                        lang-tr-dictPath=/path/to/tr.dic. Note that the same directory also needs to&quot;);</span>
+<span class="nc" id="L152">    System.out.println(&quot;                                        contain a common_words.txt file with the most common 10,000 words (used for better language detection)&quot;);</span>
+<span class="nc" id="L153">  }</span>
+
+  protected static void printCommonOptions() {
+<span class="nc" id="L156">    System.out.println(&quot;  --port, -p PRT   port to bind to, defaults to &quot; + DEFAULT_PORT + &quot; if not specified&quot;);</span>
+<span class="nc" id="L157">    System.out.println(&quot;  --public         allow this server process to be connected from anywhere; if not set,&quot;);</span>
+<span class="nc" id="L158">    System.out.println(&quot;                   it can only be connected from the computer it was started on&quot;);</span>
+<span class="nc" id="L159">    System.out.println(&quot;  --allow-origin   ORIGIN  set the Access-Control-Allow-Origin header in the HTTP response,&quot;);</span>
+<span class="nc" id="L160">    System.out.println(&quot;                         used for direct (non-proxy) JavaScript-based access from browsers;&quot;);</span>
+<span class="nc" id="L161">    System.out.println(&quot;                         example: --allow-origin \&quot;*\&quot;&quot;);</span>
+<span class="nc" id="L162">    System.out.println(&quot;  --verbose, -v    in case of exceptions, log the input text (up to 500 characters)&quot;);</span>
+<span class="nc" id="L163">    System.out.println(&quot;  --languageModel  a directory with '1grams', '2grams', '3grams' sub directories (per language)&quot;);</span>
+<span class="nc" id="L164">    System.out.println(&quot;                         which contain a Lucene index (optional, overwrites 'languageModel'&quot;);</span>
+<span class="nc" id="L165">    System.out.println(&quot;                         parameter in properties files)&quot;);</span>
+<span class="nc" id="L166">    System.out.println(&quot;  --word2vecModel  a directory with word2vec data (optional), see&quot;);</span>
+<span class="nc" id="L167">    System.out.println(&quot;                   https://github.com/languagetool-org/languagetool/blob/master/languagetool-standalone/CHANGES.md#word2vec&quot;);</span>
+<span class="nc" id="L168">  }</span>
+
+  public static void checkForNonRootUser() {
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">    if (&quot;root&quot;.equals(System.getProperty(&quot;user.name&quot;))) {</span>
+<span class="nc" id="L172">      ServerTools.print(&quot;****************************************************************************************************&quot;);</span>
+<span class="nc" id="L173">      ServerTools.print(&quot;*** WARNING: this process is running as root - please do not run it as root for security reasons ***&quot;);</span>
+<span class="nc" id="L174">      ServerTools.print(&quot;****************************************************************************************************&quot;);</span>
+    }
+<span class="fc" id="L176">  }</span>
+  
+  protected ThreadPoolExecutor getExecutorService(LinkedBlockingQueue&lt;Runnable&gt; workQueue, HTTPServerConfig config) {
+<span class="fc" id="L179">    int threadPoolSize = config.getMaxCheckThreads();</span>
+<span class="fc" id="L180">    ServerTools.print(&quot;Setting up thread pool with &quot; + threadPoolSize + &quot; threads&quot;);</span>
+<span class="fc" id="L181">    return new StoppingThreadPoolExecutor(threadPoolSize, workQueue);</span>
+  }
+
+  static class StoppingThreadPoolExecutor extends ThreadPoolExecutor {
+  
+    StoppingThreadPoolExecutor(int threadPoolSize, LinkedBlockingQueue&lt;Runnable&gt; workQueue) {
+<span class="fc" id="L187">      super(threadPoolSize, threadPoolSize, 0L, TimeUnit.MILLISECONDS, workQueue,</span>
+<span class="fc" id="L188">            new ThreadFactoryBuilder().setNameFormat(&quot;lt-server-thread-%d&quot;).build());</span>
+<span class="fc" id="L189">    }</span>
+
+    @Override
+    protected void afterExecute(Runnable r, Throwable t) {
+<span class="fc" id="L193">      super.afterExecute(r, t);</span>
+<span class="pc bpc" id="L194" title="3 of 4 branches missed.">      if (t != null &amp;&amp; t instanceof OutOfMemoryError) {</span>
+        // we prefer to stop instead of being in an unstable state:
+        //noinspection CallToPrintStackTrace
+<span class="nc" id="L197">        t.printStackTrace();</span>
+<span class="nc" id="L198">        System.exit(1);</span>
+      }
+<span class="fc" id="L200">    }</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
