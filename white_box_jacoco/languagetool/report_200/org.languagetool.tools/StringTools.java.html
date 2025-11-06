@@ -1,0 +1,546 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StringTools.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.tools</a> &gt; <span class="el_source">StringTools.java</span></div><h1>StringTools.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker 
+ * Copyright (C) 2005 Daniel Naber (http://www.danielnaber.de)
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.tools;
+
+import com.google.common.xml.XmlEscapers;
+import org.jetbrains.annotations.Nullable;
+import org.languagetool.JLanguageTool;
+import org.languagetool.Language;
+
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.text.Normalizer;
+import java.util.*;
+import java.util.regex.Pattern;
+
+/**
+ * Tools for working with strings.
+ * 
+ * @author Daniel Naber
+ */
+public final class StringTools {
+
+  /**
+   * Constants for printing XML rule matches.
+   */
+<span class="nc" id="L42">  public enum ApiPrintMode {</span>
+    /**
+     * Normally output the rule matches by starting and
+     * ending the XML/JSON output on every call.
+     */
+<span class="nc" id="L47">    NORMAL_API,</span>
+    /**
+     * Start XML/JSON output by printing the preamble and the
+     * start of the root element.
+     */
+<span class="nc" id="L52">    START_API,</span>
+    /**
+     * End XML/JSON output by closing the root element.
+     */
+<span class="nc" id="L56">    END_API,</span>
+    /**
+     * Simply continue rule match output.
+     */
+<span class="nc" id="L60">    CONTINUE_API</span>
+  }
+
+<span class="fc" id="L63">  private static final Pattern XML_COMMENT_PATTERN = Pattern.compile(&quot;&lt;!--.*?--&gt;&quot;, Pattern.DOTALL);</span>
+<span class="fc" id="L64">  private static final Pattern XML_PATTERN = Pattern.compile(&quot;(?&lt;!&lt;)&lt;[^&lt;&gt;]+&gt;&quot;, Pattern.DOTALL);</span>
+<span class="fc" id="L65">  public static final Set&lt;String&gt; UPPERCASE_GREEK_LETTERS = Collections.unmodifiableSet(new HashSet&lt;&gt;(Arrays.asList(&quot;Α&quot;,&quot;Β&quot;,&quot;Γ&quot;,&quot;Δ&quot;,&quot;Ε&quot;,&quot;Ζ&quot;,&quot;Η&quot;,&quot;Θ&quot;,&quot;Ι&quot;,&quot;Κ&quot;,&quot;Λ&quot;,&quot;Μ&quot;,&quot;Ν&quot;,&quot;Ξ&quot;,&quot;Ο&quot;,&quot;Π&quot;,&quot;Ρ&quot;,&quot;Σ&quot;,&quot;Τ&quot;,&quot;Υ&quot;,&quot;Φ&quot;,&quot;Χ&quot;,&quot;Ψ&quot;,&quot;Ω&quot;)));</span>
+<span class="fc" id="L66">  public static final Set&lt;String&gt; LOWERCASE_GREEK_LETTERS = Collections.unmodifiableSet(new HashSet&lt;&gt;(Arrays.asList(&quot;α&quot;,&quot;β&quot;,&quot;γ&quot;,&quot;δ&quot;,&quot;ε&quot;,&quot;ζ&quot;,&quot;η&quot;,&quot;θ&quot;,&quot;ι&quot;,&quot;κ&quot;,&quot;λ&quot;,&quot;μ&quot;,&quot;ν&quot;,&quot;ξ&quot;,&quot;ο&quot;,&quot;π&quot;,&quot;ρ&quot;,&quot;σ&quot;,&quot;τ&quot;,&quot;υ&quot;,&quot;φ&quot;,&quot;χ&quot;,&quot;ψ&quot;,&quot;ω&quot;)));</span>
+
+  private StringTools() {
+    // only static stuff
+  }
+
+  /**
+   * Throw exception if the given string is null or empty or only whitespace.
+   */
+  public static void assureSet(String s, String varName) {
+<span class="fc" id="L76">    Objects.requireNonNull(varName);</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">    if (isEmpty(s.trim())) {</span>
+<span class="nc" id="L78">      throw new IllegalArgumentException(varName + &quot; cannot be empty or whitespace only&quot;);</span>
+    }
+<span class="fc" id="L80">  }</span>
+
+  /**
+   * Read the text stream using the given encoding.
+   *
+   * @param stream InputStream the stream to be read
+   * @param encoding the stream's character encoding, e.g. {@code utf-8}, or {@code null} to use the system encoding
+   * @return a string with the stream's content, lines separated by {@code \n} (note that {@code \n} will
+   *  be added to the last line even if it is not in the stream)
+   * @since 2.3
+   */
+  public static String readStream(InputStream stream, String encoding) throws IOException {
+<span class="nc" id="L92">    InputStreamReader isr = null;</span>
+<span class="nc" id="L93">    StringBuilder sb = new StringBuilder();</span>
+    try {
+<span class="nc bnc" id="L95" title="All 2 branches missed.">      if (encoding == null) {</span>
+<span class="nc" id="L96">        isr = new InputStreamReader(stream);</span>
+      } else {
+<span class="nc" id="L98">        isr = new InputStreamReader(stream, encoding);</span>
+      }
+<span class="nc" id="L100">      try (BufferedReader br = new BufferedReader(isr)) {</span>
+        String line;
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        while ((line = br.readLine()) != null) {</span>
+<span class="nc" id="L103">          sb.append(line);</span>
+<span class="nc" id="L104">          sb.append('\n');</span>
+        }
+      }
+    } finally {
+<span class="nc bnc" id="L108" title="All 2 branches missed.">      if (isr != null) {</span>
+<span class="nc" id="L109">        isr.close();</span>
+      }
+    }
+<span class="nc" id="L112">    return sb.toString();</span>
+  }
+
+  /**
+   * Returns true if the given string is made up of all-uppercase characters
+   * (ignoring characters for which no upper-/lowercase distinction exists).
+   */
+  public static boolean isAllUppercase(String str) {
+<span class="nc bnc" id="L120" title="All 2 branches missed.">    for (int i = 0; i &lt; str.length(); i++) {</span>
+<span class="nc" id="L121">      char c = str.charAt(i);</span>
+<span class="nc bnc" id="L122" title="All 4 branches missed.">      if (Character.isLetter(c) &amp;&amp; Character.isLowerCase(c)) {</span>
+<span class="nc" id="L123">        return false;</span>
+      }
+    }
+<span class="nc" id="L126">    return true;</span>
+  }
+
+  /**
+   * Returns true if the given string is mixed case, like {@code MixedCase} or {@code mixedCase}
+   * (but not {@code Mixedcase}).
+   * @param str input str
+   */
+  public static boolean isMixedCase(String str) {
+<span class="nc bnc" id="L135" title="All 2 branches missed.">    return !isAllUppercase(str)</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        &amp;&amp; !isCapitalizedWord(str)</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        &amp;&amp; isNotAllLowercase(str);</span>
+  }
+
+  /**
+   * Returns true if &lt;code&gt;str&lt;/code&gt; is made up of all-lowercase characters
+   * (ignoring characters for which no upper-/lowercase distinction exists).
+   * @since 2.5
+   */
+  public static boolean isNotAllLowercase(String str) {
+<span class="nc bnc" id="L146" title="All 2 branches missed.">    for (int i = 0; i &lt; str.length(); i++) {</span>
+<span class="nc" id="L147">      char c = str.charAt(i);</span>
+<span class="nc bnc" id="L148" title="All 4 branches missed.">      if (Character.isLetter(c) &amp;&amp; !Character.isLowerCase(c)) {</span>
+<span class="nc" id="L149">        return true;</span>
+      }
+    }
+<span class="nc" id="L152">    return false;</span>
+  }
+
+  /**
+   * @param str input string
+   * @return true if word starts with an uppercase letter and all other letters are lowercase
+   */
+  public static boolean isCapitalizedWord(String str) {
+<span class="nc bnc" id="L160" title="All 4 branches missed.">    if (!isEmpty(str) &amp;&amp; Character.isUpperCase(str.charAt(0))) {</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">      for (int i = 1; i &lt; str.length(); i++) {</span>
+<span class="nc" id="L162">        char c = str.charAt(i);</span>
+<span class="nc bnc" id="L163" title="All 4 branches missed.">        if (Character.isLetter(c) &amp;&amp; !Character.isLowerCase(c)) {</span>
+<span class="nc" id="L164">          return false;</span>
+        }
+      }
+<span class="nc" id="L167">      return true;</span>
+    }
+<span class="nc" id="L169">    return false;</span>
+  }
+
+  /**
+   * Whether the first character of &lt;code&gt;str&lt;/code&gt; is an uppercase character.
+   */
+  public static boolean startsWithUppercase(String str) {
+<span class="nc bnc" id="L176" title="All 2 branches missed.">    if (isEmpty(str)) {</span>
+<span class="nc" id="L177">      return false;</span>
+    }
+<span class="nc" id="L179">    return Character.isUpperCase(str.charAt(0));</span>
+  }
+
+  /**
+   * Whether the first character of &lt;code&gt;str&lt;/code&gt; is an uppercase character.
+   * @since 4.9
+   */
+  public static boolean startsWithLowercase(String str) {
+<span class="nc bnc" id="L187" title="All 2 branches missed.">    if (isEmpty(str)) {</span>
+<span class="nc" id="L188">      return false;</span>
+    }
+<span class="nc" id="L190">    return Character.isLowerCase(str.charAt(0));</span>
+  }
+
+  /**
+   * Return &lt;code&gt;str&lt;/code&gt; modified so that its first character is now an
+   * uppercase character. If &lt;code&gt;str&lt;/code&gt; starts with non-alphabetic
+   * characters, such as quotes or parentheses, the first character is 
+   * determined as the first alphabetic character.
+   */
+  @Nullable
+  public static String uppercaseFirstChar(String str) {
+<span class="nc" id="L201">    return changeFirstCharCase(str, true);</span>
+  }
+
+  /**
+   * Like {@link #uppercaseFirstChar(String)}, but handles a special case for Dutch (IJ in 
+   * e.g. &quot;ijsselmeer&quot; -&amp;gt; &quot;IJsselmeer&quot;).
+   * @param language the language, will be ignored if it's {@code null}
+   * @since 2.7
+   */
+  @Nullable
+  public static String uppercaseFirstChar(String str, Language language) {
+<span class="nc bnc" id="L212" title="All 8 branches missed.">    if (language != null &amp;&amp; &quot;nl&quot;.equals(language.getShortCode()) &amp;&amp; str != null &amp;&amp; str.toLowerCase().startsWith(&quot;ij&quot;)) {</span>
+      // hack to fix https://github.com/languagetool-org/languagetool/issues/148
+<span class="nc" id="L214">      return &quot;IJ&quot; + str.substring(2);</span>
+    } else {
+<span class="nc" id="L216">      return changeFirstCharCase(str, true);</span>
+    }
+  }
+
+  /**
+   * Return &lt;code&gt;str&lt;/code&gt; modified so that its first character is now an
+   * lowercase character. If &lt;code&gt;str&lt;/code&gt; starts with non-alphabetic
+   * characters, such as quotes or parentheses, the first character is 
+   * determined as the first alphabetic character.
+   */
+  @Nullable
+  public static String lowercaseFirstChar(String str) {
+<span class="nc" id="L228">    return changeFirstCharCase(str, false);</span>
+  }
+
+  /**
+   * Return &lt;code&gt;str&lt;/code&gt; if str is capitalized {@link #isCapitalizedWord(String)},
+   * otherwise return modified &lt;code&gt;str&lt;/code&gt; so that its first character
+   * is now a lowercase character.
+   */
+  public static String lowercaseFirstCharIfCapitalized(String str) {
+<span class="nc bnc" id="L237" title="All 2 branches missed.">    if (!isCapitalizedWord(str)) return str;</span>
+<span class="nc" id="L238">    return changeFirstCharCase(str, false);</span>
+  }
+
+  /**
+   * Return &lt;code&gt;str&lt;/code&gt; modified so that its first character is now an
+   * lowercase or uppercase character, depending on &lt;code&gt;toUpperCase&lt;/code&gt;.
+   * If &lt;code&gt;str&lt;/code&gt; starts with non-alphabetic
+   * characters, such as quotes or parentheses, the first character is 
+   * determined as the first alphabetic character.
+   */
+  @Nullable
+  private static String changeFirstCharCase(String str, boolean toUpperCase) {
+<span class="nc bnc" id="L250" title="All 2 branches missed.">    if (isEmpty(str)) {</span>
+<span class="nc" id="L251">      return str;</span>
+    }
+<span class="nc bnc" id="L253" title="All 2 branches missed.">    if (str.length() == 1) {</span>
+<span class="nc bnc" id="L254" title="All 2 branches missed.">      return toUpperCase ? str.toUpperCase(Locale.ENGLISH) : str.toLowerCase();</span>
+    }
+<span class="nc" id="L256">    int pos = 0;</span>
+<span class="nc" id="L257">    int len = str.length() - 1;</span>
+<span class="nc bnc" id="L258" title="All 4 branches missed.">    while (!Character.isLetterOrDigit(str.charAt(pos)) &amp;&amp; len &gt; pos) {</span>
+<span class="nc" id="L259">      pos++;</span>
+    }
+<span class="nc" id="L261">    char firstChar = str.charAt(pos);    </span>
+<span class="nc bnc" id="L262" title="All 2 branches missed.">    return str.substring(0, pos) </span>
+<span class="nc" id="L263">        + (toUpperCase ? Character.toUpperCase(firstChar) : Character.toLowerCase(firstChar))</span>
+<span class="nc" id="L264">        + str.substring(pos + 1);</span>
+  }
+
+  public static String readerToString(Reader reader) throws IOException {
+<span class="fc" id="L268">    StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L269">    int readBytes = 0;</span>
+<span class="fc" id="L270">    char[] chars = new char[4000];</span>
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">    while (readBytes &gt;= 0) {</span>
+<span class="fc" id="L272">      readBytes = reader.read(chars, 0, 4000);</span>
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">      if (readBytes &lt;= 0) {</span>
+<span class="fc" id="L274">        break;</span>
+      }
+<span class="nc" id="L276">      sb.append(new String(chars, 0, readBytes));</span>
+    }
+<span class="fc" id="L278">    return sb.toString();</span>
+  }
+
+  public static String streamToString(InputStream is, String charsetName) throws IOException {
+<span class="fc" id="L282">    try (InputStreamReader isr = new InputStreamReader(is, charsetName)) {</span>
+<span class="fc" id="L283">      return readerToString(isr);</span>
+    }
+  } 
+  
+  /**
+   * Calls {@link #escapeHTML(String)}.
+   */
+  public static String escapeXML(String s) {
+<span class="nc" id="L291">    return escapeHTML(s);</span>
+  }
+
+  /**
+   * @since 2.9
+   */
+  public static String escapeForXmlAttribute(String s) {
+<span class="nc" id="L298">    return XmlEscapers.xmlAttributeEscaper().escape(s);</span>
+  }
+
+  /**
+   * @since 2.9
+   */
+  public static String escapeForXmlContent(String s) {
+<span class="nc" id="L305">    return XmlEscapers.xmlContentEscaper().escape(s);</span>
+  }
+
+  /**
+   * Escapes these characters: less than, greater than, quote, ampersand.
+   */
+  public static String escapeHTML(String s) {
+    // this version is much faster than using s.replaceAll()
+<span class="nc" id="L313">    StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L314">    int n = s.length();</span>
+<span class="nc bnc" id="L315" title="All 2 branches missed.">    for (int i = 0; i &lt; n; i++) {</span>
+<span class="nc" id="L316">      char c = s.charAt(i);</span>
+<span class="nc bnc" id="L317" title="All 5 branches missed.">      switch (c) {</span>
+        case '&lt;':
+<span class="nc" id="L319">          sb.append(&quot;&amp;lt;&quot;);</span>
+<span class="nc" id="L320">          break;</span>
+        case '&gt;':
+<span class="nc" id="L322">          sb.append(&quot;&amp;gt;&quot;);</span>
+<span class="nc" id="L323">          break;</span>
+        case '&amp;':
+<span class="nc" id="L325">          sb.append(&quot;&amp;amp;&quot;);</span>
+<span class="nc" id="L326">          break;</span>
+        case '&quot;':
+<span class="nc" id="L328">          sb.append(&quot;&amp;quot;&quot;);</span>
+<span class="nc" id="L329">          break;</span>
+        default:
+<span class="nc" id="L331">          sb.append(c);</span>
+          break;
+      }
+    }
+<span class="nc" id="L335">    return sb.toString();</span>
+  }
+
+  /**
+   * Filters any whitespace characters. Useful for trimming the contents of
+   * token elements that cannot possibly contain any spaces, with the exception
+   * for a single space in a word (for example, if the language supports numbers
+   * formatted with spaces as single tokens, as Catalan in LanguageTool).
+   * 
+   * @param s String to be filtered.
+   * @return Filtered s.
+   */
+  public static String trimWhitespace(String s) {
+<span class="nc" id="L348">    StringBuilder filter = new StringBuilder();</span>
+<span class="nc" id="L349">    String str = s.trim();</span>
+<span class="nc bnc" id="L350" title="All 2 branches missed.">    for (int i = 0; i &lt; str.length(); i++) {</span>
+<span class="nc bnc" id="L351" title="All 4 branches missed.">      while (str.charAt(i) &lt;= ' ' &amp;&amp; i &lt; str.length() &amp;&amp;</span>
+<span class="nc bnc" id="L352" title="All 6 branches missed.">          (str.charAt(i + 1) &lt;= ' ' || i &gt; 1 &amp;&amp; str.charAt(i - 1) &lt;= ' ')) {</span>
+<span class="nc" id="L353">        i++;</span>
+      }
+<span class="nc" id="L355">      char c = str.charAt(i);</span>
+<span class="nc bnc" id="L356" title="All 6 branches missed.">      if (c != '\n' &amp;&amp; c != '\t' &amp;&amp; c != '\r') {</span>
+<span class="nc" id="L357">        filter.append(c);</span>
+      }
+    }
+<span class="nc" id="L360">    return filter.toString();</span>
+  }
+
+  /**
+   * eliminate special (unicode) characters, e.g. soft hyphens
+   * @since 4.3
+   * @param s String to filter
+   * @return s, with non-(alphanumeric, punctuation, space) characters deleted
+   */
+  public static String trimSpecialCharacters(String s) {
+    // need unicode character classes -&gt; (?U)
+    // lists all allowed character classes, replace everything else
+<span class="nc" id="L372">    return s.replaceAll(&quot;(?U)[^\\p{Space}\\p{Alnum}\\p{Punct}]&quot;, &quot;&quot;);</span>
+  }
+
+  /**
+   * Adds spaces before words that are not punctuation.
+   * 
+   * @param word Word to add the preceding space.
+   * @param language
+   *          Language of the word (to check typography conventions). Currently
+   *          French convention of not adding spaces only before '.' and ',' is
+   *          implemented; other languages assume that before ,.;:!? no spaces
+   *          should be added.
+   * @return String containing a space or an empty string.
+   */
+  public static String addSpace(String word, Language language) {
+<span class="nc" id="L387">    String space = &quot; &quot;;</span>
+<span class="nc bnc" id="L388" title="All 2 branches missed.">    if (word.length() == 1) {</span>
+<span class="nc" id="L389">      char c = word.charAt(0);</span>
+<span class="nc bnc" id="L390" title="All 2 branches missed.">      if (&quot;fr&quot;.equals(language.getShortCode())) {</span>
+<span class="nc bnc" id="L391" title="All 4 branches missed.">        if (c == '.' || c == ',') {</span>
+<span class="nc" id="L392">          space = &quot;&quot;;</span>
+        }
+      } else {
+<span class="nc bnc" id="L395" title="All 12 branches missed.">        if (c == '.' || c == ',' || c == ';' || c == ':' || c == '?' || c == '!') {</span>
+<span class="nc" id="L396">          space = &quot;&quot;;</span>
+        }
+      }
+    }
+<span class="nc" id="L400">    return space;</span>
+  }
+
+  /**
+   * Checks if a string contains a whitespace, including:
+   * &lt;ul&gt;
+   * &lt;li&gt;all Unicode whitespace
+   * &lt;li&gt;the non-breaking space (U+00A0)
+   * &lt;li&gt;the narrow non-breaking space (U+202F)
+   * &lt;li&gt;the zero width space (U+200B), used in Khmer
+   * &lt;/ul&gt;
+   * @param str String to check
+   * @return true if the string is a whitespace character
+   */
+  public static boolean isWhitespace(String str) {
+<span class="nc bnc" id="L415" title="All 2 branches missed.">    if (&quot;\u0002&quot;.equals(str) // unbreakable field, e.g. a footnote number in OOo</span>
+<span class="nc bnc" id="L416" title="All 2 branches missed.">        || &quot;\u0001&quot;.equals(str)) { // breakable field in OOo</span>
+<span class="nc" id="L417">      return false;</span>
+    }
+
+<span class="nc bnc" id="L420" title="All 2 branches missed.">    if (&quot;\uFEFF&quot;.equals(str)) {</span>
+<span class="nc" id="L421">      return true;</span>
+    }
+<span class="nc" id="L423">    String trimStr = str.trim();</span>
+<span class="nc bnc" id="L424" title="All 2 branches missed.">    if (isEmpty(trimStr)) {</span>
+<span class="nc" id="L425">      return true;</span>
+    }
+<span class="nc bnc" id="L427" title="All 2 branches missed.">    if (trimStr.length() == 1) {</span>
+<span class="nc bnc" id="L428" title="All 2 branches missed.">      if (&quot;\u200B&quot;.equals(str)) {</span>
+        // We need u200B​​ to be detected as whitespace for Khmer, as it was the case before Java 7.
+<span class="nc" id="L430">        return true;</span>
+<span class="nc bnc" id="L431" title="All 4 branches missed.">      } else if (&quot;\u00A0&quot;.equals(str) || &quot;\u202F&quot;.equals(str)) {  // non-breaking space and narrow non-breaking space</span>
+<span class="nc" id="L432">        return true;</span>
+      }
+<span class="nc" id="L434">      return Character.isWhitespace(trimStr.charAt(0));</span>
+    }
+<span class="nc" id="L436">    return false;</span>
+  }
+  
+  /**
+   * Checks if a string is the non-breaking whitespace (&lt;code&gt;\u00A0&lt;/code&gt;).
+   * @since 2.1
+   */
+  public static boolean isNonBreakingWhitespace(String str) {
+<span class="nc" id="L444">    return &quot;\u00A0&quot;.equals(str);</span>
+  }
+
+  /**
+   * @param ch Character to check
+   * @return True if the character is a positive number (decimal digit from 1 to 9).
+   */
+  public static boolean isPositiveNumber(char ch) {
+<span class="nc bnc" id="L452" title="All 4 branches missed.">    return ch &gt;= '1' &amp;&amp; ch &lt;= '9';</span>
+  }
+
+  /**
+   * Helper method to replace calls to {@code &quot;&quot;.equals()}.
+   * 
+   * @param str String to check
+   * @return true if string is empty or {@code null}
+   */
+  public static boolean isEmpty(String str) {
+<span class="pc bpc" id="L462" title="1 of 4 branches missed.">    return str == null || str.length() == 0;</span>
+  }
+
+  /**
+   * Simple XML filtering for XML tags.
+   * @param str XML string to be filtered.
+   * @return Filtered string without XML tags.
+   */
+  public static String filterXML(String str) {
+<span class="nc" id="L471">    String s = str;       </span>
+<span class="nc bnc" id="L472" title="All 2 branches missed.">    if (s.contains(&quot;&lt;&quot;)) { // don't run slow regex unless we have to</span>
+<span class="nc" id="L473">      s = XML_COMMENT_PATTERN.matcher(s).replaceAll(&quot; &quot;);</span>
+<span class="nc" id="L474">      s = XML_PATTERN.matcher(s).replaceAll(&quot;&quot;);</span>
+    }
+<span class="nc" id="L476">    return s;</span>
+  }
+  
+  public static boolean hasDiacritics(String str) {
+<span class="nc bnc" id="L480" title="All 2 branches missed.">    return !str.equals(removeDiacritics(str));</span>
+  }
+  
+  public static String removeDiacritics(String str) {
+<span class="nc" id="L484">    String s = Normalizer.normalize(str, Normalizer.Form.NFD);</span>
+<span class="nc" id="L485">    return s.replaceAll(&quot;[\\p{InCombiningDiacriticalMarks}]&quot;, &quot;&quot;);</span>
+  }
+
+  @Nullable
+  public static String asString(CharSequence s) {
+<span class="nc bnc" id="L490" title="All 2 branches missed.">    if (s == null) {</span>
+<span class="nc" id="L491">      return null;</span>
+    }
+<span class="nc" id="L493">    return s.toString();</span>
+  }
+
+  /**
+   * @since 4.3
+   */
+  public static boolean isParagraphEnd(String sentence, boolean singleLineBreaksMarksPara) {
+<span class="nc" id="L500">    boolean isParaEnd = false;</span>
+<span class="nc bnc" id="L501" title="All 2 branches missed.">    if (singleLineBreaksMarksPara) {</span>
+<span class="nc bnc" id="L502" title="All 4 branches missed.">      if (sentence.endsWith(&quot;\n&quot;) || sentence.endsWith(&quot;\n\r&quot;)) {</span>
+<span class="nc" id="L503">        isParaEnd = true;</span>
+      }
+<span class="nc bnc" id="L505" title="All 6 branches missed.">    } else if (sentence.endsWith(&quot;\n\n&quot;) || sentence.endsWith(&quot;\n\r\n\r&quot;) || sentence.endsWith(&quot;\r\n\r\n&quot;)) {</span>
+<span class="nc" id="L506">      isParaEnd = true;</span>
+    }
+<span class="nc" id="L508">    return isParaEnd;</span>
+  }
+
+  /**
+   * Loads file, ignoring comments (lines starting with {@code #}).
+   * @param path path in resource dir
+   * @since 4.6
+   * @deprecated use DataBroker#getFromResourceDirAsLines(java.lang.String) instead
+   */
+  public static List&lt;String&gt; loadLines(String path) {
+<span class="nc" id="L518">    InputStream stream = JLanguageTool.getDataBroker().getFromResourceDirAsStream(path);</span>
+<span class="nc" id="L519">    List&lt;String&gt; l = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L520">    try (</span>
+<span class="nc" id="L521">      InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8);</span>
+<span class="nc" id="L522">      BufferedReader br = new BufferedReader(reader)</span>
+    ) {
+      String line;
+<span class="nc bnc" id="L525" title="All 2 branches missed.">      while ((line = br.readLine()) != null) {</span>
+<span class="nc bnc" id="L526" title="All 4 branches missed.">        if (line.isEmpty() || line.charAt(0) == '#') {   // ignore comments</span>
+<span class="nc" id="L527">          continue;</span>
+        }
+<span class="nc" id="L529">        l.add(line);</span>
+      }
+<span class="nc" id="L531">    } catch (IOException e) {</span>
+<span class="nc" id="L532">      throw new RuntimeException(&quot;Could not load data from &quot; + path, e);</span>
+<span class="nc" id="L533">    }</span>
+<span class="nc" id="L534">    return Collections.unmodifiableList(l);</span>
+  }
+
+  /**
+   * Will turn a string into a typical rule ID, i.e. uppercase and
+   * &quot;_&quot; instead of spaces. Does NOT replace all non-ASCII characters.
+   * @since 5.1
+   */
+  public static String toId(String input) {
+<span class="nc" id="L543">    return input.toUpperCase().replace(&quot; &quot;, &quot;_&quot;).replace(&quot;'&quot;, &quot;_Q_&quot;);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

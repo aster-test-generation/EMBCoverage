@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WrongWordInContextRule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules</a> &gt; <span class="el_source">WrongWordInContextRule.java</span></div><h1>WrongWordInContextRule.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker 
+ * Copyright (C) 2012 Markus Brenneis
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules;
+
+import java.io.InputStream;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import org.jetbrains.annotations.NotNull;
+import org.languagetool.AnalyzedSentence;
+import org.languagetool.AnalyzedTokenReadings;
+import org.languagetool.JLanguageTool;
+
+/**
+ * Check if there is a confusion of two words (which might have a similar spelling) depending on the context.
+ * This rule loads the words and their respective context from an external file with the following 
+ * format (tab-separated):
+ * 
+ * &lt;pre&gt;word1 word2 match1 match2 context1 context2 explanation1 explanation2&lt;/pre&gt;
+ * 
+ * &lt;ul&gt;
+ * &lt;li&gt;word1 and word2 are regular expressions of the words that can easily be confused
+ * &lt;li&gt;match1 is the substring of word1 that will be replaced with match2 when word1 occurs in a context where it is probably wrong (and vice versa) 
+ * &lt;li&gt;context1 is the context in which word1 typically occurs (but which is wrong for word2), given as a regular expression
+ * &lt;li&gt;context2 is the context in which word2 typically occurs (but which is wrong for word1), given as a regular expression
+ * &lt;li&gt;explanation1 is a short description of word1 (optional)
+ * &lt;li&gt;explanation2 is a short description of word2 (optional)
+ * &lt;/ul&gt;
+ * 
+ * @author Markus Brenneis
+ */
+public abstract class WrongWordInContextRule extends Rule {
+
+<span class="nc" id="L55">  private static final LoadingCache&lt;String, List&lt;ContextWords&gt;&gt; cache = CacheBuilder.newBuilder()</span>
+<span class="nc" id="L56">          .expireAfterWrite(30, TimeUnit.MINUTES)</span>
+<span class="nc" id="L57">          .build(new CacheLoader&lt;String, List&lt;ContextWords&gt;&gt;() {</span>
+            @Override
+            public List&lt;ContextWords&gt; load(@NotNull String path) {
+<span class="nc" id="L60">              return loadContextWords(path);</span>
+            }
+          });
+
+  private final List&lt;ContextWords&gt; contextWordsSet;
+  
+<span class="nc" id="L66">  private boolean matchLemmas = false;</span>
+
+<span class="nc" id="L68">  public WrongWordInContextRule(ResourceBundle messages) {</span>
+<span class="nc" id="L69">    super.setCategory(new Category(CategoryIds.CONFUSED_WORDS, getCategoryString()));</span>
+<span class="nc" id="L70">    contextWordsSet = cache.getUnchecked(getFilename());</span>
+<span class="nc" id="L71">    setLocQualityIssueType(ITSIssueType.Misspelling);</span>
+<span class="nc" id="L72">  }</span>
+
+  protected abstract String getFilename();
+
+  protected String getCategoryString() {
+<span class="nc" id="L77">    return messages.getString(&quot;category_misc&quot;);</span>
+  }
+  
+  @Override
+  public String getId() {
+<span class="nc" id="L82">    return &quot;WRONG_WORD_IN_CONTEXT&quot;;</span>
+  }
+
+  @Override
+  public String getDescription() {
+<span class="nc" id="L87">    return &quot;Confusion of words&quot;;</span>
+  }
+  
+  /*
+   *  Match lemmas instead of word forms
+   */
+  public void setMatchLemmmas() {
+<span class="nc" id="L94">    matchLemmas = true;</span>
+<span class="nc" id="L95">  }</span>
+  
+  @Override
+  public RuleMatch[] match(AnalyzedSentence sentence) {
+<span class="nc" id="L99">    List&lt;RuleMatch&gt; ruleMatches = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L100">    AnalyzedTokenReadings[] tokens = sentence.getTokensWithoutWhitespace();</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">    for (ContextWords contextWords : contextWordsSet) {</span>
+<span class="nc" id="L102">      boolean[] matchedWord = {false, false};</span>
+<span class="nc" id="L103">      Matcher[] matchers = {null, null};</span>
+<span class="nc" id="L104">      matchers[0] = contextWords.words[0].matcher(&quot;&quot;);</span>
+<span class="nc" id="L105">      matchers[1] = contextWords.words[1].matcher(&quot;&quot;);</span>
+      //start searching for words
+      //ignoring token 0, i.e., SENT_START
+      int i;
+<span class="nc" id="L109">      String token1 = &quot;&quot;;</span>
+<span class="nc bnc" id="L110" title="All 4 branches missed.">      for (i = 1; i &lt; tokens.length &amp;&amp; !matchedWord[0]; i++) {</span>
+<span class="nc" id="L111">        token1 = tokens[i].getToken();</span>
+<span class="nc" id="L112">        matchedWord[0] = matchers[0].reset(token1).find();</span>
+      }
+      int j;
+<span class="nc" id="L115">      String token2 = &quot;&quot;;</span>
+<span class="nc bnc" id="L116" title="All 4 branches missed.">      for (j = 1; j &lt; tokens.length &amp;&amp; !matchedWord[1]; j++) {</span>
+<span class="nc" id="L117">        token2 = tokens[j].getToken();</span>
+<span class="nc" id="L118">        matchedWord[1] = matchers[1].reset(token2).find();</span>
+      }
+      
+<span class="nc" id="L121">      int foundWord = -1;</span>
+<span class="nc" id="L122">      int notFoundWord = -1;</span>
+<span class="nc" id="L123">      int startPos = 0;</span>
+<span class="nc" id="L124">      int endPos = 0;</span>
+<span class="nc" id="L125">      String matchedToken = &quot;&quot;;</span>
+      // when both words have been found, we cannot determine if one of them is wrong
+<span class="nc bnc" id="L127" title="All 4 branches missed.">      if (matchedWord[0] &amp;&amp; !matchedWord[1]) {</span>
+<span class="nc" id="L128">        foundWord = 0;</span>
+<span class="nc" id="L129">        notFoundWord = 1;</span>
+<span class="nc" id="L130">        matchers[1] = contextWords.contexts[1].matcher(&quot;&quot;);</span>
+<span class="nc" id="L131">        startPos = tokens[i-1].getStartPos();</span>
+<span class="nc" id="L132">        endPos = tokens[i-1].getStartPos() + token1.length();</span>
+<span class="nc" id="L133">        matchedToken = token1;</span>
+<span class="nc bnc" id="L134" title="All 4 branches missed.">      } else if (matchedWord[1] &amp;&amp; !matchedWord[0]) {</span>
+<span class="nc" id="L135">        foundWord = 1;</span>
+<span class="nc" id="L136">        notFoundWord = 0;</span>
+<span class="nc" id="L137">        matchers[0] = contextWords.contexts[0].matcher(&quot;&quot;);</span>
+<span class="nc" id="L138">        startPos = tokens[j-1].getStartPos();</span>
+<span class="nc" id="L139">        endPos = tokens[j-1].getStartPos() + token2.length();</span>
+<span class="nc" id="L140">        matchedToken = token2;</span>
+      }
+      
+<span class="nc bnc" id="L143" title="All 2 branches missed.">      if (foundWord != -1) {</span>
+<span class="nc" id="L144">        boolean[] matchedContext = {false, false};</span>
+<span class="nc" id="L145">        matchers[foundWord] = contextWords.contexts[foundWord].matcher(&quot;&quot;);</span>
+<span class="nc" id="L146">        matchers[notFoundWord] = contextWords.contexts[notFoundWord].matcher(&quot;&quot;);</span>
+        //start searching for context words
+        //ignoring token 0, i.e., SENT_START
+        String token;
+<span class="nc bnc" id="L150" title="All 4 branches missed.">        for (i = 1; i &lt; tokens.length &amp;&amp; !matchedContext[foundWord]; i++) {</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">          if (matchLemmas) {</span>
+<span class="nc bnc" id="L152" title="All 4 branches missed.">            for (j = 0; j &lt; tokens[i].getReadingsLength() &amp;&amp; !matchedContext[foundWord]; j++) {</span>
+<span class="nc" id="L153">              String lemma = tokens[i].getAnalyzedToken(j).getLemma();</span>
+<span class="nc bnc" id="L154" title="All 4 branches missed.">              if (lemma != null &amp;&amp; !lemma.isEmpty()) {</span>
+<span class="nc" id="L155">                matchedContext[foundWord] = matchers[foundWord].reset(lemma).find();</span>
+              }
+            }
+          } else {
+<span class="nc" id="L159">            token = tokens[i].getToken();</span>
+<span class="nc" id="L160">            matchedContext[foundWord] = matchers[foundWord].reset(token).find();</span>
+          }
+        }
+<span class="nc bnc" id="L163" title="All 4 branches missed.">        for (i = 1; i &lt; tokens.length &amp;&amp; !matchedContext[notFoundWord]; i++) {</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">          if (matchLemmas) {</span>
+<span class="nc bnc" id="L165" title="All 4 branches missed.">            for (j = 0; j &lt; tokens[i].getReadingsLength() &amp;&amp; !matchedContext[notFoundWord]; j++) {</span>
+<span class="nc" id="L166">              String lemma = tokens[i].getAnalyzedToken(j).getLemma();</span>
+<span class="nc bnc" id="L167" title="All 4 branches missed.">              if (lemma != null &amp;&amp; !lemma.isEmpty()) {</span>
+<span class="nc" id="L168">                matchedContext[notFoundWord] = matchers[notFoundWord].reset(lemma).find();</span>
+              }
+            }
+          } else {
+<span class="nc" id="L172">            token = tokens[i].getToken();</span>
+<span class="nc" id="L173">            matchedContext[notFoundWord] = matchers[notFoundWord].reset(token).find();</span>
+          }
+        }
+<span class="nc bnc" id="L176" title="All 4 branches missed.">        if (matchedContext[notFoundWord] &amp;&amp; !matchedContext[foundWord]) {</span>
+<span class="nc" id="L177">          String msg = getMessage(matchedToken, matchedToken.replaceFirst(contextWords.matches[foundWord],contextWords.matches[notFoundWord]),</span>
+                  contextWords.explanations[notFoundWord], contextWords.explanations[foundWord]);
+<span class="nc" id="L179">          RuleMatch ruleMatch = new RuleMatch(this, sentence, startPos, endPos, msg, getShortMessageString());</span>
+<span class="nc" id="L180">          ruleMatches.add(ruleMatch);</span>
+        }
+      } // if foundWord != -1
+<span class="nc" id="L183">    } // for each contextWords in contextWordsSet</span>
+<span class="nc" id="L184">    return toRuleMatchArray(ruleMatches);</span>
+  }
+  
+  /**
+   * @return a string like &quot;Possible confusion of words: Did you mean &amp;lt;suggestion&amp;gt;$SUGGESTION&amp;lt;/suggestion&amp;gt; instead of '$WRONGWORD'?&quot;
+   */
+  protected abstract String getMessageString();
+  
+  /**
+   * @return a string like &quot;Possible confusion of words&quot;
+   */
+  protected abstract String getShortMessageString();
+  
+  /**
+   * @return a string like &quot;Possible confusion of words: Did you mean &amp;lt;suggestion&amp;gt;$SUGGESTION&amp;lt;/suggestion&amp;gt;
+   * (= $EXPLANATION_SUGGESTION) instead of '$WRONGWORD' (= $EXPLANATION_WRONGWORD)?&quot;
+   */
+  protected abstract String getLongMessageString();
+  
+  private String getMessage(String wrongWord, String suggestion, String explanationSuggestion, String explanationWrongWord) {
+<span class="nc" id="L204">    String quotedSuggestion = Matcher.quoteReplacement(suggestion);</span>
+<span class="nc" id="L205">    String quotedWrongWord = Matcher.quoteReplacement(wrongWord);</span>
+<span class="nc" id="L206">    String quotedExplanationSuggestion = Matcher.quoteReplacement(explanationSuggestion);</span>
+<span class="nc" id="L207">    String quotedExplanationWrongWord = Matcher.quoteReplacement(explanationWrongWord);</span>
+<span class="nc bnc" id="L208" title="All 4 branches missed.">    if (explanationSuggestion.isEmpty() || explanationWrongWord.isEmpty()) {</span>
+<span class="nc" id="L209">      return getMessageString()</span>
+<span class="nc" id="L210">        .replaceFirst(&quot;\\$SUGGESTION&quot;, quotedSuggestion)</span>
+<span class="nc" id="L211">        .replaceFirst(&quot;\\$WRONGWORD&quot;, quotedWrongWord);</span>
+    } else {
+<span class="nc" id="L213">      return getLongMessageString()</span>
+<span class="nc" id="L214">        .replaceFirst(&quot;\\$SUGGESTION&quot;, quotedSuggestion)</span>
+<span class="nc" id="L215">        .replaceFirst(&quot;\\$WRONGWORD&quot;, quotedWrongWord)</span>
+<span class="nc" id="L216">        .replaceFirst(&quot;\\$EXPLANATION_SUGGESTION&quot;, quotedExplanationSuggestion)</span>
+<span class="nc" id="L217">        .replaceFirst(&quot;\\$EXPLANATION_WRONGWORD&quot;, quotedExplanationWrongWord);</span>
+    }
+  }
+  
+  /**
+   * Load words, contexts, and explanations.
+   */
+  private static List&lt;ContextWords&gt; loadContextWords(String path) {
+<span class="nc" id="L225">    List&lt;ContextWords&gt; set = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L226">    InputStream stream = JLanguageTool.getDataBroker().getFromRulesDirAsStream(path);</span>
+<span class="nc" id="L227">    try (Scanner scanner = new Scanner(stream, &quot;utf-8&quot;)) {</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">      while (scanner.hasNextLine()) {</span>
+<span class="nc" id="L229">        String line = scanner.nextLine();</span>
+<span class="nc bnc" id="L230" title="All 4 branches missed.">        if (line.trim().isEmpty() || line.charAt(0) == '#') {</span>
+<span class="nc" id="L231">          continue;</span>
+        }
+<span class="nc" id="L233">        String[] column = line.split(&quot;\t&quot;);</span>
+<span class="nc bnc" id="L234" title="All 2 branches missed.">        if (column.length &gt;= 6) {</span>
+<span class="nc" id="L235">          ContextWords contextWords = new ContextWords();</span>
+<span class="nc" id="L236">          contextWords.setWord(0, column[0]);</span>
+<span class="nc" id="L237">          contextWords.setWord(1, column[1]);</span>
+<span class="nc" id="L238">          contextWords.matches[0] = column[2];</span>
+<span class="nc" id="L239">          contextWords.matches[1] = column[3];</span>
+<span class="nc" id="L240">          contextWords.setContext(0, column[4]);</span>
+<span class="nc" id="L241">          contextWords.setContext(1, column[5]);</span>
+<span class="nc bnc" id="L242" title="All 2 branches missed.">          if (column.length &gt; 6) {</span>
+<span class="nc" id="L243">            contextWords.explanations[0] = column[6];</span>
+<span class="nc bnc" id="L244" title="All 2 branches missed.">            if (column.length &gt; 7) {</span>
+<span class="nc" id="L245">              contextWords.explanations[1] = column[7];</span>
+            }
+          }
+<span class="nc" id="L248">          set.add(contextWords);</span>
+        } // if (column.length &gt;= 6)
+<span class="nc" id="L250">      }</span>
+    }
+<span class="nc" id="L252">    return Collections.unmodifiableList(set);</span>
+  }
+  
+  static class ContextWords {
+    
+<span class="nc" id="L257">    final String[] matches = {&quot;&quot;, &quot;&quot;};</span>
+<span class="nc" id="L258">    final String[] explanations = {&quot;&quot;, &quot;&quot;};</span>
+    final Pattern[] words;
+    final Pattern[] contexts;
+    
+<span class="nc" id="L262">    ContextWords() {</span>
+<span class="nc" id="L263">      words = new Pattern[2];</span>
+<span class="nc" id="L264">      contexts = new Pattern[2];</span>
+<span class="nc" id="L265">    }</span>
+    
+    private String addBoundaries(String str) {
+<span class="nc" id="L268">      String ignoreCase = &quot;&quot;;</span>
+<span class="nc bnc" id="L269" title="All 2 branches missed.">      if (str.startsWith(&quot;(?i)&quot;)) {</span>
+<span class="nc" id="L270">        str = str.substring(4);</span>
+<span class="nc" id="L271">        ignoreCase = &quot;(?i)&quot;;</span>
+      }
+<span class="nc" id="L273">      return ignoreCase + &quot;\\b(&quot; + str + &quot;)\\b&quot;;</span>
+    }
+    
+    void setWord(int i, String word) {
+<span class="nc" id="L277">      words[i] = Pattern.compile(addBoundaries(word));</span>
+<span class="nc" id="L278">    }</span>
+    
+    void setContext(int i, String context) {
+<span class="nc" id="L281">      contexts[i] = Pattern.compile(addBoundaries(context));</span>
+<span class="nc" id="L282">    }</span>
+    
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

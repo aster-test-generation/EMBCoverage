@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BitextRule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules.bitext</a> &gt; <span class="el_source">BitextRule.java</span></div><h1>BitextRule.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker 
+ * Copyright (C) 2010 Marcin Miłkowski (www.languagetool.org)
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+
+package org.languagetool.rules.bitext;
+
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+import org.jetbrains.annotations.Nullable;
+import org.languagetool.AnalyzedSentence;
+import org.languagetool.Language;
+import org.languagetool.bitext.StringPair;
+import org.languagetool.rules.Rule;
+import org.languagetool.rules.RuleMatch;
+
+/**
+ * Abstract bitext rule class. A BitextRule describes a language error and 
+ * can test whether a given pre-analyzed pair of source and target text 
+ * contains that error using the {@link Rule#match} method.
+ * 
+ * @author Marcin Miłkowski
+ */
+<span class="nc" id="L41">public abstract class BitextRule extends Rule {</span>
+
+  public static List&lt;Class&lt;? extends BitextRule&gt;&gt; getRelevantRules() {
+<span class="nc" id="L44">    return Arrays.asList(</span>
+            DifferentLengthRule.class,
+            SameTranslationRule.class,
+            DifferentPunctuationRule.class
+    );
+  }
+
+  public abstract String getMessage();
+
+  public abstract RuleMatch[] match(AnalyzedSentence sourceText,
+      AnalyzedSentence targetText) throws IOException;
+
+  private List&lt;StringPair&gt; correctExamples;
+  private List&lt;IncorrectBitextExample&gt; incorrectExamples;
+  private Language sourceLanguage;
+
+  /**
+   * This method makes no sense for bitext, thus it always returns {@code null}.
+   */
+  @Nullable
+  @Override
+  public RuleMatch[] match(AnalyzedSentence sentence) throws IOException {
+<span class="nc" id="L66">    return null;</span>
+  }
+
+  /**
+   * Set the source language. If the language is not supported
+   * by LT, you need to use the default tokenizers etc.
+   * @param lang Source Language
+   */
+  public final void setSourceLanguage(Language lang) {
+<span class="nc" id="L75">    sourceLanguage = lang;</span>
+<span class="nc" id="L76">  }</span>
+
+  public final Language getSourceLanguage() {
+<span class="nc" id="L79">    return sourceLanguage;</span>
+  }
+
+  /**
+   * Set the examples that are correct and thus do not trigger the rule.
+   */
+  public final void setCorrectBitextExamples(List&lt;StringPair&gt; correctExamples) {
+<span class="nc" id="L86">    this.correctExamples = correctExamples;</span>
+<span class="nc" id="L87">  }</span>
+
+  /**
+   * Get example sentences that are correct and thus will not match this rule.
+   */
+  public final List&lt;StringPair&gt; getCorrectBitextExamples() {
+<span class="nc" id="L93">    return correctExamples;</span>
+  }
+
+  /**
+   * Set the examples that are incorrect and thus do trigger the rule.
+   */
+  public final void setIncorrectBitextExamples(
+      final List&lt;IncorrectBitextExample&gt; incorrectExamples) {
+<span class="nc" id="L101">    this.incorrectExamples = Collections.unmodifiableList(incorrectExamples);</span>
+<span class="nc" id="L102">  }</span>
+
+  /**
+   * Get example sentences that are incorrect and thus will match this rule.
+   */
+  public final List&lt;IncorrectBitextExample&gt; getIncorrectBitextExamples() {
+<span class="nc" id="L108">    return incorrectExamples;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

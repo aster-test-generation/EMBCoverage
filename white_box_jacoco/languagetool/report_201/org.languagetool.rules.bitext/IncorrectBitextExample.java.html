@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IncorrectBitextExample.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules.bitext</a> &gt; <span class="el_source">IncorrectBitextExample.java</span></div><h1>IncorrectBitextExample.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker 
+ * Copyright (C) 2010 Marcin Miłkowski (http://www.languagetool.org)
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules.bitext;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+
+import org.languagetool.bitext.StringPair;
+
+/**
+ * A text, typically a pair of sentences that contains an error.
+ * @since 1.0.1
+ */
+public class IncorrectBitextExample {
+
+  private final StringPair example;
+  private final List&lt;String&gt; corrections;
+
+  public IncorrectBitextExample(StringPair example) {
+<span class="nc" id="L37">    this(example, Collections.emptyList());</span>
+<span class="nc" id="L38">  }</span>
+
+  /**
+   * @since 2.9
+   */
+<span class="nc" id="L43">  public IncorrectBitextExample(StringPair example, List&lt;String&gt; corrections) {</span>
+<span class="nc" id="L44">    this.example = Objects.requireNonNull(example);</span>
+<span class="nc" id="L45">    this.corrections = Collections.unmodifiableList(corrections);</span>
+<span class="nc" id="L46">  }</span>
+
+  /**
+   * Return the example that contains the error.
+   */
+  public StringPair getExample() {
+<span class="nc" id="L52">    return example;</span>
+  }
+
+  /**
+   * Return the possible corrections.
+   */
+  public List&lt;String&gt; getCorrections() {
+<span class="nc" id="L59">    return corrections;</span>
+  }
+  
+  @Override
+  public String toString() {
+<span class="nc" id="L64">    return example.getSource() + &quot;/ &quot; + example.getTarget() + &quot; &quot; + corrections;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

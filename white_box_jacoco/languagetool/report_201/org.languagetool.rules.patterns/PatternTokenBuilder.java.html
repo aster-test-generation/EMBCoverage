@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PatternTokenBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules.patterns</a> &gt; <span class="el_source">PatternTokenBuilder.java</span></div><h1>PatternTokenBuilder.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2015 Daniel Naber (http://www.danielnaber.de)
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules.patterns;
+
+import java.util.Objects;
+
+/**
+ * Helper to build {@link PatternToken}s.
+ * @since 3.1
+ */
+<span class="fc" id="L27">public class PatternTokenBuilder {</span>
+
+  private String token;
+  private String posTag;
+<span class="fc" id="L31">  private boolean marker = true;</span>
+<span class="fc" id="L32">  private boolean matchInflectedForms = false;</span>
+  private boolean caseSensitive;
+  private boolean regexp;
+  private boolean negation;
+<span class="fc" id="L36">  private boolean isWhiteSpaceSet = false;</span>
+  private boolean isWhiteSpaceBefore;
+<span class="fc" id="L38">  private int minOccurrence = 1;</span>
+<span class="fc" id="L39">  private int maxOccurrence = 1;</span>
+  private int skip;
+
+  /**
+   * Add a case-insensitive token. 
+   */
+  public PatternTokenBuilder token(String token) {
+<span class="fc" id="L46">    this.token = Objects.requireNonNull(token);</span>
+<span class="fc" id="L47">    return this;</span>
+  }
+
+  /**
+   * Add a case-sensitive token. 
+   * @since 3.3 
+   */
+  public PatternTokenBuilder csToken(String token) {
+<span class="fc" id="L55">    this.token = Objects.requireNonNull(token);</span>
+<span class="fc" id="L56">    caseSensitive = true;</span>
+<span class="fc" id="L57">    return this;</span>
+  }
+
+  public PatternTokenBuilder tokenRegex(String token) {
+<span class="fc" id="L61">    this.token = Objects.requireNonNull(token);</span>
+<span class="fc" id="L62">    regexp = true;</span>
+<span class="fc" id="L63">    return this;</span>
+  }
+
+  public PatternTokenBuilder csTokenRegex(String token) {
+<span class="fc" id="L67">    this.token = Objects.requireNonNull(token);</span>
+<span class="fc" id="L68">    regexp = true;</span>
+<span class="fc" id="L69">    caseSensitive = true;</span>
+<span class="fc" id="L70">    return this;</span>
+  }
+
+  public PatternTokenBuilder pos(String posTag) {
+<span class="fc" id="L74">    return pos(posTag, false);</span>
+  }
+
+  public PatternTokenBuilder posRegex(String posTag) {
+<span class="fc" id="L78">    return pos(posTag, true);</span>
+  }
+
+  /** @since 4.9 */
+  public PatternTokenBuilder min(int val) {
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">    if (val &lt; 0) {</span>
+<span class="nc" id="L84">      throw new IllegalArgumentException(&quot;minOccurrence must be &gt;= 0: &quot; + minOccurrence);</span>
+    }
+<span class="fc" id="L86">    minOccurrence = val;</span>
+<span class="fc" id="L87">    return this;</span>
+  }
+
+  /** @since 4.9 */
+  public PatternTokenBuilder max(int val) {
+<span class="nc" id="L92">    maxOccurrence = val;</span>
+<span class="nc" id="L93">    return this;</span>
+  }
+
+  /**
+   * Corresponds to {@code &lt;marker&gt;...&lt;/marker&gt;} in XML. Note that there
+   * can be more tokens with a mark, but then must all be adjacent.
+   * @since 4.6
+   */
+  public PatternTokenBuilder mark(boolean isMarked) {
+<span class="nc" id="L102">    this.marker = isMarked;</span>
+<span class="nc" id="L103">    return this;</span>
+  }
+
+  private PatternTokenBuilder pos(String posTag, boolean regexp) {
+<span class="fc" id="L107">    this.posTag = Objects.requireNonNull(posTag);</span>
+<span class="fc" id="L108">    this.regexp = regexp;</span>
+<span class="fc" id="L109">    return this;</span>
+  }
+
+  /** @since 3.3 */
+  public PatternTokenBuilder negate() {
+<span class="nc" id="L114">    this.negation = true;</span>
+<span class="nc" id="L115">    return this;</span>
+  }
+
+  /** @since 4.0 */
+  public PatternTokenBuilder setSkip(int skip) {
+<span class="fc" id="L120">    this.skip = skip;</span>
+<span class="fc" id="L121">    return this;</span>
+  }
+
+  /** @since 4.4 */
+  public PatternTokenBuilder setIsWhiteSpaceBefore(boolean whiteSpaceBefore) {
+<span class="fc" id="L126">    this.isWhiteSpaceBefore = whiteSpaceBefore;</span>
+<span class="fc" id="L127">    this.isWhiteSpaceSet = true;</span>
+<span class="fc" id="L128">    return this;</span>
+  }
+
+  /**
+   * Also match inflected forms of the given word - note this will only work when the
+   * given token actually is a baseform.
+   * @since 3.8 
+   */
+  public PatternTokenBuilder matchInflectedForms() {
+<span class="fc" id="L137">    matchInflectedForms = true;</span>
+<span class="fc" id="L138">    return this;</span>
+  }
+  
+  public PatternToken build() {
+    PatternToken patternToken;
+<span class="fc bfc" id="L143" title="All 2 branches covered.">    if (posTag != null) {</span>
+<span class="fc" id="L144">      patternToken = new PatternToken(null, false, false, false);</span>
+<span class="fc" id="L145">      patternToken.setPosToken(new PatternToken.PosToken(posTag, regexp, false));</span>
+    } else {
+<span class="fc" id="L147">      patternToken = new PatternToken(token, caseSensitive, regexp, matchInflectedForms);</span>
+    }
+<span class="fc bfc" id="L149" title="All 2 branches covered.">    if (isWhiteSpaceSet) {</span>
+<span class="fc" id="L150">      patternToken.setWhitespaceBefore(isWhiteSpaceBefore);</span>
+    }
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">    if (maxOccurrence &lt; minOccurrence) {</span>
+<span class="nc" id="L153">      throw new IllegalArgumentException(&quot;minOccurrence must &lt;= maxOccurrence: minOccurrence &quot; + minOccurrence + &quot;, maxOccurrence &quot; + maxOccurrence);</span>
+    }
+<span class="fc" id="L155">    patternToken.setMinOccurrence(minOccurrence);</span>
+<span class="fc" id="L156">    patternToken.setMaxOccurrence(maxOccurrence);</span>
+<span class="fc" id="L157">    patternToken.setNegation(negation);</span>
+<span class="fc" id="L158">    patternToken.setSkipNext(skip);</span>
+<span class="fc" id="L159">    patternToken.setInsideMarker(marker);</span>
+<span class="fc" id="L160">    return patternToken;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReadabilityRule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules</a> &gt; <span class="el_source">ReadabilityRule.java</span></div><h1>ReadabilityRule.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker 
+ * Copyright (C) 2005 Daniel Naber (http://www.danielnaber.de)
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.ResourceBundle;
+
+import org.languagetool.AnalyzedSentence;
+import org.languagetool.AnalyzedTokenReadings;
+import org.languagetool.Language;
+import org.languagetool.LinguServices;
+import org.languagetool.UserConfig;
+import org.languagetool.tools.Tools;
+import org.languagetool.rules.Category.Location;
+
+/**
+ * A rule that checks the readability of English text (using the Flesch-Reading-Ease Formula)
+ * If tooEasyTest == true, the rule tests if paragraph level &amp;gt; level (readability is too easy)
+ * If tooEasyTest == false, the rule tests if paragraph level &amp;lt; level (readability is too difficult)
+ * @author Fred Kruse
+ * @since 4.4
+ */
+public class ReadabilityRule extends TextLevelRule {
+
+  private static final int MARK_WORDS = 3;
+  private static final int MIN_WORDS = 10;
+
+  private final LinguServices linguServices;
+  private final Language lang;
+  private final int level;
+  private final boolean tooEasyTest;
+
+  public ReadabilityRule(ResourceBundle messages, Language lang, UserConfig userConfig, boolean tooEasyTest) {
+<span class="fc" id="L52">    this(messages, lang, userConfig, tooEasyTest, -1, false);</span>
+<span class="fc" id="L53">  }</span>
+  
+  public ReadabilityRule(ResourceBundle messages, Language lang, UserConfig userConfig, boolean tooEasyTest, int level) {
+<span class="nc" id="L56">    this(messages, lang, userConfig, tooEasyTest, level, false);</span>
+<span class="nc" id="L57">  }</span>
+  
+  public ReadabilityRule(ResourceBundle messages, Language lang, UserConfig userConfig, boolean tooEasyTest, boolean defaultOn) {
+<span class="nc" id="L60">    this(messages, lang, userConfig, tooEasyTest, -1, defaultOn);</span>
+<span class="nc" id="L61">  }</span>
+  
+  public ReadabilityRule(ResourceBundle messages, Language lang, UserConfig userConfig, 
+      boolean tooEasyTest, int level, boolean defaultOn) {
+<span class="fc" id="L65">    super(messages);</span>
+<span class="fc" id="L66">    super.setCategory(new Category(new CategoryId(&quot;TEXT_ANALYSIS&quot;), &quot;Text Analysis&quot;, Location.INTERNAL, false));</span>
+<span class="fc" id="L67">    setLocQualityIssueType(ITSIssueType.Style);</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">    if (!defaultOn) {</span>
+<span class="fc" id="L69">      setDefaultOff();</span>
+    }
+<span class="fc" id="L71">    this.lang = lang;</span>
+<span class="fc" id="L72">    this.tooEasyTest = tooEasyTest;</span>
+<span class="fc" id="L73">    int tmpLevel = -1;</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">    if (userConfig != null) {</span>
+<span class="fc" id="L75">      linguServices = userConfig.getLinguServices();</span>
+<span class="fc" id="L76">      tmpLevel = userConfig.getConfigValueByID(getId(tooEasyTest));</span>
+    } else {
+<span class="nc" id="L78">      linguServices = null;</span>
+    }
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">    if (tmpLevel &gt;= 0) {</span>
+<span class="nc" id="L81">      this.level = tmpLevel;</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">    } else if (level &gt;= 0) {</span>
+<span class="nc" id="L83">      this.level = level;</span>
+    } else {
+<span class="fc bfc" id="L85" title="All 2 branches covered.">      this.level = (tooEasyTest ? 4 : 2);</span>
+    }
+<span class="fc" id="L87">  }</span>
+  
+  @Override
+  public String getId() {
+<span class="fc" id="L91">    return getId(tooEasyTest);</span>
+  }
+
+  public String getId(boolean tooEasyTest) {
+<span class="fc bfc" id="L95" title="All 2 branches covered.">    if (tooEasyTest) {</span>
+<span class="fc" id="L96">      return &quot;READABILITY_RULE_SIMPLE&quot;;</span>
+    } else {
+<span class="fc" id="L98">      return &quot;READABILITY_RULE_DIFFICULT&quot;;</span>
+    }
+  }
+
+  @Override
+  public String getDescription() {
+<span class="nc bnc" id="L104" title="All 2 branches missed.">    if (tooEasyTest) {</span>
+<span class="nc" id="L105">      return &quot;Readability: Too easy text&quot;;</span>
+    } else {
+<span class="nc" id="L107">      return &quot;Readability: Too difficult text&quot;;</span>
+    }
+  }
+
+  @Override
+  public int getDefaultValue() {
+<span class="nc bnc" id="L113" title="All 2 branches missed.">    return (tooEasyTest ? 4 : 2);</span>
+  }
+  
+  @Override
+  public boolean hasConfigurableValue() {
+<span class="nc" id="L118">    return true;</span>
+  }
+
+  @Override
+  public int getMinConfigurableValue() {
+<span class="nc" id="L123">    return 0;</span>
+  }
+
+  @Override
+  public int getMaxConfigurableValue() {
+<span class="nc" id="L128">    return 6;</span>
+  }
+  
+  @Override
+  public String getConfigureText() {
+<span class="nc" id="L133">    return &quot;Level of readability 0 (very difficult) to 6 (very easy):&quot;;</span>
+  }
+  
+  private static String printMessageLevel(int level) {
+<span class="nc" id="L137">    String sLevel = null;</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">    if (level == 0) {</span>
+<span class="nc" id="L139">      sLevel = &quot;Very difficult&quot;;</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">    } else if (level == 1) {</span>
+<span class="nc" id="L141">      sLevel = &quot;Difficult&quot;;</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">    } else if (level == 2) {</span>
+<span class="nc" id="L143">      sLevel = &quot;Fairly difficult&quot;;</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">    } else if (level == 3) {</span>
+<span class="nc" id="L145">      sLevel = &quot;Medium&quot;;</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">    } else if (level == 4) {</span>
+<span class="nc" id="L147">      sLevel = &quot;Fairly easy&quot;;</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">    } else if (level == 5) {</span>
+<span class="nc" id="L149">      sLevel = &quot;Easy&quot;;</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">    } else if (level == 6) {</span>
+<span class="nc" id="L151">      sLevel = &quot;Very easy&quot;;</span>
+    }
+<span class="nc bnc" id="L153" title="All 2 branches missed.">    if (sLevel != null) {</span>
+<span class="nc" id="L154">      return &quot; {Level &quot; + level + &quot;: &quot; + sLevel + &quot;}&quot;;</span>
+    }
+<span class="nc" id="L156">    return &quot;&quot;;</span>
+  }
+  
+  protected String getMessage(int level, int FRE, int ASL, int ASW) {
+    String simple;
+    String few;
+<span class="nc bnc" id="L162" title="All 2 branches missed.">    if (tooEasyTest) {</span>
+<span class="nc" id="L163">      simple = &quot;simple&quot;;</span>
+<span class="nc" id="L164">      few = &quot;few&quot;;</span>
+    } else {
+<span class="nc" id="L166">      simple = &quot;difficult&quot;;</span>
+<span class="nc" id="L167">      few = &quot;many&quot;;</span>
+    }
+<span class="nc" id="L169">    return &quot;Readability: The text of this paragraph is too &quot; + simple + printMessageLevel(level) + &quot;. Too &quot;</span>
+        + few + &quot; words per sentence and too &quot; + few + &quot; syllables per word.&quot;;
+  }
+  
+  /**
+   * get level of readability (0 - 6)
+   */
+  private int getReadabilityLevel(double fre) {
+<span class="nc bnc" id="L177" title="All 2 branches missed.">    if (fre &lt; 30) {</span>
+<span class="nc" id="L178">      return 0;</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">    } else if (fre &lt; 50) {</span>
+<span class="nc" id="L180">      return 1;</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">    } else if (fre &lt; 60) {</span>
+<span class="nc" id="L182">      return 2;</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">    } else if (fre &lt; 70) {</span>
+<span class="nc" id="L184">      return 3;</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">    } else if (fre &lt; 80) {</span>
+<span class="nc" id="L186">      return 4;</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">    } else if (fre &lt; 90) {</span>
+<span class="nc" id="L188">      return 5;</span>
+    } else {
+<span class="nc" id="L190">      return 6;</span>
+    }
+  }
+
+  /**
+   * get Flesch-Reading-Ease (Formula for readability) for English
+   * the formula dependence on the language and has to be overridden for every supported language
+   */
+  protected double getFleschReadingEase(double asl, double asw) {
+<span class="nc" id="L199">    return 206.835 - ( 1.015 * asl ) - ( 84.6 * asw );</span>
+  }
+  
+  private static boolean isVowel(char c) {
+<span class="nc bnc" id="L203" title="All 24 branches missed.">    return (c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u' || c == 'y' ||</span>
+        c == 'A' || c == 'E' || c == 'I' || c == 'O' || c == 'U' || c == 'Y');
+  }
+  
+  /**
+   * A simple method to count the Syllables of a word
+   * TODO: further improvement of the method
+   * A hyphenation service should be used if available (e.g. from LO extension)
+   * Has to be overridden for every language
+   */
+  protected int simpleSyllablesCount(String word) {
+<span class="nc bnc" id="L214" title="All 2 branches missed.">    if (word.length() == 0) {</span>
+<span class="nc" id="L215">      return 0;</span>
+    }
+<span class="nc bnc" id="L217" title="All 2 branches missed.">    if (word.length() == 1) {</span>
+<span class="nc" id="L218">      return 1;</span>
+    }
+<span class="nc" id="L220">    int nSyllables = 0;</span>
+<span class="nc" id="L221">    boolean lastDouble = false;</span>
+<span class="nc bnc" id="L222" title="All 2 branches missed.">    for (int i = 0; i &lt; word.length() - 1; i++) {</span>
+<span class="nc" id="L223">      char c = word.charAt(i);</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">      if (isVowel(c)) {</span>
+<span class="nc" id="L225">        char cn = word.charAt(i + 1);</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">        if (lastDouble) {</span>
+<span class="nc" id="L227">          nSyllables++;</span>
+<span class="nc" id="L228">          lastDouble = false;</span>
+<span class="nc bnc" id="L229" title="All 52 branches missed.">        } else if (((c == 'e' || c == 'E') &amp;&amp; (cn == 'a' || cn == 'o' || cn == 'e' || cn == 'i' || cn == 'y')) ||</span>
+            ((c == 'a' || c == 'A') &amp;&amp; (cn == 'e' || cn == 'i' || cn == 'u')) ||
+            ((c == 'o' || c == 'O') &amp;&amp; (cn == 'o' || cn == 'i' || cn == 'u' || cn == 'a')) ||
+            ((c == 'u' || c == 'U') &amp;&amp; (cn == 'i' || cn == 'a')) ||
+            ((c == 'i' || c == 'I') &amp;&amp; (cn == 'e'|| cn == 'o'))) {
+<span class="nc" id="L234">          lastDouble = true;</span>
+        } else {
+<span class="nc" id="L236">          nSyllables++;</span>
+<span class="nc" id="L237">          lastDouble = false;</span>
+        }
+<span class="nc" id="L239">      } else {</span>
+<span class="nc" id="L240">        lastDouble = false;</span>
+      }
+    }
+<span class="nc" id="L243">    char c = word.charAt(word.length() - 1);</span>
+<span class="nc" id="L244">    char cl = word.charAt(word.length() - 2);</span>
+<span class="nc bnc" id="L245" title="All 10 branches missed.">    if (cl == 'e' &amp;&amp; (c == 's' || c == 'd') || cl == 'u' &amp;&amp; c == 'e') {</span>
+<span class="nc" id="L246">      nSyllables--;</span>
+<span class="nc bnc" id="L247" title="All 4 branches missed.">    } else if (isVowel(c) &amp;&amp; c != 'e') {</span>
+<span class="nc" id="L248">      nSyllables++;</span>
+    }
+<span class="nc bnc" id="L250" title="All 2 branches missed.">    return nSyllables &lt;= 0 ? 1 : nSyllables;</span>
+  }
+
+  @Override
+  public RuleMatch[] match(List&lt;AnalyzedSentence&gt; sentences) throws IOException {
+<span class="nc" id="L255">    List&lt;RuleMatch&gt; ruleMatches = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L256">    int nAllSentences = 0;</span>
+<span class="nc" id="L257">    int nAllWords = 0;</span>
+<span class="nc" id="L258">    int nAllSyllables = 0;</span>
+<span class="nc" id="L259">    int nSentences = 0;</span>
+<span class="nc" id="L260">    int nWords = 0;</span>
+<span class="nc" id="L261">    int nSyllables = 0;</span>
+<span class="nc" id="L262">    int pos = 0;</span>
+<span class="nc" id="L263">    int startPos = -1;</span>
+<span class="nc" id="L264">    int endPos = -1;</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">    for (int n = 0; n &lt; sentences.size(); n++) {</span>
+<span class="nc" id="L266">      AnalyzedSentence sentence = sentences.get(n);</span>
+<span class="nc" id="L267">      AnalyzedTokenReadings[] tokens = sentence.getTokensWithoutWhitespace();</span>
+<span class="nc bnc" id="L268" title="All 4 branches missed.">      if (startPos &lt; 0 &amp;&amp; tokens.length &gt; 1) {</span>
+<span class="nc" id="L269">        startPos = pos + tokens[1].getStartPos();</span>
+      }
+<span class="nc bnc" id="L271" title="All 4 branches missed.">      if (endPos &lt; 0 &amp;&amp; tokens.length &gt; MARK_WORDS) {</span>
+<span class="nc" id="L272">        endPos = pos + tokens[MARK_WORDS].getEndPos();</span>
+      }
+<span class="nc" id="L274">      nSentences++;</span>
+<span class="nc bnc" id="L275" title="All 2 branches missed.">      for (AnalyzedTokenReadings token : tokens) {</span>
+<span class="nc" id="L276">        String sToken = token.getToken();</span>
+<span class="nc bnc" id="L277" title="All 4 branches missed.">        if (!token.isWhitespace() &amp;&amp; !token.isNonWord()) {</span>
+<span class="nc" id="L278">          nWords++;</span>
+<span class="nc bnc" id="L279" title="All 2 branches missed.">          if (linguServices == null) {</span>
+<span class="nc" id="L280">            nSyllables += simpleSyllablesCount(sToken);</span>
+          } else {
+<span class="nc" id="L282">            nSyllables += linguServices.getNumberOfSyllables(sToken, lang.getDefaultLanguageVariant());</span>
+          }
+        }
+      }
+<span class="nc bnc" id="L286" title="All 2 branches missed.">      if (Tools.isParagraphEnd(sentences, n, lang)) {</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">        if (nWords &gt;= MIN_WORDS) {</span>
+          /* Equation for readability
+           * FRE = Flesch-Reading-Ease
+           * ASL = Average Sentence Length
+           * ASW = Average Number of Syllables per Word
+           * English: FRE = 206,835 - ( 1,015 * ASL ) - ( 84,6 * ASW )
+           * German: FRE = 180 - ASL - ( 58,5 * ASW )
+           */
+<span class="nc" id="L295">          double asl = (double) nWords / (double) nSentences;</span>
+<span class="nc" id="L296">          double asw = (double) nSyllables / (double) nWords;</span>
+<span class="nc" id="L297">          double fre = getFleschReadingEase(asl, asw);</span>
+<span class="nc" id="L298">          int rLevel = getReadabilityLevel(fre);</span>
+          
+<span class="nc bnc" id="L300" title="All 8 branches missed.">          if ((tooEasyTest &amp;&amp; rLevel &gt; level) || (!tooEasyTest &amp;&amp; rLevel &lt; level)) {</span>
+<span class="nc" id="L301">            String msg = getMessage(rLevel, (int) fre, (int) asl, (int) asw);</span>
+<span class="nc" id="L302">            RuleMatch ruleMatch = new RuleMatch(this, sentence, startPos, endPos, msg);</span>
+<span class="nc" id="L303">            ruleMatches.add(ruleMatch);</span>
+          }
+        }
+<span class="nc" id="L306">        nAllSentences += nSentences;</span>
+<span class="nc" id="L307">        nAllWords += nWords;</span>
+<span class="nc" id="L308">        nAllSyllables += nSyllables;</span>
+<span class="nc" id="L309">        nSentences = 0;</span>
+<span class="nc" id="L310">        nWords = 0;</span>
+<span class="nc" id="L311">        nSyllables = 0;</span>
+<span class="nc" id="L312">        startPos = -1;</span>
+<span class="nc" id="L313">        endPos = -1;</span>
+      }
+<span class="nc" id="L315">      pos += sentence.getCorrectedTextLength();</span>
+    }
+<span class="nc" id="L317">    double asl = (double) nAllWords / (double) nAllSentences;</span>
+<span class="nc" id="L318">    double asw = (double) nAllSyllables / (double) nAllWords;</span>
+<span class="nc" id="L319">    double fre = getFleschReadingEase(asl, asw);</span>
+<span class="nc" id="L320">    int rLevel = getReadabilityLevel(fre);</span>
+<span class="nc bnc" id="L321" title="All 8 branches missed.">    if ((tooEasyTest &amp;&amp; rLevel &gt; level) || (!tooEasyTest &amp;&amp; rLevel &lt; level)) {</span>
+<span class="nc" id="L322">      return toRuleMatchArray(ruleMatches);</span>
+    } else {
+<span class="nc" id="L324">      return toRuleMatchArray(new ArrayList&lt;&gt;());</span>
+    }
+  }
+
+  @Override
+  public int minToCheckParagraph() {
+<span class="nc" id="L330">    return 0;</span>
+  }
+ 
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,605 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MorfologikSpellerRule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules.spelling.morfologik</a> &gt; <span class="el_source">MorfologikSpellerRule.java</span></div><h1>MorfologikSpellerRule.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2012 Marcin Miłkowski (http://www.languagetool.org)
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+
+package org.languagetool.rules.spelling.morfologik;
+
+import static org.languagetool.JLanguageTool.getDataBroker;
+
+import java.io.IOException;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.ResourceBundle;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+import org.apache.commons.lang3.StringUtils;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.languagetool.AnalyzedSentence;
+import org.languagetool.AnalyzedTokenReadings;
+import org.languagetool.Experimental;
+import org.languagetool.GlobalConfig;
+import org.languagetool.Language;
+import org.languagetool.UserConfig;
+import org.languagetool.languagemodel.LanguageModel;
+import org.languagetool.rules.Categories;
+import org.languagetool.rules.ITSIssueType;
+import org.languagetool.rules.RuleMatch;
+import org.languagetool.rules.SuggestedReplacement;
+import org.languagetool.rules.spelling.SpellingCheckRule;
+import org.languagetool.rules.spelling.suggestions.SuggestionsChanges;
+import org.languagetool.rules.translation.TranslationEntry;
+import org.languagetool.rules.translation.Translator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public abstract class MorfologikSpellerRule extends SpellingCheckRule {
+
+<span class="nc" id="L60">  private static final Logger logger = LoggerFactory.getLogger(MorfologikSpellerRule.class);</span>
+
+  protected MorfologikMultiSpeller speller1;
+  protected MorfologikMultiSpeller speller2;
+  protected MorfologikMultiSpeller speller3;
+  protected Locale conversionLocale;
+  protected final Language motherTongue;
+  protected final GlobalConfig globalConfig;
+
+<span class="nc" id="L69">  private boolean ignoreTaggedWords = false;</span>
+<span class="nc" id="L70">  private boolean checkCompound = false;</span>
+<span class="nc" id="L71">  private Pattern compoundRegex = Pattern.compile(&quot;-&quot;);</span>
+  private final UserConfig userConfig;
+ 
+  //do not use very frequent words in split word suggestions ex. to *thow ≠ tot how 
+  static final int MAX_FREQUENCY_FOR_SPLITTING = 21; //0..21
+
+  /**
+   * Get the filename, e.g., &lt;tt&gt;/resource/pl/spelling.dict&lt;/tt&gt;.
+   */
+  public abstract String getFileName();
+
+  @Override
+  public abstract String getId();
+
+  public MorfologikSpellerRule(ResourceBundle messages, Language language) throws IOException {
+<span class="nc" id="L86">    this(messages, language, null);</span>
+<span class="nc" id="L87">  }</span>
+  
+  public MorfologikSpellerRule(ResourceBundle messages, Language language, UserConfig userConfig) throws IOException {
+<span class="nc" id="L90">    this(messages, language, userConfig, Collections.emptyList());</span>
+<span class="nc" id="L91">  }</span>
+
+  public MorfologikSpellerRule(ResourceBundle messages, Language language, UserConfig userConfig, List&lt;Language&gt; altLanguages) throws IOException {
+<span class="nc" id="L94">    this(messages, language, null, userConfig, altLanguages, null, null);</span>
+<span class="nc" id="L95">  }</span>
+
+  public MorfologikSpellerRule(ResourceBundle messages, Language language, GlobalConfig globalConfig, UserConfig userConfig,
+                               List&lt;Language&gt; altLanguages, LanguageModel languageModel, Language motherTongue) throws IOException {
+<span class="nc" id="L99">    super(messages, language, userConfig, altLanguages, languageModel);</span>
+<span class="nc" id="L100">    this.globalConfig = globalConfig;</span>
+<span class="nc" id="L101">    this.userConfig = userConfig;</span>
+<span class="nc" id="L102">    this.motherTongue = motherTongue;</span>
+<span class="nc" id="L103">    super.setCategory(Categories.TYPOS.getCategory(messages));</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">    this.conversionLocale = conversionLocale != null ? conversionLocale : Locale.getDefault();</span>
+<span class="nc" id="L105">    init();</span>
+<span class="nc" id="L106">    setLocQualityIssueType(ITSIssueType.Misspelling);</span>
+<span class="nc" id="L107">  }</span>
+
+  @Override
+  public String getDescription() {
+<span class="nc" id="L111">    return messages.getString(&quot;desc_spelling&quot;);</span>
+  }
+
+  public void setLocale(Locale locale) {
+<span class="nc" id="L115">    conversionLocale = locale;</span>
+<span class="nc" id="L116">  }</span>
+
+  /**
+   * Skip words that are known in the POS tagging dictionary, assuming they
+   * cannot be incorrect.
+   */
+  public void setIgnoreTaggedWords() {
+<span class="nc" id="L123">    ignoreTaggedWords = true;</span>
+<span class="nc" id="L124">  }</span>
+
+  @Override
+  public RuleMatch[] match(AnalyzedSentence sentence) throws IOException {
+<span class="nc" id="L128">    List&lt;RuleMatch&gt; ruleMatches = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L129">    AnalyzedTokenReadings[] tokens = getSentenceWithImmunization(sentence).getTokensWithoutWhitespace();</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">    if (initSpellers()) return toRuleMatchArray(ruleMatches);</span>
+<span class="nc" id="L131">    int idx = -1;</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">    for (AnalyzedTokenReadings token : tokens) {</span>
+<span class="nc" id="L133">      idx++;</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">      if (canBeIgnored(tokens, idx, token)) {</span>
+<span class="nc" id="L135">        continue;</span>
+      }
+<span class="nc" id="L137">      int startPos = token.getStartPos();</span>
+      // if we use token.getToken() we'll get ignored characters inside and speller will choke
+<span class="nc" id="L139">      String word = token.getAnalyzedToken(0).getToken();</span>
+<span class="nc" id="L140">      int newRuleIdx = ruleMatches.size();</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">      if (tokenizingPattern() == null) {</span>
+<span class="nc" id="L142">        ruleMatches.addAll(getRuleMatches(word, startPos, sentence, ruleMatches, idx, tokens));</span>
+      } else {
+<span class="nc" id="L144">        int index = 0;</span>
+<span class="nc" id="L145">        Matcher m = tokenizingPattern().matcher(word);</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        while (m.find()) {</span>
+<span class="nc" id="L147">          String match = word.subSequence(index, m.start()).toString();</span>
+<span class="nc" id="L148">          ruleMatches.addAll(getRuleMatches(match, startPos + index, sentence, ruleMatches, idx, tokens));</span>
+<span class="nc" id="L149">          index = m.end();</span>
+<span class="nc" id="L150">        }</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (index == 0) { // tokenizing char not found</span>
+<span class="nc" id="L152">          ruleMatches.addAll(getRuleMatches(word, startPos, sentence, ruleMatches, idx, tokens));</span>
+        } else {
+<span class="nc" id="L154">          ruleMatches.addAll(getRuleMatches(word.subSequence(index, word.length()).toString(), startPos + index, sentence, ruleMatches, idx, tokens));</span>
+        }
+      }
+
+<span class="nc bnc" id="L158" title="All 2 branches missed.">      if (ruleMatches.size() &gt; newRuleIdx) {</span>
+        // matches added for current token - need to adjust for hidden characters
+<span class="nc" id="L160">        int hiddenCharOffset = token.getToken().length() - word.length();</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">        if (hiddenCharOffset &gt; 0) {</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">          for (int i = newRuleIdx; i &lt; ruleMatches.size(); i++) {</span>
+<span class="nc" id="L163">            RuleMatch ruleMatch = ruleMatches.get(i);</span>
+
+<span class="nc bnc" id="L165" title="All 2 branches missed.">            if( token.getEndPos() &lt; ruleMatch.getToPos() ) // done by multi-token speller, no need to adjust</span>
+<span class="nc" id="L166">              continue;</span>
+
+<span class="nc" id="L168">            ruleMatch.setOffsetPosition(ruleMatch.getFromPos(), ruleMatch.getToPos()+hiddenCharOffset);</span>
+          }
+        }
+      }
+
+    }
+
+<span class="nc" id="L175">    return toRuleMatchArray(ruleMatches);</span>
+  }
+
+  @Nullable
+  protected Translator getTranslator(GlobalConfig globalConfig) throws IOException {
+<span class="nc" id="L180">    return null;</span>
+  }
+
+  private boolean initSpellers() throws IOException {
+<span class="nc bnc" id="L184" title="All 2 branches missed.">    if (speller1 == null) {</span>
+<span class="nc" id="L185">      String binaryDict = null;</span>
+<span class="nc bnc" id="L186" title="All 4 branches missed.">      if (getDataBroker().resourceExists(getFileName()) || Paths.get(getFileName()).toFile().exists()) {</span>
+<span class="nc" id="L187">        binaryDict = getFileName();</span>
+      }
+<span class="nc bnc" id="L189" title="All 2 branches missed.">      if (binaryDict != null) {</span>
+<span class="nc" id="L190">        initSpeller(binaryDict);</span>
+      } else {
+        // should not happen, as we only configure this rule (or rather its subclasses)
+        // when we have the resources:
+<span class="nc" id="L194">        return true;</span>
+      }
+    }
+<span class="nc" id="L197">    return false;</span>
+  }
+
+  private void initSpeller(String binaryDict) throws IOException {
+<span class="nc" id="L201">    List&lt;String&gt; plainTextDicts = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L202">    String languageVariantPlainTextDict = null;</span>
+<span class="nc bnc" id="L203" title="All 4 branches missed.">    if (getSpellingFileName() != null &amp;&amp; getDataBroker().resourceExists(getSpellingFileName())) {</span>
+<span class="nc" id="L204">      plainTextDicts.add(getSpellingFileName());</span>
+    }
+<span class="nc bnc" id="L206" title="All 2 branches missed.">    for (String fileName : getAdditionalSpellingFileNames()) {</span>
+<span class="nc bnc" id="L207" title="All 2 branches missed.">      if (getDataBroker().resourceExists(fileName)) {</span>
+<span class="nc" id="L208">        plainTextDicts.add(fileName);</span>
+      }
+<span class="nc" id="L210">    }</span>
+<span class="nc bnc" id="L211" title="All 4 branches missed.">    if (getLanguageVariantSpellingFileName() != null &amp;&amp; getDataBroker().resourceExists(getLanguageVariantSpellingFileName())) {</span>
+<span class="nc" id="L212">      languageVariantPlainTextDict = getLanguageVariantSpellingFileName();</span>
+    }
+<span class="nc" id="L214">    speller1 = new MorfologikMultiSpeller(binaryDict, plainTextDicts, languageVariantPlainTextDict, userConfig, 1);</span>
+<span class="nc" id="L215">    speller2 = new MorfologikMultiSpeller(binaryDict, plainTextDicts, languageVariantPlainTextDict, userConfig, 2);</span>
+<span class="nc" id="L216">    speller3 = new MorfologikMultiSpeller(binaryDict, plainTextDicts, languageVariantPlainTextDict, userConfig, 3);</span>
+<span class="nc" id="L217">    setConvertsCase(speller1.convertsCase());</span>
+<span class="nc" id="L218">  }</span>
+
+  private boolean canBeIgnored(AnalyzedTokenReadings[] tokens, int idx, AnalyzedTokenReadings token) throws IOException {
+<span class="nc bnc" id="L221" title="All 2 branches missed.">    return token.isSentenceStart() ||</span>
+<span class="nc bnc" id="L222" title="All 2 branches missed.">           token.isImmunized() ||</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">           token.isIgnoredBySpeller() ||</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">           isUrl(token.getToken()) ||</span>
+<span class="nc bnc" id="L225" title="All 4 branches missed.">           isEMail(token.getToken()) ||</span>
+<span class="nc bnc" id="L226" title="All 4 branches missed.">           (ignoreTaggedWords &amp;&amp; token.isTagged() &amp;&amp; !isProhibited(token.getToken())) ||</span>
+<span class="nc bnc" id="L227" title="All 2 branches missed.">           ignoreToken(tokens, idx);</span>
+  }
+
+
+  /**
+   * @since 4.8
+   */
+  @Experimental
+  @Override
+  public boolean isMisspelled(String word) throws IOException {
+<span class="nc" id="L237">    initSpellers();</span>
+<span class="nc" id="L238">    return isMisspelled(speller1, word);</span>
+  }
+  
+  /**
+   * @return true if the word is misspelled
+   * @since 2.4
+   */
+  protected boolean isMisspelled(MorfologikMultiSpeller speller, String word) {
+<span class="nc bnc" id="L246" title="All 2 branches missed.">    if (!speller.isMisspelled(word)) {</span>
+<span class="nc" id="L247">      return false;</span>
+    }
+
+<span class="nc bnc" id="L250" title="All 4 branches missed.">    if (checkCompound &amp;&amp; compoundRegex.matcher(word).find()) {</span>
+<span class="nc" id="L251">      String[] words = compoundRegex.split(word);</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">      for (String singleWord: words) {</span>
+<span class="nc bnc" id="L253" title="All 2 branches missed.">        if (speller.isMisspelled(singleWord)) {</span>
+<span class="nc" id="L254">          return true;</span>
+        }
+      }
+<span class="nc" id="L257">      return false;</span>
+    }
+
+<span class="nc" id="L260">    return true;</span>
+  }
+  
+  protected int getFrequency(MorfologikMultiSpeller speller, String word) {
+<span class="nc" id="L264">    return speller.getFrequency(word);</span>
+  }
+
+  protected List&lt;RuleMatch&gt; getRuleMatches(String word, int startPos, AnalyzedSentence sentence, List&lt;RuleMatch&gt; ruleMatchesSoFar, int idx, AnalyzedTokenReadings[] tokens) throws IOException {
+    // We create only one rule match. 
+    // Several rule matches on the same word or words can not be shown to the user.
+<span class="nc" id="L270">    List&lt;RuleMatch&gt; ruleMatches = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L271">    RuleMatch ruleMatch = null;</span>
+    
+<span class="nc bnc" id="L273" title="All 4 branches missed.">    if (!isMisspelled(speller1, word) &amp;&amp; !isProhibited(word)) {</span>
+<span class="nc" id="L274">      return ruleMatches;</span>
+    }
+    
+    //the current word is already dealt with in the previous match, so do nothing
+<span class="nc bnc" id="L278" title="All 4 branches missed.">    if (ruleMatchesSoFar.size() &gt; 0 &amp;&amp; ruleMatchesSoFar.get(ruleMatchesSoFar.size() - 1).getToPos() &gt; startPos) {</span>
+<span class="nc" id="L279">      return ruleMatches;</span>
+    }
+    
+<span class="nc" id="L282">    String beforeSuggestionStr = &quot;&quot;; //to be added before the suggestion if there is a suggestion for a split word</span>
+<span class="nc" id="L283">    String afterSuggestionStr = &quot;&quot;;  //to be added after</span>
+    
+    // Check for split word with previous word
+<span class="nc bnc" id="L286" title="All 4 branches missed.">    if (idx &gt; 0 &amp;&amp; tokens[idx].isWhitespaceBefore()) {</span>
+<span class="nc" id="L287">      String prevWord = tokens[idx - 1].getToken();</span>
+<span class="nc bnc" id="L288" title="All 4 branches missed.">      if (prevWord.length() &gt; 0 &amp;&amp; !prevWord.matches(&quot;.*\\d.*&quot;)</span>
+<span class="nc bnc" id="L289" title="All 2 branches missed.">          &amp;&amp; getFrequency(speller1, prevWord) &lt; MAX_FREQUENCY_FOR_SPLITTING) {</span>
+<span class="nc" id="L290">        int prevStartPos = tokens[idx - 1].getStartPos();</span>
+        // &quot;thanky ou&quot; -&gt; &quot;thank you&quot;
+<span class="nc" id="L292">        String sugg1a = prevWord.substring(0, prevWord.length() - 1);</span>
+<span class="nc" id="L293">        String sugg1b = prevWord.substring(prevWord.length() - 1) + word;</span>
+<span class="nc bnc" id="L294" title="All 6 branches missed.">        if (sugg1a.length() &gt; 1 &amp;&amp; sugg1b.length() &gt; 2 &amp;&amp; !isMisspelled(speller1, sugg1a)</span>
+<span class="nc bnc" id="L295" title="All 2 branches missed.">            &amp;&amp; !isMisspelled(speller1, sugg1b)</span>
+<span class="nc bnc" id="L296" title="All 2 branches missed.">            &amp;&amp; getFrequency(speller1, sugg1a) + getFrequency(speller1, sugg1b) &gt; getFrequency(speller1, prevWord)) {</span>
+<span class="nc" id="L297">          ruleMatch = createWrongSplitMatch(sentence, ruleMatchesSoFar, startPos, word, sugg1a, sugg1b, prevStartPos);</span>
+<span class="nc" id="L298">          beforeSuggestionStr = prevWord + &quot; &quot;;</span>
+        }
+        // &quot;than kyou&quot; -&gt; &quot;thank you&quot; ; but not &quot;She awaked&quot; -&gt; &quot;Shea waked&quot;
+<span class="nc" id="L301">        String sugg2a = prevWord + word.substring(0, 1);</span>
+<span class="nc" id="L302">        String sugg2b = word.substring(1);</span>
+<span class="nc bnc" id="L303" title="All 6 branches missed.">        if (sugg2a.length() &gt; 1 &amp;&amp; sugg2b.length() &gt; 2 &amp;&amp; !isMisspelled(speller1, sugg2a)</span>
+<span class="nc bnc" id="L304" title="All 2 branches missed.">            &amp;&amp; !isMisspelled(speller1, sugg2b)) {</span>
+<span class="nc bnc" id="L305" title="All 2 branches missed.">          if (ruleMatch == null) {</span>
+<span class="nc bnc" id="L306" title="All 2 branches missed.">            if (getFrequency(speller1, sugg2a) + getFrequency(speller1, sugg2b) &gt; getFrequency(speller1, prevWord)) {</span>
+<span class="nc" id="L307">              ruleMatch = createWrongSplitMatch(sentence, ruleMatchesSoFar, startPos, word, sugg2a, sugg2b,</span>
+                  prevStartPos);
+<span class="nc" id="L309">              beforeSuggestionStr = prevWord + &quot; &quot;;</span>
+            }
+          } else {
+<span class="nc" id="L312">            ruleMatch.addSuggestedReplacement((sugg2a + &quot; &quot; + sugg2b).trim());</span>
+          }
+        }
+        // &quot;g oing-&gt; &quot;going&quot;
+<span class="nc" id="L316">        String sugg = prevWord + word;</span>
+<span class="nc bnc" id="L317" title="All 4 branches missed.">        if (word.equals(word.toLowerCase()) &amp;&amp; !isMisspelled(speller1, sugg)) {</span>
+<span class="nc bnc" id="L318" title="All 2 branches missed.">          if (ruleMatch == null) {</span>
+<span class="nc bnc" id="L319" title="All 2 branches missed.">            if (getFrequency(speller1, sugg) &gt;= getFrequency(speller1, prevWord)) {</span>
+<span class="nc" id="L320">              ruleMatch = new RuleMatch(this, sentence, prevStartPos, startPos + word.length(),</span>
+<span class="nc" id="L321">                  messages.getString(&quot;spelling&quot;), messages.getString(&quot;desc_spelling_short&quot;));</span>
+<span class="nc" id="L322">              beforeSuggestionStr = prevWord + &quot; &quot;;</span>
+<span class="nc" id="L323">              ruleMatch.setSuggestedReplacement(sugg);</span>
+            }
+          } else {
+<span class="nc" id="L326">            ruleMatch.addSuggestedReplacement(sugg);</span>
+          }
+        }
+<span class="nc bnc" id="L329" title="All 4 branches missed.">        if (ruleMatch != null &amp;&amp; isMisspelled(speller1, prevWord)) {</span>
+<span class="nc" id="L330">          ruleMatches.add(ruleMatch);</span>
+<span class="nc" id="L331">          return ruleMatches;</span>
+        }
+      }
+    }
+        
+    // Check for split word with next word
+<span class="nc bnc" id="L337" title="All 6 branches missed.">    if (ruleMatch == null &amp;&amp; idx &lt; tokens.length - 1 &amp;&amp; tokens[idx + 1].isWhitespaceBefore()) {</span>
+<span class="nc" id="L338">      String nextWord = tokens[idx + 1].getToken();</span>
+<span class="nc bnc" id="L339" title="All 4 branches missed.">      if (nextWord.length() &gt; 0 &amp;&amp; !StringUtils.containsAny(nextWord, &quot;0&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;, &quot;6&quot;, &quot;7&quot;, &quot;8&quot;, &quot;9&quot;)</span>
+<span class="nc bnc" id="L340" title="All 2 branches missed.">          &amp;&amp; getFrequency(speller1, nextWord) &lt; MAX_FREQUENCY_FOR_SPLITTING) {</span>
+<span class="nc" id="L341">        int nextStartPos = tokens[idx + 1].getStartPos();</span>
+<span class="nc" id="L342">        String sugg1a = word.substring(0, word.length() - 1);</span>
+<span class="nc" id="L343">        String sugg1b = word.substring(word.length() - 1) + nextWord;</span>
+<span class="nc bnc" id="L344" title="All 8 branches missed.">        if (sugg1a.length() &gt; 1 &amp;&amp; sugg1b.length() &gt; 2 &amp;&amp; !isMisspelled(speller1, sugg1a) &amp;&amp; !isMisspelled(speller1, sugg1b) &amp;&amp;</span>
+<span class="nc bnc" id="L345" title="All 2 branches missed.">            getFrequency(speller1, sugg1a) + getFrequency(speller1, sugg1b) &gt; getFrequency(speller1, nextWord)) {</span>
+<span class="nc" id="L346">          ruleMatch = createWrongSplitMatch(sentence, ruleMatchesSoFar, nextStartPos, nextWord, sugg1a, sugg1b, startPos);</span>
+<span class="nc" id="L347">          afterSuggestionStr = &quot; &quot; + nextWord;</span>
+        }
+<span class="nc" id="L349">        String sugg2a = word + nextWord.substring(0, 1);</span>
+<span class="nc" id="L350">        String sugg2b = nextWord.substring(1);</span>
+<span class="nc bnc" id="L351" title="All 8 branches missed.">        if (sugg2a.length() &gt; 1 &amp;&amp; sugg2b.length() &gt; 2 &amp;&amp; !isMisspelled(speller1, sugg2a) &amp;&amp; !isMisspelled(speller1, sugg2b)) {</span>
+<span class="nc bnc" id="L352" title="All 2 branches missed.">          if (ruleMatch == null) {</span>
+<span class="nc bnc" id="L353" title="All 2 branches missed.">            if (getFrequency(speller1, sugg2a) + getFrequency(speller1, sugg2b) &gt; getFrequency(speller1, nextWord)) {</span>
+<span class="nc" id="L354">              ruleMatch = createWrongSplitMatch(sentence, ruleMatchesSoFar, nextStartPos, nextWord, sugg2a, sugg2b, startPos);</span>
+<span class="nc" id="L355">              afterSuggestionStr = &quot; &quot; + nextWord;</span>
+            }
+          } else {
+<span class="nc" id="L358">            ruleMatch.addSuggestedReplacement((sugg2a + &quot; &quot; + sugg2b).trim());</span>
+          }
+        }
+<span class="nc" id="L361">        String sugg = word + nextWord;</span>
+<span class="nc bnc" id="L362" title="All 4 branches missed.">        if (nextWord.equals(nextWord.toLowerCase()) &amp;&amp; !isMisspelled(speller1, sugg)) {</span>
+<span class="nc bnc" id="L363" title="All 2 branches missed.">          if (ruleMatch == null) {</span>
+<span class="nc bnc" id="L364" title="All 2 branches missed.">            if (getFrequency(speller1, sugg) &gt;= getFrequency(speller1, nextWord)) {</span>
+<span class="nc" id="L365">              ruleMatch = new RuleMatch(this, sentence, startPos, nextStartPos + nextWord.length(),</span>
+<span class="nc" id="L366">                  messages.getString(&quot;spelling&quot;), messages.getString(&quot;desc_spelling_short&quot;));</span>
+<span class="nc" id="L367">              afterSuggestionStr = &quot; &quot; + nextWord;</span>
+<span class="nc" id="L368">              ruleMatch.setSuggestedReplacement(sugg);</span>
+            }
+          } else {
+<span class="nc" id="L371">            ruleMatch.addSuggestedReplacement(sugg);</span>
+          }
+        }
+<span class="nc bnc" id="L374" title="All 4 branches missed.">        if (ruleMatch != null &amp;&amp; isMisspelled(speller1, nextWord)) {</span>
+<span class="nc" id="L375">          ruleMatches.add(ruleMatch);</span>
+<span class="nc" id="L376">          return ruleMatches;</span>
+        }
+      }
+    }
+ 
+<span class="nc" id="L381">    int translationSuggestionCount = 0;</span>
+<span class="nc" id="L382">    boolean preventFurtherSuggestions = false;</span>
+<span class="nc" id="L383">    Translator translator = getTranslator(globalConfig);</span>
+<span class="nc bnc" id="L384" title="All 6 branches missed.">    if (translator != null &amp;&amp; ruleMatch == null &amp;&amp; motherTongue != null &amp;&amp;</span>
+<span class="nc bnc" id="L385" title="All 4 branches missed.">        language.getShortCode().equals(&quot;en&quot;) &amp;&amp; motherTongue.getShortCode().equals(&quot;de&quot;)) {</span>
+<span class="nc" id="L386">      List&lt;PhraseToTranslate&gt; phrasesToTranslate = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L387" title="All 2 branches missed.">      if (idx + 1 &lt; tokens.length) {</span>
+<span class="nc" id="L388">        String nextWord = tokens[idx + 1].getToken();</span>
+<span class="nc bnc" id="L389" title="All 2 branches missed.">        if (isMisspelled(nextWord)) {</span>
+<span class="nc" id="L390">          phrasesToTranslate.add(new PhraseToTranslate(word + &quot; &quot; + nextWord, tokens[idx + 1].getEndPos()));</span>
+        }
+      }
+<span class="nc" id="L393">      phrasesToTranslate.add(new PhraseToTranslate(word, startPos + word.length()));</span>
+<span class="nc bnc" id="L394" title="All 2 branches missed.">      for (PhraseToTranslate phraseToTranslate : phrasesToTranslate) {</span>
+<span class="nc" id="L395">        List&lt;TranslationEntry&gt; translations = translator.translate(phraseToTranslate.phrase, motherTongue.getShortCode(), language.getShortCode());</span>
+<span class="nc bnc" id="L396" title="All 2 branches missed.">        if (!translations.isEmpty()) {</span>
+<span class="nc" id="L397">          logger.info(&quot;Translated: {}&quot;, word);   // privacy: logging a single word without IP address etc. is okay</span>
+<span class="nc" id="L398">          ruleMatch = new RuleMatch(this, sentence, startPos, phraseToTranslate.endPos, translator.getMessage());</span>
+<span class="nc" id="L399">          ruleMatch.setType(RuleMatch.Type.Hint);</span>
+<span class="nc" id="L400">          ruleMatch.setSuggestedReplacements(new ArrayList&lt;&gt;());</span>
+<span class="nc" id="L401">          List&lt;SuggestedReplacement&gt; l = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L402" title="All 2 branches missed.">          String prevWord = idx &gt; 0 ? tokens[idx-1].getToken() : null;</span>
+<span class="nc bnc" id="L403" title="All 2 branches missed.">          for (TranslationEntry translation : translations) {</span>
+<span class="nc bnc" id="L404" title="All 2 branches missed.">            for (String s : translation.getL2()) {</span>
+<span class="nc" id="L405">              String suffix = translator.getTranslationSuffix(s);</span>
+<span class="nc bnc" id="L406" title="All 2 branches missed.">              SuggestedReplacement repl = new SuggestedReplacement(translator.cleanTranslationForReplace(s, prevWord), String.join(&quot;, &quot;, translation.getL1()), suffix.isEmpty() ? null : suffix);</span>
+<span class="nc" id="L407">              repl.setType(SuggestedReplacement.SuggestionType.Translation);</span>
+<span class="nc bnc" id="L408" title="All 2 branches missed.">              if (!repl.getReplacement().equals(word)) {</span>
+<span class="nc" id="L409">                l.add(repl);</span>
+              }
+<span class="nc" id="L411">            }</span>
+<span class="nc" id="L412">          }</span>
+<span class="nc" id="L413">          List&lt;SuggestedReplacement&gt; mergedRepl = mergeSuggestionsWithSameTranslation(l);</span>
+<span class="nc bnc" id="L414" title="All 2 branches missed.">          if (!mergedRepl.isEmpty()) {</span>
+<span class="nc" id="L415">            ruleMatch.setSuggestedReplacementObjects(mergedRepl);</span>
+<span class="nc" id="L416">            translationSuggestionCount = mergedRepl.size();</span>
+<span class="nc bnc" id="L417" title="All 2 branches missed.">            if (phraseToTranslate.phrase.contains(&quot; &quot;)) {</span>
+<span class="nc" id="L418">              preventFurtherSuggestions = true;  // mark gets extended, so suggestions for the original marker won't make sense</span>
+            }
+            break;  // let's assume the first phrase is the best because it's longer
+          }
+        }
+<span class="nc" id="L423">      }</span>
+    }
+
+<span class="nc bnc" id="L426" title="All 2 branches missed.">    if (ruleMatch == null) {</span>
+<span class="nc" id="L427">      ruleMatch = new RuleMatch(this, sentence, startPos, startPos + word.length(), messages.getString(&quot;spelling&quot;),</span>
+<span class="nc" id="L428">              messages.getString(&quot;desc_spelling_short&quot;));</span>
+    }
+<span class="nc bnc" id="L430" title="All 2 branches missed.">    boolean fullResults = SuggestionsChanges.getInstance() != null &amp;&amp;</span>
+<span class="nc bnc" id="L431" title="All 2 branches missed.">      SuggestionsChanges.getInstance().getCurrentExperiment() != null &amp;&amp;</span>
+<span class="nc bnc" id="L432" title="All 2 branches missed.">      (boolean) SuggestionsChanges.getInstance().getCurrentExperiment()</span>
+<span class="nc" id="L433">        .parameters.getOrDefault(&quot;fullSuggestionCandidates&quot;, Boolean.FALSE);</span>
+
+<span class="nc bnc" id="L435" title="All 4 branches missed.">    if (userConfig == null || userConfig.getMaxSpellingSuggestions() == 0 </span>
+<span class="nc bnc" id="L436" title="All 2 branches missed.">        || ruleMatchesSoFar.size() &lt;= userConfig.getMaxSpellingSuggestions()) {</span>
+<span class="nc" id="L437">      List&lt;SuggestedReplacement&gt; defaultSuggestions = SuggestedReplacement.convert(speller1.getSuggestionsFromDefaultDicts(word));</span>
+<span class="nc" id="L438">      List&lt;SuggestedReplacement&gt; userSuggestions = SuggestedReplacement.convert(speller1.getSuggestionsFromUserDicts(word));</span>
+      //System.out.println(&quot;speller1: &quot; + suggestions);
+<span class="nc" id="L440">      boolean onlyCaseDiffers = false;</span>
+<span class="nc bnc" id="L441" title="All 4 branches missed.">      if (defaultSuggestions.size() &gt; 0 &amp;&amp; word.equalsIgnoreCase(defaultSuggestions.get(0).getReplacement())) {</span>
+        // We have no good concept yet for showing both translations and standard suggestions, so
+        // use a hack to fix e.g. &quot;muslims&quot; not suggesting &quot;Muslims&quot; (https://github.com/languagetool-org/languagetool/issues/3333)
+<span class="nc" id="L444">        onlyCaseDiffers = true;</span>
+      }
+<span class="nc bnc" id="L446" title="All 8 branches missed.">      if (word.length() &gt;= 3 &amp;&amp; (onlyCaseDiffers || fullResults || defaultSuggestions.isEmpty())) {</span>
+        // speller1 uses a maximum edit distance of 1, it won't find suggestion for &quot;garentee&quot;, &quot;greatful&quot; etc.
+        //System.out.println(&quot;speller2: &quot; + speller2.getSuggestions(word));
+<span class="nc" id="L449">        defaultSuggestions.addAll(SuggestedReplacement.convert(speller2.getSuggestionsFromDefaultDicts(word)));</span>
+<span class="nc" id="L450">        userSuggestions.addAll(SuggestedReplacement.convert(speller2.getSuggestionsFromUserDicts(word)));</span>
+<span class="nc bnc" id="L451" title="All 6 branches missed.">        if (word.length() &gt;= 5 &amp;&amp; (fullResults || defaultSuggestions.isEmpty())) {</span>
+          //System.out.println(&quot;speller3: &quot; + speller3.getSuggestions(word));
+<span class="nc" id="L453">          defaultSuggestions.addAll(SuggestedReplacement.convert(speller3.getSuggestionsFromDefaultDicts(word)));</span>
+<span class="nc" id="L454">          userSuggestions.addAll(SuggestedReplacement.convert(speller3.getSuggestionsFromUserDicts(word)));</span>
+        }
+      }
+      //System.out.println(&quot;getAdditionalTopSuggestions(suggestions, word): &quot; + getAdditionalTopSuggestions(suggestions, word));
+<span class="nc" id="L458">      List&lt;SuggestedReplacement&gt; topSuggestions = getAdditionalTopSuggestions(defaultSuggestions, word);</span>
+<span class="nc" id="L459">      topSuggestions.forEach(s -&gt; s.setType(SuggestedReplacement.SuggestionType.Curated));</span>
+<span class="nc" id="L460">      defaultSuggestions.addAll(0, topSuggestions);</span>
+      //System.out.println(&quot;getAdditionalSuggestions(suggestions, word): &quot; + getAdditionalSuggestions(suggestions, word));
+<span class="nc" id="L462">      defaultSuggestions.addAll(getAdditionalSuggestions(defaultSuggestions, word));</span>
+
+<span class="nc bnc" id="L464" title="All 6 branches missed.">      if (!(defaultSuggestions.isEmpty() &amp;&amp; userSuggestions.isEmpty()) &amp;&amp; !preventFurtherSuggestions) {</span>
+<span class="nc" id="L465">        defaultSuggestions = filterSuggestions(defaultSuggestions, sentence, idx);</span>
+<span class="nc" id="L466">        userSuggestions = filterDupes(userSuggestions);</span>
+<span class="nc" id="L467">        defaultSuggestions = orderSuggestions(defaultSuggestions, word);</span>
+        
+<span class="nc" id="L469">        defaultSuggestions = joinBeforeAfterSuggestions(defaultSuggestions, beforeSuggestionStr, afterSuggestionStr);</span>
+<span class="nc" id="L470">        userSuggestions = joinBeforeAfterSuggestions(userSuggestions, beforeSuggestionStr, afterSuggestionStr);</span>
+        // use suggestionsOrderer only w/ A/B - Testing or manually enabled experiments
+<span class="nc" id="L472">        addSuggestionsToRuleMatch(word, userSuggestions, defaultSuggestions, null, ruleMatch);</span>
+<span class="nc bnc" id="L473" title="All 4 branches missed.">        if (translationSuggestionCount &gt; 0 &amp;&amp; ruleMatch.getSuggestedReplacements().size() &gt; translationSuggestionCount) {</span>
+<span class="nc" id="L474">          RuleMatch newRuleMatch = new RuleMatch(ruleMatch.getRule(), ruleMatch.getSentence(), ruleMatch.getFromPos(), ruleMatch.getToPos(),</span>
+<span class="nc" id="L475">            messages.getString(&quot;spelling&quot;) + &quot; Translations to English are also offered.&quot;);</span>
+<span class="nc" id="L476">          newRuleMatch.setSuggestedReplacementObjects(ruleMatch.getSuggestedReplacementObjects());</span>
+<span class="nc" id="L477">          ruleMatch = newRuleMatch;</span>
+        }
+      }
+<span class="nc" id="L480">    } else {</span>
+      // limited to save CPU
+<span class="nc" id="L482">      ruleMatch.setSuggestedReplacement(messages.getString(&quot;too_many_errors&quot;));</span>
+    }
+ 
+<span class="nc" id="L485">    ruleMatches.add(ruleMatch);</span>
+<span class="nc" id="L486">    return ruleMatches;</span>
+  }
+
+  @NotNull
+  private List&lt;SuggestedReplacement&gt; mergeSuggestionsWithSameTranslation(List&lt;SuggestedReplacement&gt; l) {
+<span class="nc" id="L491">    List&lt;SuggestedReplacement&gt; mergedRepl = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L492">    Set&lt;String&gt; handledReplacements = new HashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L493" title="All 2 branches missed.">    for (SuggestedReplacement repl : l) {</span>
+<span class="nc" id="L494">      List&lt;SuggestedReplacement&gt; sameRepl = l.stream()</span>
+<span class="nc" id="L495">        .filter(k -&gt; k.getReplacement().equals(repl.getReplacement()))</span>
+<span class="nc bnc" id="L496" title="All 6 branches missed.">        .filter(k -&gt; k.getSuffix() == null || (k.getSuffix() != null &amp;&amp; k.getSuffix().equals(repl.getSuffix())))</span>
+<span class="nc" id="L497">        .collect(Collectors.toList());</span>
+<span class="nc bnc" id="L498" title="All 2 branches missed.">      if (sameRepl.size() &gt; 1) {</span>
+<span class="nc bnc" id="L499" title="All 2 branches missed.">        if (handledReplacements.contains(repl.getReplacement())) {</span>
+          // skip
+        } else {
+<span class="nc" id="L502">          List&lt;String&gt; joinedRepls = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L503" title="All 2 branches missed.">          for (SuggestedReplacement r : sameRepl) {</span>
+<span class="nc" id="L504">            joinedRepls.add(&quot;* &quot; + r.getShortDescription());</span>
+<span class="nc" id="L505">          }</span>
+<span class="nc" id="L506">          mergedRepl.add(new SuggestedReplacement(repl.getReplacement(), String.join(&quot;\n&quot;, joinedRepls), repl.getSuffix()));</span>
+<span class="nc" id="L507">          handledReplacements.add(repl.getReplacement());</span>
+<span class="nc" id="L508">        }</span>
+      } else {
+<span class="nc" id="L510">        mergedRepl.add(repl);</span>
+      }
+<span class="nc" id="L512">    }</span>
+<span class="nc" id="L513">    return mergedRepl;</span>
+  }
+
+  /**
+   * Get the regular expression pattern used to tokenize
+   * the words as in the source dictionary. For example,
+   * it may contain a hyphen, if the words with hyphens are
+   * not included in the dictionary
+   * @return A compiled {@link Pattern} that is used to tokenize words or {@code null}.
+   */
+  @Nullable
+  public Pattern tokenizingPattern() {
+<span class="nc" id="L525">    return null;</span>
+  }
+
+  protected List&lt;SuggestedReplacement&gt; orderSuggestions(List&lt;SuggestedReplacement&gt; suggestions, String word) {
+<span class="nc" id="L529">    return suggestions;</span>
+  }
+
+  /**
+   * @param checkCompound If true and the word is not in the dictionary
+   * it will be split (see {@link #setCompoundRegex(String)})
+   * and each component will be checked separately
+   * @since 2.4
+   */
+  protected void setCheckCompound(boolean checkCompound) {
+<span class="nc" id="L539">    this.checkCompound = checkCompound;</span>
+<span class="nc" id="L540">  }</span>
+
+  /**
+   * @param compoundRegex see {@link #setCheckCompound(boolean)}
+   * @since 2.4
+   */
+  protected void setCompoundRegex(String compoundRegex) {
+<span class="nc" id="L547">    this.compoundRegex = Pattern.compile(compoundRegex);</span>
+<span class="nc" id="L548">  }</span>
+
+  /**
+   * Checks whether a given String consists only of surrogate pairs.
+   * @param word to be checked
+   * @since 4.2
+   */
+  protected boolean isSurrogatePairCombination (String word) {
+<span class="nc bnc" id="L556" title="All 6 branches missed.">    if (word.length() &gt; 1 &amp;&amp; word.length() % 2 == 0 &amp;&amp; word.codePointCount(0, word.length()) != word.length()) {</span>
+      // some symbols such as emojis (😂) have a string length that equals 2
+<span class="nc" id="L558">      boolean isSurrogatePairCombination = true;</span>
+<span class="nc bnc" id="L559" title="All 4 branches missed.">      for (int i = 0; i &lt; word.length() &amp;&amp; isSurrogatePairCombination; i += 2) {</span>
+<span class="nc" id="L560">        isSurrogatePairCombination &amp;= Character.isSurrogatePair(word.charAt(i), word.charAt(i + 1));</span>
+      }
+<span class="nc" id="L562">      return isSurrogatePairCombination;</span>
+    }
+<span class="nc" id="L564">    return false;</span>
+  }
+
+  /**
+   * Ignore surrogate pairs (emojis) 
+   * @since 4.3 
+   * @see org.languagetool.rules.spelling.SpellingCheckRule#ignoreWord(java.lang.String)
+   */
+  @Override
+  protected boolean ignoreWord(String word) throws IOException {
+<span class="nc bnc" id="L574" title="All 4 branches missed.">    return super.ignoreWord(word) || isSurrogatePairCombination(word);</span>
+  }
+  
+  /**
+   * 
+   * Join strings before and after a suggestion.
+   * Used when there is also suggestion for split words
+   * Ex. to thow &gt; tot how | to throw
+   * 
+   */
+  private List&lt;SuggestedReplacement&gt; joinBeforeAfterSuggestions(List&lt;SuggestedReplacement&gt; suggestionsList, String beforeSuggestionStr,
+      String afterSuggestionStr) {
+<span class="nc" id="L586">    List&lt;SuggestedReplacement&gt; newSuggestionsList = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L587" title="All 2 branches missed.">    for (SuggestedReplacement suggestion : suggestionsList) {</span>
+<span class="nc" id="L588">      String str = suggestion.getReplacement();</span>
+<span class="nc" id="L589">      SuggestedReplacement newSuggestion = new SuggestedReplacement(suggestion);</span>
+<span class="nc" id="L590">      newSuggestion.setReplacement(beforeSuggestionStr + str + afterSuggestionStr);</span>
+<span class="nc" id="L591">      newSuggestionsList.add(newSuggestion);</span>
+<span class="nc" id="L592">    }</span>
+<span class="nc" id="L593">    return newSuggestionsList;</span>
+  }
+
+  static class PhraseToTranslate {
+    String phrase;
+    int endPos;
+<span class="nc" id="L599">    PhraseToTranslate(String phrase, int endPos) {</span>
+<span class="nc" id="L600">      this.phrase = phrase;</span>
+<span class="nc" id="L601">      this.endPos = endPos;</span>
+<span class="nc" id="L602">    }</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

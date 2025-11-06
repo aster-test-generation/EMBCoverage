@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EmptyLineRule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules</a> &gt; <span class="el_source">EmptyLineRule.java</span></div><h1>EmptyLineRule.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2014 Daniel Naber (http://danielnaber.de/)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.ResourceBundle;
+import org.languagetool.AnalyzedSentence;
+import org.languagetool.AnalyzedTokenReadings;
+import org.languagetool.Language;
+import org.languagetool.tools.Tools;
+
+/**
+ * A rule that checks for empty lines. Useful especially for office extension
+ * It checks only linebreaks because empty paragraphs can't be handled in LO/OO 
+ * 
+ * @author Fred Kruse
+ */
+
+public class EmptyLineRule extends TextLevelRule {
+
+  private final Language lang;
+  
+  public EmptyLineRule(ResourceBundle messages, Language lang, boolean defaultActive) {
+<span class="fc" id="L42">    super(messages);</span>
+<span class="fc" id="L43">    super.setCategory(Categories.STYLE.getCategory(messages));</span>
+<span class="fc" id="L44">    this.lang = lang;</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">    if (!defaultActive) {</span>
+<span class="fc" id="L46">      setDefaultOff();</span>
+    }
+<span class="fc" id="L48">    setOfficeDefaultOn();  // Default for LO/OO is always On</span>
+<span class="fc" id="L49">    setLocQualityIssueType(ITSIssueType.Style);</span>
+<span class="fc" id="L50">  }</span>
+
+  public EmptyLineRule(ResourceBundle messages, Language lang) {
+<span class="fc" id="L53">    this(messages, lang, false);</span>
+<span class="fc" id="L54">  }</span>
+
+  @Override
+  public String getId() {
+<span class="fc" id="L58">    return &quot;EMPTY_LINE&quot;;</span>
+  }
+
+  @Override
+  public String getDescription() {
+<span class="nc" id="L63">    return messages.getString(&quot;empty_line_rule_desc&quot;);</span>
+  }
+
+  @Override
+  public org.languagetool.rules.RuleMatch[] match(List&lt;AnalyzedSentence&gt; sentences) throws IOException {
+<span class="nc" id="L68">    List&lt;RuleMatch&gt; ruleMatches = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L69">    int pos = 0;</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">    for (int n = 0; n &lt; sentences.size() - 1; n++) {</span>
+<span class="nc" id="L71">      AnalyzedSentence sentence = sentences.get(n);</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">      if(Tools.isParagraphEnd(sentences, n, lang)) {</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        if(isSecondParagraphEndMark(sentence.getText())) {</span>
+<span class="nc" id="L74">          AnalyzedTokenReadings[] tokens = sentence.getTokensWithoutWhitespace();</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">          if(tokens.length &gt; 1) {</span>
+<span class="nc" id="L76">            int fromPos = pos + tokens[tokens.length - 1].getStartPos();</span>
+<span class="nc" id="L77">            int toPos = pos + tokens[tokens.length - 1].getEndPos();</span>
+<span class="nc" id="L78">            RuleMatch ruleMatch = new RuleMatch(this, sentence, fromPos, toPos, messages.getString(&quot;empty_line_rule_msg&quot;));</span>
+            // Can't use SuggestedReplacement because of problems in LO/OO dialog with linebreaks
+<span class="nc" id="L80">            ruleMatches.add(ruleMatch);</span>
+          }
+        }
+      }
+<span class="nc" id="L84">      pos += sentence.getCorrectedTextLength();</span>
+    }
+<span class="nc" id="L86">    return toRuleMatchArray(ruleMatches);</span>
+  }
+
+  private boolean isSecondParagraphEndMark(String sentence) {
+<span class="nc bnc" id="L90" title="All 2 branches missed.">    if (lang.getSentenceTokenizer().singleLineBreaksMarksPara()) {</span>
+<span class="nc bnc" id="L91" title="All 4 branches missed.">      if (sentence.endsWith(&quot;\n\n&quot;) || sentence.endsWith(&quot;\n\r\n\r&quot;)) {</span>
+<span class="nc" id="L92">        return true;</span>
+      }
+    } else { 
+<span class="nc bnc" id="L95" title="All 6 branches missed.">      if (sentence.endsWith(&quot;\n\n\n\n&quot;) || sentence.endsWith(&quot;\n\r\n\r\n\r\n\r&quot;) || sentence.endsWith(&quot;\r\n\r\n\r\n\r\n&quot;)) {</span>
+<span class="nc" id="L96">        return true;</span>
+      }
+    }
+<span class="nc" id="L99">    return false;</span>
+  }
+  
+  @Override
+  public int minToCheckParagraph() {
+<span class="nc" id="L104">    return 1;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

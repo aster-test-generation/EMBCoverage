@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Matrix.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules.neuralnetwork</a> &gt; <span class="el_source">Matrix.java</span></div><h1>Matrix.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2017 Markus Brenneis
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules.neuralnetwork;
+
+import java.io.InputStream;
+import java.util.Arrays;
+import java.util.List;
+
+public class Matrix {
+
+  private float[][] m;
+
+<span class="nc" id="L29">  public Matrix(InputStream stream) {</span>
+<span class="nc" id="L30">    List&lt;String&gt; rows = ResourceReader.readAllLines(stream);</span>
+<span class="nc" id="L31">    fromLines(rows);</span>
+<span class="nc" id="L32">  }</span>
+
+<span class="nc" id="L34">  Matrix(float[] row) {</span>
+<span class="nc" id="L35">    m = new float[][]{row};</span>
+<span class="nc" id="L36">  }</span>
+
+<span class="nc" id="L38">  Matrix(List&lt;String&gt; rows) {</span>
+<span class="nc" id="L39">    fromLines(rows);</span>
+<span class="nc" id="L40">  }</span>
+
+<span class="nc" id="L42">  Matrix(float[][] matrix) {</span>
+<span class="nc" id="L43">    m = matrix;</span>
+<span class="nc" id="L44">  }</span>
+
+  private void fromLines(List&lt;String&gt; rows) {
+<span class="nc" id="L47">    final int nRows = rows.size();</span>
+<span class="nc" id="L48">    final int nCols = rows.get(0).split(&quot; &quot;).length;</span>
+
+<span class="nc" id="L50">    m = new float[nRows][nCols];</span>
+
+<span class="nc bnc" id="L52" title="All 2 branches missed.">    for (int i = 0; i &lt; nRows; i++) {</span>
+<span class="nc" id="L53">      String[] row = rows.get(i).split(&quot; &quot;);</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">      for (int j = 0; j &lt; nCols; j++) {</span>
+<span class="nc" id="L55">        m[i][j] = Float.parseFloat(row[j]);</span>
+      }
+    }
+<span class="nc" id="L58">  }</span>
+
+  float[] row(int n) {
+<span class="nc" id="L61">    return Arrays.copyOf(m[n], m[n].length);</span>
+  }
+
+  int rows() {
+<span class="nc" id="L65">    return m.length;</span>
+  }
+
+  int columns() {
+<span class="nc" id="L69">    return m[0].length;</span>
+  }
+
+  void printDimension() {
+<span class="nc" id="L73">    System.out.println(m.length + &quot;/&quot; + m[0].length);</span>
+<span class="nc" id="L74">  }</span>
+
+  Matrix mul(Matrix that) {
+<span class="nc" id="L77">    float[][] a = this.m;</span>
+<span class="nc" id="L78">    float[][] b = that.m;</span>
+
+<span class="nc" id="L80">    final int rowsA = a.length;</span>
+<span class="nc" id="L81">    final int colsA = a[0].length;</span>
+<span class="nc" id="L82">    final int rowsB = b.length;</span>
+<span class="nc" id="L83">    final int colsB = b[0].length;</span>
+
+<span class="nc bnc" id="L85" title="All 2 branches missed.">    if (colsA != rowsB) {</span>
+<span class="nc" id="L86">      throw new ArithmeticException(&quot;Matrix with &quot; + colsA + &quot; columns cannot be multiplied with matrix with &quot; + colsB + &quot; rows&quot;);</span>
+    }
+
+<span class="nc" id="L89">    float[][] c = new float[rowsA][colsB];</span>
+
+<span class="nc bnc" id="L91" title="All 2 branches missed.">    for (int i = 0; i &lt; rowsA; i++) {</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">      for (int j = 0; j &lt; colsB; j++) {</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        for (int k = 0; k &lt; colsA; k++) {</span>
+<span class="nc" id="L94">          c[i][j] += a[i][k] * b[k][j];</span>
+        }
+      }
+    }
+
+<span class="nc" id="L99">    return new Matrix(c);</span>
+  }
+
+  Matrix add(Matrix that) {
+<span class="nc" id="L103">    float[][] a = this.m;</span>
+<span class="nc" id="L104">    float[][] b = that.m;</span>
+
+<span class="nc" id="L106">    final int rowsA = a.length;</span>
+<span class="nc" id="L107">    final int colsA = a[0].length;</span>
+<span class="nc" id="L108">    final int rowsB = b.length;</span>
+<span class="nc" id="L109">    final int colsB = b[0].length;</span>
+
+<span class="nc bnc" id="L111" title="All 2 branches missed.">    if (rowsA != rowsB) throw new ArithmeticException(&quot;Matrix with &quot; + rowsA + &quot; rows cannot be added to a matrix with &quot; + rowsB + &quot; rows&quot;);</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">    if (colsA != colsB) throw new ArithmeticException(&quot;Matrix with &quot; + colsA + &quot; columns cannot be added to a matrix with &quot; + colsB + &quot; columns&quot;);</span>
+
+<span class="nc" id="L114">    float[][] c = new float[rowsA][colsA];</span>
+
+<span class="nc bnc" id="L116" title="All 2 branches missed.">    for (int i = 0; i &lt; rowsA; i++) {</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">      for (int j = 0; j &lt; colsB; j++) {</span>
+<span class="nc" id="L118">        c[i][j] = a[i][j] + b[i][j];</span>
+      }
+    }
+
+<span class="nc" id="L122">    return new Matrix(c);</span>
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+<span class="nc bnc" id="L127" title="All 2 branches missed.">    if (obj instanceof Matrix) {</span>
+<span class="nc" id="L128">      return Arrays.deepEquals(m, ((Matrix) obj).m);</span>
+    }
+<span class="nc" id="L130">    return false;</span>
+  }
+
+  public Matrix transpose() {
+<span class="nc" id="L134">    int rows = m.length;</span>
+<span class="nc" id="L135">    int cols = m[0].length;</span>
+<span class="nc" id="L136">    float[][] b = new float[cols][rows];</span>
+
+<span class="nc bnc" id="L138" title="All 2 branches missed.">    for (int i = 0; i &lt; rows; i++) {</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">      for (int j = 0; j &lt; cols; j++) {</span>
+<span class="nc" id="L140">        b[j][i] = m[i][j];</span>
+      }
+    }
+
+<span class="nc" id="L144">    return new Matrix(b);</span>
+  }
+
+  public Matrix relu() {
+<span class="nc" id="L148">    int rows = m.length;</span>
+<span class="nc" id="L149">    int cols = m[0].length;</span>
+<span class="nc" id="L150">    float[][] b = new float[rows][cols];</span>
+
+<span class="nc bnc" id="L152" title="All 2 branches missed.">    for (int i = 0; i &lt; rows; i++) {</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">      for (int j = 0; j &lt; cols; j++) {</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">        b[i][j] = m[i][j] &lt; 0 ? 0 : m[i][j];</span>
+      }
+    }
+
+<span class="nc" id="L158">    return new Matrix(b);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

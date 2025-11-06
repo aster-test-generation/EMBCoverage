@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ShortDescriptionProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool</a> &gt; <span class="el_source">ShortDescriptionProvider.java</span></div><h1>ShortDescriptionProvider.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2019 Daniel Naber (www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool;
+
+import org.jetbrains.annotations.Nullable;
+import org.languagetool.broker.ResourceDataBroker;
+
+import java.util.*;
+
+/**
+ * Provide short (up to ~ 40 characters) descriptions for words.
+ * Used to display as an additional hint when there are several suggestions.
+ * @since 4.5
+ */
+public class ShortDescriptionProvider {
+
+<span class="fc" id="L33">  private final static Map&lt;Key,String&gt; wordToDef = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L34">  private final static Set&lt;Language&gt; initializedLangs = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L35">  private final static List&lt;String&gt; filenames = Arrays.asList(</span>
+    &quot;word_definitions.txt&quot;
+  );
+
+<span class="fc" id="L39">  public ShortDescriptionProvider() {</span>
+<span class="fc" id="L40">  }</span>
+
+  @Nullable
+  public String getShortDescription(String word, Language lang) {
+<span class="fc bfc" id="L44" title="All 2 branches covered.">    if (!initializedLangs.contains(lang)) {</span>
+<span class="fc" id="L45">      init(lang);</span>
+    }
+<span class="fc" id="L47">    return wordToDef.get(new Key(word, lang));</span>
+  }
+
+  /**
+   * For testing only.
+   */
+  public Map&lt;String, String&gt; getAllDescriptions(Language lang) {
+<span class="nc bnc" id="L54" title="All 2 branches missed.">    if (!initializedLangs.contains(lang)) {</span>
+<span class="nc" id="L55">      init(lang);</span>
+    }
+<span class="nc" id="L57">    Map&lt;String,String&gt; result = new HashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">    for (Map.Entry&lt;Key, String&gt; entry : wordToDef.entrySet()) {</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">      if (entry.getKey().lang.equals(lang)) {</span>
+<span class="nc" id="L60">        result.put(entry.getKey().word, entry.getValue());</span>
+      }
+<span class="nc" id="L62">    }</span>
+<span class="nc" id="L63">    return result;</span>
+  }
+
+  private void init(Language lang) {
+<span class="fc" id="L67">    ResourceDataBroker dataBroker = JLanguageTool.getDataBroker();</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">    for (String filename : filenames) {</span>
+<span class="fc" id="L69">      String path = &quot;/&quot; + lang.getShortCode() + &quot;/&quot; + filename;</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">      if (!dataBroker.resourceExists(path)) {</span>
+<span class="fc" id="L71">        continue;</span>
+      }
+<span class="nc" id="L73">      List&lt;String&gt; lines = dataBroker.getFromResourceDirAsLines(path);</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">      for (String line : lines) {</span>
+<span class="nc bnc" id="L75" title="All 4 branches missed.">        if (line.startsWith(&quot;#&quot;) || line.trim().isEmpty()) {</span>
+<span class="nc" id="L76">          continue;</span>
+        }
+<span class="nc" id="L78">        String[] parts = line.split(&quot;\t&quot;);</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        if (parts.length != 2) {</span>
+<span class="nc" id="L80">          throw new RuntimeException(&quot;Format in &quot; + path + &quot; not expected, expected 2 tab-separated columns: '&quot; + line + &quot;'&quot;);</span>
+        }
+<span class="nc" id="L82">        wordToDef.put(new Key(parts[0], lang), parts[1]);</span>
+<span class="nc" id="L83">      }</span>
+<span class="nc" id="L84">    }</span>
+<span class="fc" id="L85">    initializedLangs.add(lang);</span>
+<span class="fc" id="L86">  }</span>
+
+  private static class Key {
+    String word;
+    Language lang;
+<span class="fc" id="L91">    Key(String word, Language lang) {</span>
+<span class="fc" id="L92">      this.word = Objects.requireNonNull(word);</span>
+<span class="fc" id="L93">      this.lang = Objects.requireNonNull(lang);</span>
+<span class="fc" id="L94">    }</span>
+    @Override
+    public boolean equals(Object o) {
+<span class="nc bnc" id="L97" title="All 2 branches missed.">      if (this == o) return true;</span>
+<span class="nc bnc" id="L98" title="All 4 branches missed.">      if (o == null || getClass() != o.getClass()) return false;</span>
+<span class="nc" id="L99">      Key key = (Key) o;</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">      return word.equals(key.word) &amp;&amp;</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        lang.equals(key.lang);</span>
+    }
+    @Override
+    public int hashCode() {
+<span class="fc" id="L105">      return Objects.hash(word, lang);</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L110">      return word + &quot;@&quot; + lang.getShortCodeWithCountryAndVariant();</span>
+    }
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

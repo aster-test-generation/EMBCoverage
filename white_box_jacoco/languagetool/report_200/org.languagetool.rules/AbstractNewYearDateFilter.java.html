@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractNewYearDateFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules</a> &gt; <span class="el_source">AbstractNewYearDateFilter.java</span></div><h1>AbstractNewYearDateFilter.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2014 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules;
+
+import org.apache.commons.lang3.StringUtils;
+import org.languagetool.AnalyzedTokenReadings;
+import org.languagetool.rules.patterns.RuleFilter;
+
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Accepts rule matches if we are in the first days of a new year and the user
+ * may have entered a date with the old year (but not a date in December).
+ * @since 4.3
+ */
+<span class="nc" id="L34">public abstract class AbstractNewYearDateFilter extends RuleFilter {</span>
+  // The day of the month may contain not only digits but also extra letters
+  // such as &quot;22nd&quot; in English or &quot;22-an&quot; in Esperanto. The regexp extracts
+  // the numerical part.
+<span class="nc" id="L38">  private static final Pattern DAY_OF_MONTH_PATTERN = Pattern.compile(&quot;(\\d+).*&quot;);</span>
+
+  /**
+   * Return true if the year recently changed (= it is January)
+  */
+  protected boolean isJanuary() {
+<span class="nc bnc" id="L44" title="All 2 branches missed.">    if (TestHackHelper.isJUnitTest()) {</span>
+<span class="nc" id="L45">      return true;</span>
+    }
+<span class="nc bnc" id="L47" title="All 2 branches missed.">    return getCalendar().get(Calendar.MONTH) == Calendar.JANUARY;</span>
+  }
+
+  protected int getCurrentYear() {
+<span class="nc bnc" id="L51" title="All 2 branches missed.">    if (TestHackHelper.isJUnitTest()) {</span>
+<span class="nc" id="L52">      return 2014;</span>
+    }
+<span class="nc" id="L54">    return getCalendar().get(Calendar.YEAR);</span>
+  }
+
+  /**
+   * Implement so that January returns {@code 1}, February {@code 2} etc.
+   * @param localizedMonth name of a month or abbreviation thereof
+   */
+  protected abstract int getMonth(String localizedMonth);
+
+  protected abstract Calendar getCalendar();
+
+  /**
+   * Implement so that &quot;first&quot; returns {@code 1}, second returns {@code 2} etc.
+   * @param localizedDayOfMonth name of day of the month or abbreviation thereof
+   */
+  protected int getDayOfMonth(String localizedDayOfMonth) {
+<span class="nc" id="L70">    return 0;</span>
+  }
+
+  /**
+   * @param args a map with values for {@code year}, {@code month}, {@code day} (day of month)
+   */
+  @Override
+  public RuleMatch acceptRuleMatch(RuleMatch match, Map&lt;String, String&gt; args, int patternTokenPos, AnalyzedTokenReadings[] patternTokens) {
+<span class="nc" id="L78">    Calendar dateFromText = getDate(args);</span>
+    int monthFromText;
+    int yearFromText;
+    try {
+<span class="nc" id="L82">      monthFromText = dateFromText.get(Calendar.MONTH);</span>
+<span class="nc" id="L83">      yearFromText = dateFromText.get(Calendar.YEAR);</span>
+<span class="nc" id="L84">    } catch (IllegalArgumentException e) {</span>
+<span class="nc" id="L85">      return null; // date is not valid; another rule is responsible</span>
+<span class="nc" id="L86">    }</span>
+<span class="nc" id="L87">    int currentYear = getCurrentYear();</span>
+<span class="nc bnc" id="L88" title="All 6 branches missed.">    if (isJanuary() &amp;&amp; monthFromText != 11 /*December*/ &amp;&amp; yearFromText + 1 == currentYear) {</span>
+<span class="nc" id="L89">      String message = match.getMessage()</span>
+<span class="nc" id="L90">              .replace(&quot;{year}&quot;, Integer.toString(yearFromText))</span>
+<span class="nc" id="L91">              .replace(&quot;{realYear}&quot;, Integer.toString(currentYear));</span>
+<span class="nc" id="L92">      RuleMatch ruleMatch = new RuleMatch(match.getRule(), match.getSentence(), match.getFromPos(), match.getToPos(), message, match.getShortMessage());</span>
+<span class="nc" id="L93">      ruleMatch.setType(match.getType());</span>
+<span class="nc" id="L94">      return ruleMatch;</span>
+    } else {
+<span class="nc" id="L96">      return null;</span>
+    }
+  }
+
+  private Calendar getDate(Map&lt;String, String&gt; args) {
+<span class="nc" id="L101">    int year = Integer.parseInt(getRequired(&quot;year&quot;, args));</span>
+<span class="nc" id="L102">    int month = getMonthFromArguments(args);</span>
+<span class="nc" id="L103">    int dayOfMonth = getDayOfMonthFromArguments(args);</span>
+
+<span class="nc" id="L105">    Calendar calendar = getCalendar();</span>
+<span class="nc" id="L106">    calendar.setLenient(false);  // be strict about validity of dates</span>
+    //noinspection MagicConstant
+<span class="nc" id="L108">    calendar.set(year, month, dayOfMonth, 0, 0, 0);</span>
+<span class="nc" id="L109">    return calendar;</span>
+  }
+
+  private int getDayOfMonthFromArguments(Map&lt;String, String&gt; args) {
+<span class="nc" id="L113">    String dayOfMonthString = getRequired(&quot;day&quot;, args);</span>
+    int dayOfMonth;
+<span class="nc" id="L115">    Matcher matcherDayOfMonth = DAY_OF_MONTH_PATTERN.matcher(dayOfMonthString);</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">    if (matcherDayOfMonth.matches()) {</span>
+      // The day of the month is a number, possibly with a suffix such
+      // as &quot;22nd&quot; for example.
+<span class="nc" id="L119">      dayOfMonth = Integer.parseInt(matcherDayOfMonth.group(1));</span>
+    } else {
+      // In some languages, the day of the month can also be written with
+      // letters rather than with digits, so parse localized numbers.
+<span class="nc" id="L123">      dayOfMonth = getDayOfMonth(dayOfMonthString);</span>
+    }
+<span class="nc" id="L125">    return dayOfMonth;</span>
+  }
+
+  private int getMonthFromArguments(Map&lt;String, String&gt; args) {
+<span class="nc" id="L129">    String monthStr = getRequired(&quot;month&quot;, args);</span>
+    int month;
+<span class="nc bnc" id="L131" title="All 2 branches missed.">    if (StringUtils.isNumeric(monthStr)) {</span>
+<span class="nc" id="L132">      month = Integer.parseInt(monthStr);</span>
+    } else {
+<span class="nc" id="L134">      month = getMonth(monthStr);</span>
+    }
+<span class="nc" id="L136">    return month - 1;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

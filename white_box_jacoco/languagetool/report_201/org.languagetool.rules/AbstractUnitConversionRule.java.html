@@ -1,0 +1,587 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractUnitConversionRule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules</a> &gt; <span class="el_source">AbstractUnitConversionRule.java</span></div><h1>AbstractUnitConversionRule.java</h1><pre class="source lang-java linenums">/*
+ *  LanguageTool, a natural language style checker
+ *  * Copyright (C) 2018 Fabian Richter
+ *  *
+ *  * This library is free software; you can redistribute it and/or
+ *  * modify it under the terms of the GNU Lesser General Public
+ *  * License as published by the Free Software Foundation; either
+ *  * version 2.1 of the License, or (at your option) any later version.
+ *  *
+ *  * This library is distributed in the hope that it will be useful,
+ *  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *  * Lesser General Public License for more details.
+ *  *
+ *  * You should have received a copy of the GNU Lesser General Public
+ *  * License along with this library; if not, write to the Free Software
+ *  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ *  * USA
+ *
+ */
+package org.languagetool.rules;
+
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.languagetool.AnalyzedSentence;
+
+import javax.measure.UnconvertibleException;
+import javax.measure.Unit;
+import javax.measure.quantity.Length;
+import javax.measure.quantity.Mass;
+import javax.measure.quantity.Temperature;
+import javax.measure.quantity.Volume;
+import java.io.IOException;
+import java.math.RoundingMode;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
+import java.text.ParseException;
+import java.util.*;
+import java.util.function.DoubleUnaryOperator;
+import java.util.function.Function;
+import java.util.regex.MatchResult;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+import static tech.units.indriya.unit.Units.*;
+
+/**
+ * Base class providing support for detecting, parsing and converting between measurements in different units
+ * @since 4.3
+ */
+@SuppressWarnings(&quot;unchecked&quot;)
+public abstract class AbstractUnitConversionRule extends Rule {
+  
+<span class="fc" id="L57">  protected static final Unit&lt;Mass&gt; POUND = KILOGRAM.multiply(0.45359237);</span>
+<span class="fc" id="L58">  protected static final Unit&lt;Mass&gt; OUNCE = POUND.divide(12);</span>
+
+<span class="fc" id="L60">  protected static final Unit&lt;Length&gt; FEET = METRE.multiply(0.3048);</span>
+<span class="fc" id="L61">  protected static final Unit&lt;Length&gt; YARD = FEET.multiply(3);</span>
+<span class="fc" id="L62">  protected static final Unit&lt;Length&gt; INCH = FEET.divide(12);</span>
+<span class="fc" id="L63">  protected static final Unit&lt;Length&gt; MILE = FEET.multiply(5280);</span>
+
+<span class="fc" id="L65">  protected static final Unit&lt;Volume&gt; US_QUART = LITRE.multiply(0.946352946);</span>
+<span class="fc" id="L66">  protected static final Unit&lt;Volume&gt; US_GALLON = US_QUART.multiply(4);</span>
+<span class="fc" id="L67">  protected static final Unit&lt;Volume&gt; US_PINT = US_QUART.divide(2);</span>
+<span class="fc" id="L68">  protected static final Unit&lt;Volume&gt; US_CUP = US_QUART.divide(4);</span>
+<span class="fc" id="L69">  protected static final Unit&lt;Volume&gt; US_FL_OUNCE = US_QUART.divide(32);</span>
+
+<span class="fc" id="L71">  protected static final Unit&lt;Volume&gt; IMP_PINT = LITRE.multiply(0.5682612532);</span>
+<span class="fc" id="L72">  protected static final Unit&lt;Volume&gt; IMP_QUART = IMP_PINT.multiply(2);</span>
+<span class="fc" id="L73">  protected static final Unit&lt;Volume&gt; IMP_GALLON = IMP_QUART.multiply(4);</span>
+<span class="fc" id="L74">  protected static final Unit&lt;Volume&gt; IMP_FL_OUNCE = IMP_PINT.divide(20);</span>
+
+<span class="fc" id="L76">  protected static final Unit&lt;Temperature&gt; FAHRENHEIT = CELSIUS.multiply(5.0/9.0).shift(-32);</span>
+  // limit size of matched number to (possibly) avoid hangups
+  protected static final String NUMBER_REGEX = &quot;(-?[0-9]{1,32}[0-9,.]{0,32})&quot;;
+
+<span class="fc" id="L80">  protected final Pattern numberRangePart = Pattern.compile(&quot;\\b&quot; + NUMBER_REGEX + &quot;$&quot;);</span>
+  
+  private static final double DELTA = 1e-2;
+  private static final double ROUNDING_DELTA = 0.05;
+  private static final int MAX_SUGGESTIONS = 5;
+  private static final int WHITESPACE_LIMIT = 5;
+
+<span class="fc" id="L87">  protected Map&lt;Pattern, Unit&gt; unitPatterns = new HashMap&lt;&gt;();</span>
+
+  // for patterns that require a custom number parsing function
+<span class="fc" id="L90">  protected Map&lt;Pattern, Map.Entry&lt;Unit, Function&lt;MatchResult, Double&gt;&gt;&gt; specialPatterns = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L91">  protected Map&lt;Unit, List&lt;String&gt;&gt;  unitSymbols = new HashMap&lt;&gt;();</span>
+  // for recognizing conversions made by this rule or the user
+<span class="fc" id="L93">  protected List&lt;Pattern&gt; convertedPatterns = new ArrayList&lt;&gt;();</span>
+  // units to use for conversions
+<span class="fc" id="L95">  protected final List&lt;Unit&gt; metricUnits = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L97">  protected enum Message {</span>
+<span class="nc" id="L98">    SUGGESTION,</span>
+<span class="nc" id="L99">    CHECK,</span>
+<span class="nc" id="L100">    CHECK_UNKNOWN_UNIT,</span>
+<span class="nc" id="L101">    UNIT_MISMATCH</span>
+  }
+
+  private URL buildURLForExplanation(String original) {
+    try {
+<span class="nc" id="L106">      String query = URLEncoder.encode(&quot;convert &quot; + original + &quot; to metric&quot;, &quot;utf-8&quot;);</span>
+<span class="nc" id="L107">      return new URL(&quot;http://www.wolframalpha.com/input/?i=&quot; + query);</span>
+<span class="nc" id="L108">    } catch (Exception e) {</span>
+<span class="nc" id="L109">      return null;</span>
+    }
+  }
+
+  /**
+   * Override in subclasses
+   * @return locale-specific number format
+   */
+  protected NumberFormat getNumberFormat() {
+<span class="nc" id="L118">    DecimalFormat df = new DecimalFormat();</span>
+<span class="nc" id="L119">    df.setMaximumFractionDigits(2);</span>
+<span class="nc" id="L120">    df.setRoundingMode(RoundingMode.HALF_UP);</span>
+<span class="nc" id="L121">    return df;</span>
+  }
+
+  /**
+   * Override in subclasses
+   */
+  protected String getMessage(Message message) {
+<span class="nc bnc" id="L128" title="All 5 branches missed.">    switch(message) {</span>
+      case CHECK:
+<span class="nc" id="L130">        return &quot;This conversion doesn't seem right. Do you want to correct it automatically?&quot;;</span>
+      case SUGGESTION:
+<span class="nc" id="L132">        return &quot;Writing for an international audience? Consider adding the metric equivalent.&quot;;</span>
+      case CHECK_UNKNOWN_UNIT:
+<span class="nc" id="L134">        return &quot;This conversion doesn't seem right, unable to recognize the used unit.&quot;;</span>
+      case UNIT_MISMATCH:
+<span class="nc" id="L136">        return &quot;These units don't seem to be compatible.&quot;;</span>
+      default:
+<span class="nc" id="L138">        throw new RuntimeException(&quot;Unknown message type: &quot; + message);</span>
+    }
+  }
+
+  /**
+   * Override in subclasses
+   */
+  protected String getShortMessage(Message message) {
+<span class="nc bnc" id="L146" title="All 5 branches missed.">    switch(message) {</span>
+      case CHECK:
+<span class="nc" id="L148">        return &quot;Incorrect conversion. Correct it?&quot;;</span>
+      case SUGGESTION:
+<span class="nc" id="L150">        return &quot;Add metric equivalent?&quot;;</span>
+      case CHECK_UNKNOWN_UNIT:
+<span class="nc" id="L152">        return &quot;Unknown unit used in conversion.&quot;;</span>
+      case UNIT_MISMATCH:
+<span class="nc" id="L154">        return &quot;Units incompatible.&quot;;</span>
+      default:
+<span class="nc" id="L156">        throw new RuntimeException(&quot;Unknown message type: &quot; + message);</span>
+    }
+  }
+
+  /**
+   * Format suggestion.
+   * @param original matched in the text
+   * @param converted computed by this rule
+   */
+  protected String getSuggestion(String original, String converted) {
+<span class="nc" id="L166">    return original + &quot; (&quot; + converted + &quot;)&quot;;</span>
+  }
+
+  /**
+   * Override in subclasses.
+   * @return formatting of rounded numbers according to locale
+   */
+  protected String formatRounded(String s) {
+<span class="nc" id="L174">    return &quot;ca. &quot; + s;</span>
+  }
+
+  /**
+   * Associate a notation with a given unit.
+   * @param pattern Regex for recognizing the unit. Word boundaries and numbers are added to this pattern by addUnit itself.
+   * @param base Unit to associate with the pattern
+   * @param symbol Suffix used for suggestion.
+   * @param factor Convenience parameter for prefixes for metric units, unit is multiplied with this. Defaults to 1 if not used.
+   * @param metric Register this notation for suggestion.
+   */
+  protected void addUnit(String pattern, Unit base, String symbol, double factor, boolean metric) {
+<span class="fc" id="L186">    Unit unit = base.multiply(factor);</span>
+<span class="fc" id="L187">    unitPatterns.put(Pattern.compile(&quot;\\b&quot; + NUMBER_REGEX + &quot;\\s{0,&quot; + WHITESPACE_LIMIT + &quot;}&quot; + pattern + &quot;\\b&quot;), unit);</span>
+<span class="fc" id="L188">    unitSymbols.putIfAbsent(unit, new ArrayList&lt;&gt;());</span>
+<span class="fc" id="L189">    unitSymbols.get(unit).add(symbol);</span>
+<span class="fc bfc" id="L190" title="All 4 branches covered.">    if (metric &amp;&amp; !metricUnits.contains(unit)) {</span>
+<span class="fc" id="L191">      metricUnits.add(unit);</span>
+    }
+<span class="fc" id="L193">  }</span>
+
+<span class="fc" id="L195">  protected AbstractUnitConversionRule(ResourceBundle messages) {</span>
+<span class="fc" id="L196">    setCategory(Categories.STYLE.getCategory(messages));</span>
+<span class="fc" id="L197">    setLocQualityIssueType(ITSIssueType.Style);</span>
+
+<span class="fc" id="L199">    addUnit(&quot;kg&quot;, KILOGRAM, &quot;kg&quot;, 1e0, true);</span>
+<span class="fc" id="L200">    addUnit(&quot;g&quot;, KILOGRAM, &quot;g&quot;, 1e-3, true);</span>
+<span class="fc" id="L201">    addUnit(&quot;t&quot;, KILOGRAM, &quot;t&quot;, 1e3, true);</span>
+
+<span class="fc" id="L203">    addUnit(&quot;lb&quot;, POUND, &quot;lb&quot;, 1, false);</span>
+<span class="fc" id="L204">    addUnit(&quot;oz&quot;, OUNCE, &quot;oz&quot;, 1, false);</span>
+
+<span class="fc" id="L206">    addUnit(&quot;mi&quot;, MILE, &quot;mi&quot;, 1, false);</span>
+<span class="fc" id="L207">    addUnit(&quot;yd&quot;, YARD, &quot;yd&quot;, 1, false);</span>
+    // negative lookahead here to avoid matching &quot;'s&quot; and so on
+<span class="fc" id="L209">    addUnit(&quot;(?:ft|′|')(?!(\\w|\\d))&quot;, FEET, &quot;ft&quot;, 1, false);</span>
+    // removed 'in', &quot; because of many false positives
+<span class="fc" id="L211">    addUnit(&quot;(?:inch|″)(?!(\\w|\\d))&quot;, INCH, &quot;inch&quot;, 1, false);</span>
+
+<span class="fc" id="L213">    addUnit(&quot;(?:km/h|kmh)&quot;, KILOMETRE_PER_HOUR, &quot;km/h&quot;, 1, true);</span>
+<span class="fc" id="L214">    addUnit(&quot;(?:mph)&quot;, MILE.divide(HOUR), &quot;mph&quot;, 1, false);</span>
+
+<span class="fc" id="L216">    addUnit(&quot;km&quot;, METRE, &quot;km&quot;, 1e3, true);</span>
+<span class="fc" id="L217">    addUnit(&quot;m&quot;, METRE, &quot;m&quot;,   1e0, true);</span>
+<span class="fc" id="L218">    addUnit(&quot;dm&quot;, METRE, &quot;dm&quot;, 1e-1,  false/*true*/); // Metric, but not commonly used</span>
+<span class="fc" id="L219">    addUnit(&quot;cm&quot;, METRE, &quot;cm&quot;, 1e-2, true);</span>
+<span class="fc" id="L220">    addUnit(&quot;mm&quot;, METRE, &quot;mm&quot;, 1e-3, true);</span>
+<span class="fc" id="L221">    addUnit(&quot;µm&quot;, METRE, &quot;µm&quot;, 1e-6, true);</span>
+<span class="fc" id="L222">    addUnit(&quot;nm&quot;, METRE, &quot;nm&quot;, 1e-9, true);</span>
+
+<span class="fc" id="L224">    addUnit(&quot;m(?:\\^2|2|²)&quot;, SQUARE_METRE, &quot;m²&quot;, 1, true);</span>
+<span class="fc" id="L225">    addUnit(&quot;ha&quot;, SQUARE_METRE, &quot;ha&quot;, 1e4, true);</span>
+<span class="fc" id="L226">    addUnit(&quot;a&quot;, SQUARE_METRE, &quot;a&quot;, 1e2, true);</span>
+<span class="fc" id="L227">    addUnit(&quot;km(?:\\^2|2|²)&quot;, SQUARE_METRE, &quot;km²&quot;, 1e6, true);</span>
+<span class="fc" id="L228">    addUnit(&quot;dm(?:\\^2|2|²)&quot;, SQUARE_METRE, &quot;dm²&quot;, 1e-2,  false/*true*/); // Metric, but not commonly used</span>
+<span class="fc" id="L229">    addUnit(&quot;cm(?:\\^2|2|²)&quot;, SQUARE_METRE, &quot;cm²&quot;, 1e-4, true);</span>
+<span class="fc" id="L230">    addUnit(&quot;mm(?:\\^2|2|²)&quot;, SQUARE_METRE, &quot;mm²&quot;, 1e-6, true);</span>
+<span class="fc" id="L231">    addUnit(&quot;µm(?:\\^2|2|²)&quot;, SQUARE_METRE, &quot;µm²&quot;, 1e-12, true);</span>
+<span class="fc" id="L232">    addUnit(&quot;nm(?:\\^2|2|²)&quot;, SQUARE_METRE, &quot;nm²&quot;, 1e-18, true);</span>
+
+<span class="fc" id="L234">    addUnit(&quot;(?:sq|square) (?:in(?:ch)?|inches)&quot;, INCH.multiply(INCH), &quot;sq in&quot;, 1, false);</span>
+<span class="fc" id="L235">    addUnit(&quot;(?:inches|in|inch) (?:\\^2|2|²)&quot;, INCH.multiply(INCH), &quot;in²&quot;, 1, false);</span>
+
+<span class="fc" id="L237">    addUnit(&quot;(?:sq|square) (?:ft|feet|foot)&quot;, FEET.multiply(FEET), &quot;sq ft&quot;, 1, false);</span>
+<span class="fc" id="L238">    addUnit(&quot;sf&quot;, FEET.multiply(FEET), &quot;sf&quot;, 1, false);</span>
+<span class="fc" id="L239">    addUnit(&quot;ft(?:\\^2|2|²)&quot;, FEET.multiply(FEET), &quot;ft²&quot;, 1, false);</span>
+
+<span class="fc" id="L241">    addUnit(&quot;(?:sq|square) (?:yds?|yards?)&quot;, YARD.multiply(YARD), &quot;sq yd&quot;, 1, false);</span>
+<span class="fc" id="L242">    addUnit(&quot;(?:yards?|yds?)(?:\\^2|2|²)&quot;, YARD.multiply(YARD), &quot;yd²&quot;, 1, false);</span>
+
+<span class="fc" id="L244">    addUnit(&quot;m(?:\\^3|3|³)&quot;, CUBIC_METRE, &quot;m³&quot;, 1, true);</span>
+<span class="fc" id="L245">    addUnit(&quot;km(?:\\^3|3|³)&quot;, CUBIC_METRE, &quot;km³&quot;, 1e9, true);</span>
+<span class="fc" id="L246">    addUnit(&quot;dm(?:\\^3|3|³)&quot;, CUBIC_METRE, &quot;dm³&quot;, 1e-3,  false/*true*/); // Metric, but not commonly used</span>
+<span class="fc" id="L247">    addUnit(&quot;cm(?:\\^3|3|³)&quot;, CUBIC_METRE, &quot;cm³&quot;, 1e-6, true);</span>
+<span class="fc" id="L248">    addUnit(&quot;mm(?:\\^3|3|³)&quot;, CUBIC_METRE, &quot;mm³&quot;, 1e-9, true);</span>
+<span class="fc" id="L249">    addUnit(&quot;µm(?:\\^3|3|³)&quot;, CUBIC_METRE, &quot;µm³&quot;, 1e-18, true);</span>
+<span class="fc" id="L250">    addUnit(&quot;nm(?:\\^3|3|³)&quot;, CUBIC_METRE, &quot;nm³&quot;, 1e-27, true);</span>
+
+<span class="fc" id="L252">    addUnit(&quot;(?:cubic|cu) (?:feet|ft|foot)&quot;, FEET.multiply(FEET).multiply(FEET), &quot;cubic feet&quot;, 1, false);</span>
+<span class="fc" id="L253">    addUnit(&quot;(?:feet|ft|foot)(?:\\^3|3|³)&quot;, FEET.multiply(FEET).multiply(FEET), &quot;ft³&quot;, 1, false);</span>
+
+<span class="fc" id="L255">    addUnit(&quot;(?:cubic|cu) (?:inch|in|inches)&quot;, INCH.multiply(INCH).multiply(INCH), &quot;cubic inch&quot;, 1, false);</span>
+<span class="fc" id="L256">    addUnit(&quot;(?:inch|in)(?:\\^3|3|³)&quot;, INCH.multiply(INCH).multiply(INCH), &quot;inch³&quot;, 1, false);</span>
+
+<span class="fc" id="L258">    addUnit(&quot;(?:cubic|cu) (?:yards?|yds?)&quot;, YARD.multiply(YARD).multiply(YARD), &quot;cubic yard&quot;, 1, false);</span>
+<span class="fc" id="L259">    addUnit(&quot;(?:yard|yd)(?:\\^3|3|³)&quot;, YARD.multiply(YARD).multiply(YARD), &quot;yard³&quot;, 1, false);</span>
+
+<span class="fc" id="L261">    addUnit(&quot;l&quot;, LITRE, &quot;l&quot;, 1, true);</span>
+<span class="fc" id="L262">    addUnit(&quot;ml&quot;, LITRE, &quot;ml&quot;, 1e-3, true);</span>
+
+
+<span class="fc" id="L265">    addUnit( &quot;°F&quot;, FAHRENHEIT, &quot;°F&quot;, 1, false);</span>
+<span class="fc" id="L266">    addUnit( &quot;°C&quot;, CELSIUS, &quot;°C&quot;, 1, true);</span>
+
+<span class="fc" id="L268">    convertedPatterns.add(Pattern.compile(&quot;\\s*\\((?:ca. )?&quot; + NUMBER_REGEX + &quot;\\s*([^)]+)\\s*\\)&quot;));</span>
+
+    // recognizes 5'6&quot; = 5 feet + 6 inches = 5.5 feet
+<span class="fc" id="L271">    Function&lt;MatchResult, Double&gt; parseFeetAndInch = match -&gt; {</span>
+      double feet, inch;
+      try {
+<span class="nc" id="L274">        feet = getNumberFormat().parse(match.group(1)).doubleValue();</span>
+<span class="nc" id="L275">      } catch (ParseException e) {</span>
+<span class="nc" id="L276">        return null;</span>
+<span class="nc" id="L277">      }</span>
+      try {
+<span class="nc" id="L279">        inch = getNumberFormat().parse(match.group(2)).doubleValue();</span>
+<span class="nc" id="L280">      } catch (ParseException e) {</span>
+<span class="nc" id="L281">        inch = 0.0;</span>
+<span class="nc" id="L282">      }</span>
+<span class="nc" id="L283">      return feet + inch / 12.0;</span>
+    };
+<span class="fc" id="L285">    Map.Entry&lt;Unit, Function&lt;MatchResult, Double&gt;&gt; feetAndInchEntry = new AbstractMap.SimpleImmutableEntry&lt;&gt;( FEET, parseFeetAndInch );</span>
+<span class="fc" id="L286">    specialPatterns.put(Pattern.compile(&quot;(?:(?&lt;=[^º°\\d]))\\s(\\d+)(?:ft|′|')\\s*(\\d+)\\s*(?:in|\&quot;|″)?&quot;), feetAndInchEntry);</span>
+<span class="fc" id="L287">    specialPatterns.put(Pattern.compile(&quot;(?:(?&lt;=[^º°\\d\\s]))(\\d+)(?:ft|′|')\\s*(\\d+)\\s*(?:in|\&quot;|″)?&quot;), feetAndInchEntry);</span>
+<span class="fc" id="L288">  }</span>
+
+  /**
+   * @param value number to convert
+   * @param unit unit used in text
+   * @return suggestions of the given number converted into metric units, sorted by naturalness
+   *         or null if conversion is not necessary / was not possible
+   */
+  @Nullable
+  protected List&lt;Map.Entry&lt;Unit, Double&gt;&gt; getMetricEquivalent(double value, @NotNull Unit unit) {
+<span class="nc" id="L298">    LinkedList&lt;Map.Entry&lt;Unit, Double&gt;&gt; conversions = new LinkedList&lt;&gt;();</span>
+<span class="nc bnc" id="L299" title="All 2 branches missed.">    for (Unit metric : metricUnits) {</span>
+<span class="nc bnc" id="L300" title="All 2 branches missed.">      if (unit.equals(metric)) { // don't convert to itself</span>
+<span class="nc" id="L301">        return null;</span>
+      }
+<span class="nc bnc" id="L303" title="All 2 branches missed.">      if (unit.isCompatible(metric)) {</span>
+<span class="nc" id="L304">        Double converted = unit.getConverterTo(metric).convert(value);</span>
+<span class="nc" id="L305">        conversions.add(new AbstractMap.SimpleImmutableEntry&lt;&gt;(metric, converted));</span>
+      }
+<span class="nc" id="L307">    }</span>
+<span class="nc" id="L308">    sortByNaturalness(conversions);</span>
+<span class="nc bnc" id="L309" title="All 2 branches missed.">    if (conversions.isEmpty()) {</span>
+<span class="nc" id="L310">      return null;</span>
+    } else {
+<span class="nc" id="L312">      return conversions;</span>
+    }
+  }
+
+  @Nullable
+  protected List&lt;String&gt; formatMeasurement(double value, @NotNull Unit unit) {
+<span class="nc" id="L318">    List&lt;Map.Entry&lt;Unit, Double&gt;&gt; equivalents = getMetricEquivalent(value, unit);</span>
+<span class="nc bnc" id="L319" title="All 2 branches missed.">    if (equivalents == null) {</span>
+<span class="nc" id="L320">      return null;</span>
+    }
+<span class="nc" id="L322">    List&lt;String&gt; formatted = getFormattedConversions(equivalents);</span>
+<span class="nc bnc" id="L323" title="All 2 branches missed.">    if (formatted.isEmpty()) {</span>
+<span class="nc" id="L324">      return null;</span>
+    }
+<span class="nc" id="L326">    return formatted;</span>
+  }
+
+  /**
+   * Adds different formatted variants of the given conversions up to MAX_SUGGESTIONS.
+   * @param conversions as computed by getMetricEquivalent
+   * @return formatted numbers, with various units and unit symbols, rounded to integers or according to getNumberFormat
+   */
+  @NotNull
+  private List&lt;String&gt; getFormattedConversions(List&lt;Map.Entry&lt;Unit, Double&gt;&gt; conversions) {
+<span class="nc" id="L336">    List&lt;String&gt; formatted = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L337" title="All 2 branches missed.">    for (Map.Entry&lt;Unit, Double&gt; equivalent : conversions) {</span>
+<span class="nc" id="L338">      Unit metric = equivalent.getKey();</span>
+<span class="nc" id="L339">      double converted = equivalent.getValue();</span>
+<span class="nc" id="L340">      long rounded = Math.round(converted);</span>
+<span class="nc bnc" id="L341" title="All 2 branches missed.">      for (String symbol : unitSymbols.getOrDefault(metric, new ArrayList&lt;&gt;())) {</span>
+<span class="nc bnc" id="L342" title="All 2 branches missed.">        if (formatted.size() &gt; MAX_SUGGESTIONS) {</span>
+<span class="nc" id="L343">          break;</span>
+        }
+<span class="nc bnc" id="L345" title="All 4 branches missed.">        if (Math.abs(converted - rounded) / Math.abs(converted) &lt; ROUNDING_DELTA &amp;&amp; rounded != 0) {</span>
+<span class="nc" id="L346">          String formattedStr = formatRounded(getNumberFormat().format(rounded) + &quot; &quot; + symbol);</span>
+<span class="nc bnc" id="L347" title="All 2 branches missed.">          if (!formatted.contains(formattedStr)) {</span>
+<span class="nc" id="L348">            formatted.add(formattedStr);</span>
+          }
+        }
+<span class="nc" id="L351">        String formattedNumber = getNumberFormat().format(converted);</span>
+<span class="nc" id="L352">        String formattedStr = formattedNumber + &quot; &quot; + symbol;</span>
+        // TODO: be cleverer than !equals(&quot;0&quot;), can prevent valid conversions
+<span class="nc bnc" id="L354" title="All 4 branches missed.">        if (!formatted.contains(formattedStr) &amp;&amp; !formattedNumber.equals(&quot;0&quot;)) {</span>
+<span class="nc" id="L355">          formatted.add(formattedStr);</span>
+        }
+<span class="nc" id="L357">      }</span>
+<span class="nc" id="L358">    }</span>
+<span class="nc" id="L359">    return formatted;</span>
+  }
+
+  private void sortByNaturalness(List&lt;Map.Entry&lt;Unit, Double&gt;&gt; conversions) {
+<span class="nc" id="L363">    conversions.sort((a, b) -&gt; { // sort according to &quot;naturalness&quot; of this unit, i.e. numbers not being too small/large</span>
+<span class="nc" id="L364">      DoubleUnaryOperator naturalness = number -&gt; { // smaller score -&gt; better</span>
+<span class="nc" id="L365">        double abs = Math.abs(number);</span>
+<span class="nc bnc" id="L366" title="All 2 branches missed.">        if (abs &lt; 1.0) {</span>
+<span class="nc" id="L367">          return 1.0 / (abs * abs * 2);</span>
+<span class="nc bnc" id="L368" title="All 2 branches missed.">        } else if (abs &lt; 100) {</span>
+<span class="nc" id="L369">          return abs - 50;</span>
+        } else {
+<span class="nc" id="L371">          return abs * abs;</span>
+        }
+      };
+<span class="nc" id="L374">      double scoreA = naturalness.applyAsDouble(a.getValue());</span>
+<span class="nc" id="L375">      double scoreB = naturalness.applyAsDouble(b.getValue());</span>
+<span class="nc" id="L376">      return Double.compare(scoreA, scoreB);</span>
+    });
+<span class="nc" id="L378">  }</span>
+
+  private void matchUnits(AnalyzedSentence sentence, List&lt;RuleMatch&gt; matches, List&lt;Map.Entry&lt;Integer, Integer&gt;&gt; ignoreRanges, boolean isMetric) {
+<span class="fc bfc" id="L381" title="All 2 branches covered.">    for (Pattern unitPattern : unitPatterns.keySet()) { // find specific unit through lookup of pattern</span>
+<span class="fc bfc" id="L382" title="All 2 branches covered.">      if (metricUnits.contains(unitPatterns.get(unitPattern)) != isMetric) {</span>
+<span class="fc" id="L383">        continue;</span>
+      }
+<span class="fc" id="L385">      Matcher unitMatcher = unitPattern.matcher(sentence.getText());</span>
+<span class="pc bpc" id="L386" title="1 of 2 branches missed.">      while (unitMatcher.find()) {</span>
+<span class="nc" id="L387">        boolean ignore = false;</span>
+<span class="nc bnc" id="L388" title="All 2 branches missed.">        for (Map.Entry&lt;Integer, Integer&gt; range : ignoreRanges) {</span>
+<span class="nc bnc" id="L389" title="All 4 branches missed.">          if (unitMatcher.start() &gt;= range.getKey() &amp;&amp; unitMatcher.end() &lt;= range.getValue()) {</span>
+<span class="nc" id="L390">            ignore = true;</span>
+<span class="nc" id="L391">            break;</span>
+          }
+<span class="nc" id="L393">        }</span>
+<span class="nc bnc" id="L394" title="All 2 branches missed.">        if (!ignore) {</span>
+<span class="nc" id="L395">          tryConversion(sentence, matches, unitPattern, null, null, unitMatcher, ignoreRanges);</span>
+        }
+<span class="nc" id="L397">      }</span>
+<span class="fc" id="L398">    }</span>
+<span class="fc" id="L399">  }</span>
+
+
+  protected boolean detectNumberRange(AnalyzedSentence sentence, Matcher matcher) {
+<span class="nc" id="L403">    boolean hyphenInNumber = matcher.group(1).startsWith(&quot;-&quot;);</span>
+<span class="nc bnc" id="L404" title="All 2 branches missed.">    if (!hyphenInNumber) {</span>
+<span class="nc" id="L405">      return false;</span>
+    }
+
+<span class="nc" id="L408">    String textBefore = sentence.getText().substring(0, matcher.start());</span>
+<span class="nc" id="L409">    boolean endsWithNumberRangePart = numberRangePart.matcher(textBefore).find();</span>
+
+<span class="nc" id="L411">    return endsWithNumberRangePart;</span>
+  }
+
+  private void tryConversion(AnalyzedSentence sentence, List&lt;RuleMatch&gt; matches, Pattern unitPattern, Double customValue, Unit customUnit, Matcher unitMatcher, List&lt;Map.Entry&lt;Integer, Integer&gt;&gt; ignoreRanges) {
+<span class="nc" id="L415">    Map.Entry&lt;Integer, Integer&gt; range = new AbstractMap.SimpleImmutableEntry&lt;&gt;(</span>
+<span class="nc" id="L416">      unitMatcher.start(), unitMatcher.end());</span>
+<span class="nc" id="L417">    ignoreRanges.add(range);</span>
+    // search for an existing conversion, e.g. &quot;5 miles (8km)&quot;
+<span class="nc" id="L419">    String convertedInText = null;</span>
+<span class="nc" id="L420">    int convertedOffset = unitMatcher.end();</span>
+<span class="nc" id="L421">    Matcher convertedMatcher = null;</span>
+<span class="nc bnc" id="L422" title="All 2 branches missed.">    for (Pattern convertedPattern : convertedPatterns) {</span>
+<span class="nc" id="L423">      convertedMatcher = convertedPattern.matcher(sentence.getText().substring(convertedOffset));</span>
+<span class="nc bnc" id="L424" title="All 4 branches missed.">      if (convertedMatcher.find() &amp;&amp; convertedMatcher.start() == 0) {</span>
+<span class="nc" id="L425">        convertedInText = convertedMatcher.group(0);</span>
+<span class="nc" id="L426">        break;</span>
+      }
+<span class="nc" id="L428">    }</span>
+    // customValue/unit are used with patterns in specialPatterns, where unit and value are already extracted
+<span class="nc" id="L430">    Unit unit = unitPatterns.getOrDefault(unitPattern, customUnit);</span>
+    double value;
+<span class="nc bnc" id="L432" title="All 2 branches missed.">    if (customValue == null) {</span>
+      try {
+<span class="nc" id="L434">        String valueAsString = unitMatcher.group(1);</span>
+        // remove hyphen at start if it belongs to a range (e.g 1-5 miles)
+        // see https://github.com/languagetool-org/languagetool/issues/2170
+        // TODO convert whole range, not only end
+<span class="nc bnc" id="L438" title="All 2 branches missed.">        if (detectNumberRange(sentence, unitMatcher)) {</span>
+<span class="nc" id="L439">          valueAsString = valueAsString.substring(1);</span>
+        }
+<span class="nc" id="L441">        value = getNumberFormat().parse(valueAsString).doubleValue();</span>
+<span class="nc" id="L442">      } catch (ParseException e) {</span>
+<span class="nc" id="L443">        return;</span>
+<span class="nc" id="L444">      }</span>
+    } else {
+<span class="nc" id="L446">      value = customValue;</span>
+    }
+<span class="nc" id="L448">    List&lt;String&gt; converted = formatMeasurement(value, unit);</span>
+<span class="nc bnc" id="L449" title="All 4 branches missed.">    if (converted == null &amp;&amp; convertedInText == null) {</span>
+      // no conversion necessary, e.g. already metric
+<span class="nc bnc" id="L451" title="All 2 branches missed.">    } else if (convertedInText == null) { // no conversion found -&gt; suggest one</span>
+<span class="nc" id="L452">      RuleMatch match = new RuleMatch(this, sentence, unitMatcher.start(), unitMatcher.end(),</span>
+<span class="nc" id="L453">        getMessage(Message.SUGGESTION), getShortMessage(Message.SUGGESTION));</span>
+<span class="nc" id="L454">      List&lt;String&gt; suggestions = converted.stream()</span>
+<span class="nc" id="L455">        .map(formatted -&gt; getSuggestion(unitMatcher.group(0), formatted))</span>
+<span class="nc" id="L456">        .collect(Collectors.toList());</span>
+<span class="nc" id="L457">      match.setSuggestedReplacements(suggestions);</span>
+<span class="nc" id="L458">      match.setUrl(buildURLForExplanation(unitMatcher.group(0)));</span>
+<span class="nc" id="L459">      matches.add(match);</span>
+<span class="nc" id="L460">    } else { // check given conversion for accuracy</span>
+<span class="nc" id="L461">      Map.Entry&lt;Integer, Integer&gt; convertedRange = new AbstractMap.SimpleImmutableEntry&lt;&gt;(</span>
+<span class="nc" id="L462">        convertedMatcher.start(0) + convertedOffset, convertedMatcher.end(0) + convertedOffset);</span>
+<span class="nc" id="L463">      ignoreRanges.add(convertedRange);</span>
+
+      // already using one of our conversions?
+<span class="nc" id="L466">      String finalConvertedInText = convertedInText.trim();</span>
+<span class="nc" id="L467">      String convertedTrimmed = finalConvertedInText.substring(1, finalConvertedInText.length()-1);</span>
+<span class="nc bnc" id="L468" title="All 4 branches missed.">      if (converted != null &amp;&amp; converted.stream().anyMatch(s -&gt; s.equals(convertedTrimmed))) {</span>
+<span class="nc" id="L469">        return;</span>
+      }
+<span class="nc" id="L471">      Optional&lt;Pattern&gt; convertedUnitPattern = unitPatterns.keySet().stream()</span>
+<span class="nc" id="L472">        .filter(pattern -&gt; pattern.matcher(finalConvertedInText).find())</span>
+<span class="nc" id="L473">        .findFirst();</span>
+<span class="nc bnc" id="L474" title="All 2 branches missed.">      if (convertedUnitPattern.isPresent()) { // known unit used for conversion</span>
+<span class="nc" id="L475">        Unit convertedUnit = unitPatterns.get(convertedUnitPattern.get());</span>
+        Double convertedValueInText;
+        try {
+<span class="nc" id="L478">          convertedValueInText = getNumberFormat().parse(convertedMatcher.group(1)).doubleValue();</span>
+<span class="nc" id="L479">        } catch (ParseException e) {</span>
+<span class="nc" id="L480">          return;</span>
+<span class="nc" id="L481">        }</span>
+<span class="nc bnc" id="L482" title="All 2 branches missed.">        if (converted == null) { // already metric, check conversion in convertedUnit / convertedValueInText (order may be reversed)</span>
+<span class="nc" id="L483">          List&lt;String&gt; reverseConverted = null;</span>
+          try {
+<span class="nc" id="L485">            double unitConverted = unit.getConverterTo(convertedUnit).convert(value);</span>
+<span class="nc" id="L486">            double diff = Math.abs(unitConverted - convertedValueInText);</span>
+<span class="nc bnc" id="L487" title="All 2 branches missed.">            if (diff &gt; DELTA) {</span>
+<span class="nc" id="L488">              RuleMatch match = new RuleMatch(this, sentence,</span>
+<span class="nc" id="L489">                convertedMatcher.start(1) + convertedOffset, convertedMatcher.end(1) + convertedOffset,</span>
+<span class="nc" id="L490">                getMessage(Message.CHECK), getShortMessage(Message.CHECK));</span>
+<span class="nc" id="L491">              match.setUrl(buildURLForExplanation(convertedTrimmed));</span>
+<span class="nc" id="L492">              List&lt;Map.Entry&lt;Unit, Double&gt;&gt; numbers = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L493">              numbers.add(new AbstractMap.SimpleImmutableEntry&lt;&gt;(convertedUnit, unitConverted));</span>
+<span class="nc" id="L494">              reverseConverted = getFormattedConversions(numbers);</span>
+<span class="nc bnc" id="L495" title="All 2 branches missed.">              if (reverseConverted.stream().anyMatch(s -&gt; s.equals(convertedTrimmed))) {</span>
+<span class="nc" id="L496">                return;</span>
+              }
+<span class="nc" id="L498">              match.setSuggestedReplacements(reverseConverted);</span>
+<span class="nc" id="L499">              matches.add(match);</span>
+            }
+<span class="nc" id="L501">          } catch (UnconvertibleException e) {</span>
+<span class="nc" id="L502">            RuleMatch match = new RuleMatch(this, sentence, unitMatcher.start(), convertedMatcher.end() + convertedOffset,</span>
+<span class="nc" id="L503">              getMessage(Message.UNIT_MISMATCH), getShortMessage(Message.UNIT_MISMATCH));</span>
+<span class="nc bnc" id="L504" title="All 2 branches missed.">            if (reverseConverted != null) {</span>
+<span class="nc" id="L505">              match.setSuggestedReplacements(reverseConverted);</span>
+            }
+<span class="nc" id="L507">            match.setUrl(buildURLForExplanation(convertedTrimmed));</span>
+<span class="nc" id="L508">            matches.add(match);</span>
+<span class="nc" id="L509">          }</span>
+<span class="nc" id="L510">        } else { // found conversion to metric, check for accuracy</span>
+<span class="nc" id="L511">          List&lt;Map.Entry&lt;Unit, Double&gt;&gt; metricEquivalents = getMetricEquivalent(value, unit);</span>
+<span class="nc bnc" id="L512" title="All 4 branches missed.">          if (metricEquivalents == null || metricEquivalents.isEmpty()) {</span>
+<span class="nc" id="L513">            return;</span>
+          }
+<span class="nc" id="L515">          Map.Entry&lt;Unit, Double&gt; metricEquivalent = metricEquivalents.get(0);</span>
+<span class="nc" id="L516">          Unit metricUnit = metricEquivalent.getKey();</span>
+<span class="nc" id="L517">          Double convertedValueComputed = metricEquivalent.getValue();</span>
+<span class="nc" id="L518">          String original = unitMatcher.group(0);</span>
+<span class="nc" id="L519">          List&lt;String&gt; corrected = converted.stream()</span>
+<span class="nc" id="L520">            .map(suggestion -&gt; getSuggestion(original, suggestion)).collect(Collectors.toList());</span>
+<span class="nc bnc" id="L521" title="All 4 branches missed.">          if (!(convertedUnit.equals(metricUnit) &amp;&amp; Math.abs(convertedValueInText - convertedValueComputed) &lt; DELTA)) {</span>
+<span class="nc" id="L522">            RuleMatch match = new RuleMatch(this, sentence,</span>
+<span class="nc" id="L523">              unitMatcher.start(), convertedMatcher.end(0) + convertedOffset,</span>
+<span class="nc" id="L524">              getMessage(Message.CHECK), getShortMessage(Message.CHECK));</span>
+<span class="nc" id="L525">            match.setSuggestedReplacements(corrected);</span>
+<span class="nc" id="L526">            match.setUrl(buildURLForExplanation(unitMatcher.group(0)));</span>
+<span class="nc" id="L527">            matches.add(match);</span>
+          }
+        }
+<span class="nc bnc" id="L530" title="All 2 branches missed.">      } else if (converted != null) { // unknown unit used for conversion</span>
+<span class="nc" id="L531">        RuleMatch match = new RuleMatch(this, sentence,</span>
+<span class="nc" id="L532">          convertedMatcher.start(1) + convertedOffset, convertedMatcher.end(2) + convertedOffset,</span>
+<span class="nc" id="L533">          getMessage(Message.CHECK_UNKNOWN_UNIT), getShortMessage(Message.CHECK_UNKNOWN_UNIT));</span>
+<span class="nc" id="L534">        match.setSuggestedReplacements(converted);</span>
+<span class="nc" id="L535">        matches.add(match);</span>
+      }
+    }
+<span class="nc" id="L538">  }</span>
+
+  @Override
+  public RuleMatch[] match(AnalyzedSentence sentence) throws IOException {
+<span class="fc" id="L542">    List&lt;RuleMatch&gt; matches = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L543">    List&lt;Map.Entry&lt;Integer, Integer&gt;&gt; ignoreRanges = new LinkedList&lt;&gt;();</span>
+
+    // handle special patterns where simple number parsing is not enough, e.g. 5'6&quot;
+<span class="fc bfc" id="L546" title="All 2 branches covered.">    for (Pattern specialPattern : specialPatterns.keySet()) {</span>
+<span class="fc" id="L547">      Matcher matcher = specialPattern.matcher(sentence.getText());</span>
+<span class="pc bpc" id="L548" title="1 of 2 branches missed.">      while (matcher.find()) {</span>
+<span class="nc" id="L549">        MatchResult result = matcher.toMatchResult();</span>
+<span class="nc" id="L550">        Double value = specialPatterns.get(specialPattern).getValue().apply(result);</span>
+<span class="nc" id="L551">        Unit unit = specialPatterns.get(specialPattern).getKey();</span>
+<span class="nc bnc" id="L552" title="All 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L553">          continue;</span>
+        }
+<span class="nc" id="L555">        boolean ignore = false;</span>
+<span class="nc bnc" id="L556" title="All 2 branches missed.">        for (Map.Entry&lt;Integer, Integer&gt; range : ignoreRanges) {</span>
+<span class="nc bnc" id="L557" title="All 4 branches missed.">          if (matcher.start() &gt;= range.getKey() &amp;&amp; matcher.end() &lt;= range.getValue()) {</span>
+<span class="nc" id="L558">            ignore = true;</span>
+<span class="nc" id="L559">            break;</span>
+          }
+<span class="nc" id="L561">        }</span>
+<span class="nc bnc" id="L562" title="All 2 branches missed.">        if (!ignore) {</span>
+<span class="nc" id="L563">          tryConversion(sentence, matches, specialPattern, value, unit, matcher, ignoreRanges);</span>
+        }
+<span class="nc" id="L565">      }</span>
+<span class="fc" id="L566">    }</span>
+
+    // check for numbers with a given set of units (e.g. imperial)
+
+    // two runs: first metric units, so that ignore ranges are set up properly
+    // then match other units
+    // should fix sentences like 10 km (5 miles), where 5 miles matches first and matching 10 km first would have prevented that
+    // there should be no influence on other results
+<span class="fc" id="L574">    matchUnits(sentence, matches, ignoreRanges, true);</span>
+<span class="fc" id="L575">    matchUnits(sentence, matches, ignoreRanges, false);</span>
+<span class="fc" id="L576">    Map&lt;Integer, RuleMatch&gt; matchesByStart = new HashMap&lt;&gt;();</span>
+    // deduplicate matches with equal start, longer match should win, e.g. miles per hour over just miles
+<span class="pc bpc" id="L578" title="1 of 2 branches missed.">    for (RuleMatch match : matches) {</span>
+<span class="nc" id="L579">      matchesByStart.compute(match.getFromPos(), (pos, other) -&gt;</span>
+<span class="nc bnc" id="L580" title="All 2 branches missed.">        other == null ? match :</span>
+<span class="nc bnc" id="L581" title="All 2 branches missed.">        match.getToPos() &gt; other.getToPos() ? match : other);</span>
+<span class="nc" id="L582">    }</span>
+<span class="fc" id="L583">    return matchesByStart.values().toArray(new RuleMatch[0]);</span>
+  }
+  
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

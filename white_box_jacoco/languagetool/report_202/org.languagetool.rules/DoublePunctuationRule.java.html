@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DoublePunctuationRule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules</a> &gt; <span class="el_source">DoublePunctuationRule.java</span></div><h1>DoublePunctuationRule.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker 
+ * Copyright (C) 2005 Daniel Naber (http://www.danielnaber.de)
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.ResourceBundle;
+
+import org.languagetool.AnalyzedSentence;
+import org.languagetool.AnalyzedTokenReadings;
+
+/**
+ * A rule that matches &quot;..&quot; (but not &quot;...&quot; etc) and &quot;,,&quot;.
+ * 
+ * @author Daniel Naber
+ */
+public class DoublePunctuationRule extends Rule {
+
+  public DoublePunctuationRule(ResourceBundle messages) {
+<span class="fc" id="L36">    super(messages);</span>
+<span class="fc" id="L37">    super.setCategory(Categories.PUNCTUATION.getCategory(messages));</span>
+<span class="fc" id="L38">    setLocQualityIssueType(ITSIssueType.Typographical);</span>
+<span class="fc" id="L39">  }</span>
+
+  @Override
+  public String getId() {
+<span class="fc" id="L43">    return &quot;DOUBLE_PUNCTUATION&quot;;</span>
+  }
+
+  @Override
+  public final String getDescription() {
+<span class="nc" id="L48">    return messages.getString(&quot;desc_double_punct&quot;);</span>
+  }
+  
+  public String getCommaCharacter() {
+<span class="fc" id="L52">    return &quot;,&quot;;</span>
+  }
+
+  @Override
+  public final RuleMatch[] match(AnalyzedSentence sentence) {
+<span class="fc" id="L57">    List&lt;RuleMatch&gt; ruleMatches = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L58">    AnalyzedTokenReadings[] tokens = sentence.getTokensWithoutWhitespace();</span>
+<span class="fc" id="L59">    int startPos = 0;</span>
+<span class="fc" id="L60">    int dotCount = 0;</span>
+<span class="fc" id="L61">    int commaCount = 0;</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">    for (int i = 1; i &lt; tokens.length; i++) {</span>
+<span class="fc" id="L63">      String token = tokens[i].getToken();</span>
+<span class="fc" id="L64">      String nextToken = null;</span>
+<span class="fc" id="L65">      String prevToken = null;</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">      if (i &lt; tokens.length - 1) {</span>
+<span class="fc" id="L67">        nextToken = tokens[i + 1].getToken();</span>
+      }
+<span class="fc bfc" id="L69" title="All 2 branches covered.">      if (i &gt; 1) {</span>
+<span class="fc" id="L70">        prevToken = tokens[i - 2].getToken();</span>
+      }
+<span class="fc bfc" id="L72" title="All 2 branches covered.">      if (&quot;.&quot;.equals(token)) {</span>
+<span class="fc" id="L73">        dotCount++;</span>
+<span class="fc" id="L74">        commaCount = 0;</span>
+<span class="fc" id="L75">        startPos = tokens[i].getStartPos();</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">      } else if (getCommaCharacter().equals(token)) {</span>
+<span class="nc" id="L77">        commaCount++;</span>
+<span class="nc" id="L78">        dotCount = 0;</span>
+<span class="nc" id="L79">        startPos = tokens[i].getStartPos();</span>
+      }
+<span class="pc bpc" id="L81" title="7 of 8 branches missed.">      if (dotCount == 2 &amp;&amp; !&quot;.&quot;.equals(nextToken) &amp;&amp; !&quot;?&quot;.equals(prevToken) &amp;&amp; !&quot;!&quot;.equals(prevToken)) {</span>
+<span class="nc" id="L82">        int fromPos = Math.max(0, startPos - 1);</span>
+<span class="nc" id="L83">        RuleMatch ruleMatch = new RuleMatch(this, sentence, fromPos, startPos + 1,</span>
+<span class="nc" id="L84">            getDotMessage(), messages.getString(&quot;double_dots_short&quot;));</span>
+<span class="nc" id="L85">        ruleMatch.addSuggestedReplacement(&quot;.&quot;);</span>
+<span class="nc" id="L86">        ruleMatch.addSuggestedReplacement(&quot;…&quot;);</span>
+<span class="nc" id="L87">        ruleMatches.add(ruleMatch);</span>
+<span class="nc" id="L88">        dotCount = 0;</span>
+<span class="pc bpc" id="L89" title="3 of 4 branches missed.">      } else if (commaCount == 2 &amp;&amp; !getCommaCharacter().equals(nextToken)) {</span>
+<span class="nc" id="L90">        int fromPos = Math.max(0, startPos - 1);</span>
+<span class="nc" id="L91">        RuleMatch ruleMatch = new RuleMatch(this, sentence, fromPos, startPos + 1,</span>
+<span class="nc" id="L92">            getCommaMessage(), messages.getString(&quot;double_commas_short&quot;));</span>
+<span class="nc" id="L93">        ruleMatch.setSuggestedReplacement(getCommaCharacter());</span>
+<span class="nc" id="L94">        ruleMatches.add(ruleMatch);</span>
+<span class="nc" id="L95">        commaCount = 0;</span>
+      }
+<span class="pc bpc" id="L97" title="1 of 4 branches missed.">      if (!&quot;.&quot;.equals(token) &amp;&amp; !getCommaCharacter().equals(token)) {</span>
+<span class="fc" id="L98">        dotCount = 0;</span>
+<span class="fc" id="L99">        commaCount = 0;</span>
+      }
+    }
+
+<span class="fc" id="L103">    return toRuleMatchArray(ruleMatches);</span>
+  }
+
+  protected String getDotMessage() {
+<span class="nc" id="L107">    return messages.getString(&quot;two_dots&quot;);</span>
+  }
+
+  protected String getCommaMessage() {
+<span class="nc" id="L111">    return messages.getString(&quot;two_commas&quot;);</span>
+  }
+  
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,774 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PatternRuleHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules.patterns</a> &gt; <span class="el_source">PatternRuleHandler.java</span></div><h1>PatternRuleHandler.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2012 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules.patterns;
+
+import org.apache.commons.lang3.ObjectUtils;
+import org.languagetool.Languages;
+import org.languagetool.rules.*;
+import org.languagetool.tagging.disambiguation.rules.DisambiguationPatternRule;
+import org.xml.sax.Attributes;
+import org.xml.sax.SAXException;
+
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.*;
+import java.util.regex.Pattern;
+
+public class PatternRuleHandler extends XMLRuleHandler {
+
+  public static final String TYPE = &quot;type&quot;;
+
+  static final String MARKER_TAG = &quot;&lt;marker&gt;&quot;;
+  static final String RAW_TAG = &quot;raw_pos&quot;;
+  static final String PLEASE_SPELL_ME = &quot;&lt;pleasespellme/&gt;&quot;;
+
+  private static final String EXTERNAL = &quot;external&quot;;
+
+  protected final String sourceFile;
+
+  protected Category category;
+  protected String categoryIssueType;
+  protected String ruleGroupIssueType;
+  protected String ruleIssueType;
+  protected String name;
+  protected String filterClassName;
+  protected String filterArgs;
+
+<span class="pc" id="L53">  private final List&lt;DisambiguationPatternRule&gt; rulegroupAntiPatterns = new ArrayList&lt;&gt;();</span>
+<span class="pc" id="L54">  private final List&lt;DisambiguationPatternRule&gt; ruleAntiPatterns = new ArrayList&lt;&gt;();</span>
+<span class="pc" id="L55">  private final List&lt;String&gt; categoryTags = new ArrayList&lt;&gt;();</span>
+<span class="pc" id="L56">  private final List&lt;String&gt; ruleGroupTags = new ArrayList&lt;&gt;();</span>
+<span class="pc" id="L57">  private final List&lt;String&gt; ruleTags = new ArrayList&lt;&gt;();</span>
+
+  private int subId;
+  private boolean interpretPosTagsPreDisambiguation;
+
+  private boolean defaultOff;
+  private boolean defaultTempOff;
+  private boolean ruleGroupDefaultOff;
+  private boolean ruleGroupDefaultTempOff;
+
+  private String ruleGroupDescription;
+<span class="pc" id="L68">  private int startPos = -1;</span>
+<span class="pc" id="L69">  private int endPos = -1;</span>
+  private int tokenCountForMarker;
+
+  private int antiPatternCounter;
+
+  private boolean inRule;
+
+<span class="pc" id="L76">  private boolean relaxedMode = false;</span>
+  private boolean inAntiPattern;
+  
+  private boolean isRuleSuppressMisspelled;
+  private boolean isSuggestionSupressMisspelled;
+
+  private String idPrefix;
+
+<span class="nc" id="L84">  public PatternRuleHandler() {</span>
+<span class="nc" id="L85">    this.sourceFile = null;</span>
+<span class="nc" id="L86">  }</span>
+
+<span class="fc" id="L88">  public PatternRuleHandler(String sourceFile) {</span>
+<span class="fc" id="L89">    this.sourceFile = sourceFile;</span>
+<span class="fc" id="L90">  }</span>
+
+  /**
+   * If set to true, don't throw an exception if id or name is not set.
+   * Used for online rule editor.
+   * @since 2.1
+   */
+  void setRelaxedMode(boolean relaxedMode) {
+<span class="fc" id="L98">    this.relaxedMode = relaxedMode;</span>
+<span class="fc" id="L99">  }</span>
+
+  // ===========================================================
+  // SAX DocumentHandler methods
+  // ===========================================================
+
+  @Override
+  public void startElement(String namespaceURI, String lName,
+                           String qName, Attributes attrs) throws SAXException {
+<span class="pc bpc" id="L108" title="1 of 30 branches missed.">    switch (qName) {</span>
+      case &quot;category&quot;:
+<span class="fc" id="L110">        String catName = attrs.getValue(NAME);</span>
+<span class="fc" id="L111">        String catId = attrs.getValue(ID);</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        Category.Location location = YES.equals(attrs.getValue(EXTERNAL)) ?</span>
+                Category.Location.EXTERNAL : Category.Location.INTERNAL;
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        boolean onByDefault = !OFF.equals(attrs.getValue(DEFAULT));</span>
+<span class="fc" id="L115">        String tabName = attrs.getValue(TABNAME);</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        category = new Category(catId != null ? new CategoryId(catId) : null, catName, location, onByDefault, tabName);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (attrs.getValue(TYPE) != null) {</span>
+<span class="fc" id="L118">          categoryIssueType = attrs.getValue(TYPE);</span>
+        }
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (attrs.getValue(&quot;tags&quot;) != null) {</span>
+<span class="nc" id="L121">          categoryTags.addAll(Arrays.asList(attrs.getValue(&quot;tags&quot;).split(&quot; &quot;)));</span>
+        }
+        break;
+      case &quot;rules&quot;:
+<span class="fc" id="L125">        String languageStr = attrs.getValue(&quot;lang&quot;);</span>
+<span class="fc" id="L126">        idPrefix = attrs.getValue(&quot;idprefix&quot;);</span>
+<span class="fc" id="L127">        language = Languages.getLanguageForShortCode(languageStr);</span>
+<span class="fc" id="L128">        break;</span>
+      case &quot;regexp&quot;:
+<span class="fc" id="L130">        inRegex = true;</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        regexMode = &quot;exact&quot;.equals(attrs.getValue(&quot;type&quot;)) ? RegexpMode.EXACT : RegexpMode.SMART;</span>
+<span class="pc bpc" id="L132" title="1 of 4 branches missed.">        regexCaseSensitive = attrs.getValue(CASE_SENSITIVE) != null &amp;&amp; YES.equals(attrs.getValue(CASE_SENSITIVE));</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        regexpMark = attrs.getValue(MARK) != null ? Integer.parseInt(attrs.getValue(MARK)) : 0;</span>
+<span class="fc" id="L134">        break;</span>
+      case RULE:
+<span class="fc" id="L136">        regex = new StringBuilder();</span>
+<span class="fc" id="L137">        inRule = true;</span>
+<span class="fc" id="L138">        shortMessage = new StringBuilder();</span>
+<span class="fc" id="L139">        message = new StringBuilder();</span>
+<span class="fc" id="L140">        suggestionsOutMsg = new StringBuilder();</span>
+<span class="fc" id="L141">        url = new StringBuilder();</span>
+<span class="fc" id="L142">        id = attrs.getValue(ID);</span>
+<span class="fc" id="L143">        name = attrs.getValue(NAME);</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        if (inRuleGroup) {</span>
+<span class="fc" id="L145">          subId++;</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">          if (id == null) {</span>
+<span class="fc" id="L147">            id = ruleGroupId;</span>
+          }
+<span class="fc bfc" id="L149" title="All 2 branches covered.">          if (name == null) {</span>
+<span class="fc" id="L150">            name = ruleGroupDescription;</span>
+          }
+        }
+<span class="pc bpc" id="L153" title="3 of 4 branches missed.">        if (id == null &amp;&amp; !relaxedMode) {</span>
+<span class="nc" id="L154">          throw new RuntimeException(&quot;id is null for rule with name '&quot; + name + &quot;'&quot;);</span>
+        }
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        id = idPrefix != null ? idPrefix + id : id;</span>
+
+<span class="pc bpc" id="L158" title="1 of 6 branches missed.">        if (inRuleGroup &amp;&amp; ruleGroupDefaultOff &amp;&amp; attrs.getValue(DEFAULT) != null) {</span>
+<span class="nc" id="L159">          throw new RuntimeException(&quot;Rule group &quot; + ruleGroupId + &quot; is off by default, thus rule &quot; + id + &quot; cannot specify 'default=...'&quot;);</span>
+        }
+<span class="pc bpc" id="L161" title="1 of 6 branches missed.">        if (inRuleGroup &amp;&amp; ruleGroupDefaultTempOff &amp;&amp; attrs.getValue(DEFAULT) != null) {</span>
+<span class="nc" id="L162">          throw new RuntimeException(&quot;Rule group &quot; + ruleGroupId + &quot; is off by default, thus rule &quot; + id + &quot; cannot specify 'default=...'&quot;);</span>
+        }
+<span class="fc bfc" id="L164" title="All 4 branches covered.">        if (inRuleGroup &amp;&amp; ruleGroupDefaultOff) {</span>
+<span class="fc" id="L165">          defaultOff = true;</span>
+<span class="fc bfc" id="L166" title="All 4 branches covered.">        } else if (inRuleGroup &amp;&amp; ruleGroupDefaultTempOff) {</span>
+<span class="fc" id="L167">          defaultTempOff = true;</span>
+        } else {
+<span class="fc" id="L169">          defaultOff = OFF.equals(attrs.getValue(DEFAULT));</span>
+<span class="fc" id="L170">          defaultTempOff = TEMP_OFF.equals(attrs.getValue(DEFAULT));</span>
+        }
+
+<span class="fc" id="L173">        correctExamples = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L174">        incorrectExamples = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L175">        errorTriggeringExamples = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L176">        suggestionMatches.clear();</span>
+<span class="fc" id="L177">        suggestionMatchesOutMsg.clear();</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        if (attrs.getValue(TYPE) != null) {</span>
+<span class="fc" id="L179">          ruleIssueType = attrs.getValue(TYPE);</span>
+        }
+<span class="fc" id="L181">        isRuleSuppressMisspelled = false;</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        if (attrs.getValue(&quot;tags&quot;) != null) {</span>
+<span class="nc" id="L183">          ruleTags.addAll(Arrays.asList(attrs.getValue(&quot;tags&quot;).split(&quot; &quot;)));</span>
+        }
+        break;
+      case PATTERN:
+<span class="fc" id="L187">        startPattern(attrs);</span>
+<span class="fc" id="L188">        tokenCountForMarker = 0;</span>
+<span class="fc" id="L189">        interpretPosTagsPreDisambiguation = YES.equals(attrs.getValue(RAW_TAG));</span>
+<span class="fc" id="L190">        break;</span>
+      case ANTIPATTERN:
+<span class="fc" id="L192">        inAntiPattern = true;</span>
+<span class="fc" id="L193">        antiPatternCounter++;</span>
+<span class="fc" id="L194">        caseSensitive = YES.equals(attrs.getValue(CASE_SENSITIVE));</span>
+<span class="fc" id="L195">        tokenCounter = 0;</span>
+<span class="fc" id="L196">        tokenCountForMarker = 0;</span>
+<span class="fc" id="L197">        break;</span>
+      case AND:
+<span class="fc" id="L199">        inAndGroup = true;</span>
+<span class="fc" id="L200">        tokenCountForMarker++;</span>
+<span class="fc" id="L201">        break;</span>
+      case OR:
+<span class="fc" id="L203">        inOrGroup = true;</span>
+<span class="fc" id="L204">        tokenCountForMarker++;</span>
+<span class="fc" id="L205">        break;</span>
+      case UNIFY:
+<span class="fc" id="L207">        inUnification = true;</span>
+<span class="fc" id="L208">        uniNegation = YES.equals(attrs.getValue(NEGATE));</span>
+<span class="fc" id="L209">        break;</span>
+      case UNIFY_IGNORE:
+<span class="fc" id="L211">        inUnificationNeutral = true;</span>
+<span class="fc" id="L212">        break;</span>
+      case FEATURE:
+<span class="fc" id="L214">        uFeature = attrs.getValue(ID);</span>
+<span class="fc" id="L215">        break;</span>
+      case TYPE:
+<span class="fc" id="L217">        uType = attrs.getValue(ID);</span>
+<span class="fc" id="L218">        uTypeList.add(uType);</span>
+<span class="fc" id="L219">        break;</span>
+      case TOKEN:
+<span class="fc" id="L221">        setToken(attrs);</span>
+<span class="fc bfc" id="L222" title="All 4 branches covered.">        if (!inAndGroup &amp;&amp; !inOrGroup) {</span>
+<span class="fc" id="L223">          tokenCountForMarker++;</span>
+        }
+        break;
+      case EXCEPTION:
+<span class="fc" id="L227">        setExceptions(attrs);</span>
+<span class="fc" id="L228">        break;</span>
+      case EXAMPLE:
+<span class="fc" id="L230">        String typeVal = attrs.getValue(TYPE);</span>
+<span class="fc bfc" id="L231" title="All 4 branches covered.">        if (&quot;incorrect&quot;.equals(typeVal) || attrs.getValue(&quot;correction&quot;) != null) {</span>
+<span class="fc" id="L232">          inIncorrectExample = true;</span>
+<span class="fc" id="L233">          incorrectExample = new StringBuilder();</span>
+<span class="fc" id="L234">          exampleCorrection = new StringBuilder();</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">          if (attrs.getValue(&quot;correction&quot;) != null) {</span>
+<span class="fc" id="L236">            exampleCorrection.append(attrs.getValue(&quot;correction&quot;));</span>
+          }
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        } else if (&quot;triggers_error&quot;.equals(typeVal)) {</span>
+<span class="fc" id="L239">          inErrorTriggerExample = true;</span>
+<span class="fc" id="L240">          errorTriggerExample = new StringBuilder();</span>
+        } else {
+          // no attribute implies the sentence is a correct example
+<span class="fc" id="L243">          inCorrectExample = true;</span>
+<span class="fc" id="L244">          correctExample = new StringBuilder();</span>
+        }
+<span class="fc" id="L246">        break;</span>
+      case &quot;filter&quot;:
+<span class="fc" id="L248">        filterClassName = attrs.getValue(&quot;class&quot;);</span>
+<span class="fc" id="L249">        filterArgs = attrs.getValue(&quot;args&quot;);</span>
+<span class="fc" id="L250">        break;</span>
+      case MESSAGE:
+<span class="fc" id="L252">        inMessage = true;</span>
+<span class="fc" id="L253">        inSuggestion = false;</span>
+<span class="fc" id="L254">        message = new StringBuilder();</span>
+<span class="fc" id="L255">        isRuleSuppressMisspelled = YES.equals(attrs.getValue(&quot;suppress_misspelled&quot;));</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">        if (isRuleSuppressMisspelled) {</span>
+<span class="fc" id="L257">          message.append(PLEASE_SPELL_ME);</span>
+        } 
+        break;
+      case SUGGESTION:
+<span class="fc" id="L261">        String strToAppend = &quot;&lt;suggestion&gt;&quot;;</span>
+<span class="fc" id="L262">        isSuggestionSupressMisspelled = YES.equals(attrs.getValue(&quot;suppress_misspelled&quot;));</span>
+<span class="fc bfc" id="L263" title="All 4 branches covered.">        if (isSuggestionSupressMisspelled || isRuleSuppressMisspelled) {</span>
+<span class="fc" id="L264">          strToAppend = strToAppend + PLEASE_SPELL_ME;</span>
+        }
+<span class="fc bfc" id="L266" title="All 2 branches covered.">        if (inMessage) {</span>
+<span class="fc" id="L267">          message.append(strToAppend);</span>
+        } else { // suggestions outside message
+<span class="fc" id="L269">          suggestionsOutMsg.append(strToAppend);</span>
+        }
+<span class="fc" id="L271">        inSuggestion = true;</span>
+<span class="fc" id="L272">        break;</span>
+      case &quot;short&quot;:
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">        if (inRule) {</span>
+<span class="fc" id="L275">          inShortMessage = true;</span>
+<span class="fc" id="L276">          shortMessage = new StringBuilder();</span>
+        } else {
+<span class="nc" id="L278">          inShortMessageForRuleGroup = true;</span>
+<span class="nc" id="L279">          shortMessageForRuleGroup = new StringBuilder();</span>
+        }
+<span class="nc" id="L281">        break;</span>
+      case &quot;url&quot;:
+<span class="fc bfc" id="L283" title="All 2 branches covered.">        if (inRule) {</span>
+<span class="fc" id="L284">          inUrl = true;</span>
+<span class="fc" id="L285">          url = new StringBuilder();</span>
+        } else {
+<span class="fc" id="L287">          inUrlForRuleGroup = true;</span>
+<span class="fc" id="L288">          urlForRuleGroup = new StringBuilder();</span>
+        }
+<span class="fc" id="L290">        break;</span>
+      case RULEGROUP:
+<span class="fc" id="L292">        ruleGroupId = attrs.getValue(ID);</span>
+<span class="fc" id="L293">        ruleGroupDescription = attrs.getValue(NAME);</span>
+<span class="fc" id="L294">        ruleGroupDefaultOff = OFF.equals(attrs.getValue(DEFAULT));</span>
+<span class="fc" id="L295">        ruleGroupDefaultTempOff = TEMP_OFF.equals(attrs.getValue(DEFAULT));</span>
+<span class="fc" id="L296">        urlForRuleGroup = new StringBuilder();</span>
+<span class="fc" id="L297">        shortMessageForRuleGroup = new StringBuilder();</span>
+<span class="fc" id="L298">        inRuleGroup = true;</span>
+<span class="fc" id="L299">        subId = 0;</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">        if (attrs.getValue(TYPE) != null) {</span>
+<span class="fc" id="L301">          ruleGroupIssueType = attrs.getValue(TYPE);</span>
+        }
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">        if (attrs.getValue(&quot;tags&quot;) != null) {</span>
+<span class="nc" id="L304">          ruleGroupTags.addAll(Arrays.asList(attrs.getValue(&quot;tags&quot;).split(&quot; &quot;)));</span>
+        }
+        break;
+      case MATCH:
+<span class="fc bfc" id="L308" title="All 6 branches covered.">        setMatchElement(attrs, inSuggestion &amp;&amp; (isSuggestionSupressMisspelled || isRuleSuppressMisspelled));</span>
+<span class="fc" id="L309">        break;</span>
+      case MARKER:
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        if (inIncorrectExample) {</span>
+<span class="fc" id="L312">          incorrectExample.append(MARKER_TAG);</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">        } else if (inCorrectExample) {</span>
+<span class="fc" id="L314">          correctExample.append(MARKER_TAG);</span>
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">        } else if (inErrorTriggerExample) {</span>
+<span class="nc" id="L316">          errorTriggerExample.append(MARKER_TAG);</span>
+<span class="pc bpc" id="L317" title="1 of 4 branches missed.">        } else if (inPattern || inAntiPattern) {</span>
+<span class="fc" id="L318">          startPos = tokenCounter;</span>
+<span class="fc" id="L319">          inMarker = true;</span>
+        }
+        break;
+      case UNIFICATION:
+<span class="fc" id="L323">        uFeature = attrs.getValue(&quot;feature&quot;);</span>
+<span class="fc" id="L324">        inUnificationDef = true;</span>
+<span class="fc" id="L325">        break;</span>
+      case &quot;equivalence&quot;:
+<span class="fc" id="L327">        uType = attrs.getValue(TYPE);</span>
+<span class="fc" id="L328">        break;</span>
+      case PHRASES:
+<span class="fc" id="L330">        inPhrases = true;</span>
+<span class="fc" id="L331">        break;</span>
+      case &quot;includephrases&quot;:
+<span class="fc" id="L333">        break;</span>
+      case &quot;phrase&quot;:
+<span class="pc bpc" id="L335" title="1 of 2 branches missed.">        if (inPhrases) {</span>
+<span class="fc" id="L336">          phraseId = attrs.getValue(ID);</span>
+        }
+        break;
+      case &quot;phraseref&quot;:
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">        if (attrs.getValue(&quot;idref&quot;) != null) {</span>
+<span class="fc" id="L341">          preparePhrase(attrs);</span>
+<span class="fc" id="L342">          tokenCountForMarker++;</span>
+        }
+        break;
+    }
+<span class="fc" id="L346">  }</span>
+
+  @Override
+  public void endElement(String namespaceURI, String sName,
+      String qName) throws SAXException {
+<span class="fc bfc" id="L351" title="All 25 branches covered.">    switch (qName) {</span>
+      case &quot;category&quot;:
+<span class="fc" id="L353">        categoryIssueType = null;</span>
+<span class="fc" id="L354">        categoryTags.clear();</span>
+<span class="fc" id="L355">        break;</span>
+      case &quot;regexp&quot;:
+<span class="fc" id="L357">        inRegex = false;</span>
+<span class="fc" id="L358">        break;</span>
+      case RULE:
+<span class="fc" id="L360">        suggestionMatchesOutMsg = addLegacyMatches(suggestionMatchesOutMsg, suggestionsOutMsg.toString(), false);</span>
+<span class="pc bpc" id="L361" title="3 of 4 branches missed.">        if (relaxedMode &amp;&amp; id == null) {</span>
+<span class="nc" id="L362">          id = &quot;&quot;;</span>
+        }
+<span class="pc bpc" id="L364" title="3 of 4 branches missed.">        if (relaxedMode &amp;&amp; name == null) {</span>
+<span class="nc" id="L365">          name = &quot;&quot;;</span>
+        }
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        if (phrasePatternTokens.isEmpty()) {</span>
+          // Elements contain information whether they are inside a &lt;marker&gt;...&lt;/marker&gt;,
+          // but for phraserefs this depends on the position where the phraseref is used
+          // not where it's defined. Thus we have to copy the elements so each use of
+          // the phraseref can carry their own information:
+
+<span class="fc" id="L373">          List&lt;PatternToken&gt; tmpPatternTokens = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L374">          createRules(new ArrayList&lt;&gt;(patternTokens), tmpPatternTokens, 0);</span>
+
+<span class="fc" id="L376">        } else {</span>
+<span class="fc bfc" id="L377" title="All 2 branches covered.">          if (!patternTokens.isEmpty()) {</span>
+<span class="fc bfc" id="L378" title="All 2 branches covered.">            for (List&lt;PatternToken&gt; ph : phrasePatternTokens) {</span>
+<span class="fc" id="L379">              ph.addAll(new ArrayList&lt;&gt;(patternTokens));</span>
+<span class="fc" id="L380">            }</span>
+          }
+<span class="fc bfc" id="L382" title="All 2 branches covered.">          for (List&lt;PatternToken&gt; phrasePatternToken : phrasePatternTokens) {</span>
+<span class="fc" id="L383">            processElement(phrasePatternToken);</span>
+<span class="fc" id="L384">            List&lt;PatternToken&gt; tmpPatternTokens = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L385">            createRules(phrasePatternToken, tmpPatternTokens, 0);</span>
+<span class="fc" id="L386">          }</span>
+        }
+<span class="fc" id="L388">        patternTokens.clear();</span>
+<span class="pc bpc" id="L389" title="1 of 2 branches missed.">        if (phrasePatternTokens != null) {</span>
+<span class="fc" id="L390">          phrasePatternTokens.clear();</span>
+        }
+<span class="fc" id="L392">        ruleIssueType = null;</span>
+<span class="fc" id="L393">        inRule = false;</span>
+<span class="fc" id="L394">        filterClassName = null;</span>
+<span class="fc" id="L395">        filterArgs = null;</span>
+<span class="fc" id="L396">        ruleTags.clear();</span>
+<span class="fc" id="L397">        break;</span>
+      case EXCEPTION:
+<span class="fc" id="L399">        finalizeExceptions();</span>
+<span class="fc" id="L400">        break;</span>
+      case AND:
+<span class="fc" id="L402">        inAndGroup = false;</span>
+<span class="fc" id="L403">        andGroupCounter = 0;</span>
+<span class="fc" id="L404">        tokenCounter++;</span>
+<span class="fc" id="L405">        break;</span>
+      case OR:
+<span class="fc" id="L407">        inOrGroup = false;</span>
+<span class="fc" id="L408">        orGroupCounter = 0;</span>
+<span class="fc" id="L409">        tokenCounter++;</span>
+<span class="fc" id="L410">        break;</span>
+      case TOKEN:
+<span class="fc" id="L412">        finalizeTokens();</span>
+<span class="fc" id="L413">        break;</span>
+      case PATTERN:
+<span class="fc" id="L415">        inPattern = false;</span>
+<span class="fc bfc" id="L416" title="All 2 branches covered.">        if (lastPhrase) {</span>
+<span class="fc" id="L417">          patternTokens.clear();</span>
+        }
+<span class="fc" id="L419">        tokenCounter = 0;</span>
+<span class="fc" id="L420">        break;</span>
+      case ANTIPATTERN:
+<span class="fc" id="L422">        String antiId = id;</span>
+<span class="fc bfc" id="L423" title="All 2 branches covered.">        if (inRuleGroup) {</span>
+<span class="fc bfc" id="L424" title="All 2 branches covered.">          if (subId &gt; 0) {</span>
+<span class="fc" id="L425">            antiId = ruleGroupId + &quot;[&quot; + subId + &quot;]&quot;;</span>
+          } else {
+<span class="fc" id="L427">            antiId = ruleGroupId;</span>
+          }
+        }
+<span class="fc" id="L430">        DisambiguationPatternRule rule = new DisambiguationPatternRule(</span>
+            antiId + &quot;_antipattern:&quot; + antiPatternCounter,
+            &quot;antipattern&quot;, language, patternTokens, null, null,
+            DisambiguationPatternRule.DisambiguatorAction.IMMUNIZE);
+<span class="pc bpc" id="L434" title="1 of 4 branches missed.">        if (startPos != -1 &amp;&amp; endPos != -1) {</span>
+<span class="fc" id="L435">          rule.setStartPositionCorrection(startPos);</span>
+<span class="fc" id="L436">          rule.setEndPositionCorrection(endPos - tokenCountForMarker);</span>
+        } else {
+          // No '&lt;marker&gt;'? Then add artificial &lt;marker&gt;s around all tokens to work
+          // around issue https://github.com/languagetool-org/languagetool/issues/189:
+<span class="fc bfc" id="L440" title="All 2 branches covered.">          for (PatternToken patternToken : patternTokens) {</span>
+<span class="fc" id="L441">            patternToken.setInsideMarker(true);</span>
+<span class="fc" id="L442">          }</span>
+        }
+<span class="fc" id="L444">        patternTokens.clear();</span>
+<span class="fc bfc" id="L445" title="All 2 branches covered.">        if (inRule) {</span>
+<span class="fc" id="L446">          ruleAntiPatterns.add(rule);</span>
+        } else { // a rulegroup shares all antipatterns not included in a single rule
+<span class="fc" id="L448">          rulegroupAntiPatterns.add(rule);</span>
+        }
+<span class="fc" id="L450">        tokenCounter = 0;</span>
+<span class="fc" id="L451">        inAntiPattern = false;</span>
+<span class="fc" id="L452">        break;</span>
+      case EXAMPLE:
+<span class="fc bfc" id="L454" title="All 2 branches covered.">        if (inCorrectExample) {</span>
+<span class="fc" id="L455">          correctExamples.add(new CorrectExample(correctExample.toString()));</span>
+<span class="fc bfc" id="L456" title="All 2 branches covered.">        } else if (inIncorrectExample) {</span>
+          IncorrectExample example;
+<span class="fc" id="L458">          List&lt;String&gt; corrections = new ArrayList&lt;&gt;(Arrays.asList(exampleCorrection.toString().split(&quot;\\|&quot;)));</span>
+<span class="pc bpc" id="L459" title="1 of 2 branches missed.">          if (corrections.size() &gt; 0) {</span>
+<span class="pc bpc" id="L460" title="1 of 2 branches missed.">            if (exampleCorrection.toString().endsWith(&quot;|&quot;)) {  // split() will ignore trailing empty items</span>
+<span class="nc" id="L461">              corrections.add(&quot;&quot;);</span>
+            }
+<span class="fc" id="L463">            example = new IncorrectExample(incorrectExample.toString(), corrections);</span>
+          } else {
+<span class="nc" id="L465">            example = new IncorrectExample(incorrectExample.toString());</span>
+          }
+<span class="fc" id="L467">          incorrectExamples.add(example);</span>
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">        } else if (inErrorTriggerExample) {</span>
+<span class="fc" id="L469">          errorTriggeringExamples.add(new ErrorTriggeringExample(errorTriggerExample.toString()));</span>
+        }
+<span class="fc" id="L471">        inCorrectExample = false;</span>
+<span class="fc" id="L472">        inIncorrectExample = false;</span>
+<span class="fc" id="L473">        inErrorTriggerExample = false;</span>
+<span class="fc" id="L474">        correctExample = new StringBuilder();</span>
+<span class="fc" id="L475">        incorrectExample = new StringBuilder();</span>
+<span class="fc" id="L476">        errorTriggerExample = new StringBuilder();</span>
+<span class="fc" id="L477">        exampleCorrection = new StringBuilder();</span>
+<span class="fc" id="L478">        break;</span>
+      case MESSAGE:
+<span class="fc" id="L480">        suggestionMatches = addLegacyMatches(suggestionMatches, message.toString(), true);</span>
+<span class="fc" id="L481">        inMessage = false;</span>
+<span class="fc" id="L482">        break;</span>
+      case SUGGESTION:
+<span class="fc bfc" id="L484" title="All 2 branches covered.">        if (inMessage) {</span>
+<span class="fc" id="L485">          message.append(&quot;&lt;/suggestion&gt;&quot;);</span>
+        } else { //suggestion outside message
+<span class="fc" id="L487">          suggestionsOutMsg.append(&quot;&lt;/suggestion&gt;&quot;);</span>
+        }
+<span class="fc" id="L489">        inSuggestion = false;</span>
+<span class="fc" id="L490">        break;</span>
+      case &quot;short&quot;:
+<span class="fc" id="L492">        inShortMessage = false;</span>
+<span class="fc" id="L493">        inShortMessageForRuleGroup = false;</span>
+<span class="fc" id="L494">        break;</span>
+      case &quot;url&quot;:
+<span class="fc" id="L496">        inUrl = false;</span>
+<span class="fc" id="L497">        inUrlForRuleGroup = false;</span>
+<span class="fc" id="L498">        break;</span>
+      case MATCH:
+<span class="fc bfc" id="L500" title="All 2 branches covered.">        if (inMessage) {</span>
+<span class="fc" id="L501">          suggestionMatches.get(suggestionMatches.size() - 1).</span>
+<span class="fc" id="L502">              setLemmaString(match.toString());</span>
+<span class="fc bfc" id="L503" title="All 2 branches covered.">        } else if (inSuggestion) {</span>
+<span class="fc" id="L504">          suggestionMatchesOutMsg.get(suggestionMatchesOutMsg.size() - 1).</span>
+<span class="fc" id="L505">              setLemmaString(match.toString());</span>
+<span class="pc bpc" id="L506" title="1 of 2 branches missed.">        } else if (inToken) {</span>
+<span class="fc" id="L507">          tokenReference.setLemmaString(match.toString());</span>
+        }
+<span class="fc" id="L509">        inMatch = false;</span>
+<span class="fc" id="L510">        break;</span>
+      case RULEGROUP:
+<span class="fc" id="L512">        urlForRuleGroup = new StringBuilder();</span>
+<span class="fc" id="L513">        shortMessageForRuleGroup = new StringBuilder();</span>
+<span class="fc" id="L514">        inRuleGroup = false;</span>
+<span class="fc" id="L515">        ruleGroupIssueType = null;</span>
+<span class="fc" id="L516">        rulegroupAntiPatterns.clear();</span>
+<span class="fc" id="L517">        antiPatternCounter = 0;</span>
+<span class="fc" id="L518">        ruleGroupDefaultOff = false;</span>
+<span class="fc" id="L519">        ruleGroupDefaultTempOff = false;</span>
+<span class="fc" id="L520">        defaultOff = false;</span>
+<span class="fc" id="L521">        defaultTempOff = false;</span>
+<span class="fc" id="L522">        ruleGroupTags.clear();</span>
+<span class="fc" id="L523">        break;</span>
+      case MARKER:
+<span class="fc bfc" id="L525" title="All 2 branches covered.">        if (inCorrectExample) {</span>
+<span class="fc" id="L526">          correctExample.append(&quot;&lt;/marker&gt;&quot;);</span>
+<span class="fc bfc" id="L527" title="All 2 branches covered.">        } else if (inIncorrectExample) {</span>
+<span class="fc" id="L528">          incorrectExample.append(&quot;&lt;/marker&gt;&quot;);</span>
+<span class="pc bpc" id="L529" title="1 of 2 branches missed.">        } else if (inErrorTriggerExample) {</span>
+<span class="nc" id="L530">          errorTriggerExample.append(&quot;&lt;/marker&gt;&quot;);</span>
+<span class="pc bpc" id="L531" title="1 of 4 branches missed.">        } else if (inPattern || inAntiPattern) {</span>
+<span class="fc" id="L532">          endPos = tokenCountForMarker;</span>
+<span class="fc" id="L533">          inMarker = false;</span>
+        }
+        break;
+      case &quot;phrase&quot;:
+<span class="pc bpc" id="L537" title="1 of 2 branches missed.">        if (inPhrases) {</span>
+<span class="fc" id="L538">          finalizePhrase();</span>
+        }
+        break;
+      case &quot;includephrases&quot;:
+<span class="fc" id="L542">        patternTokens.clear();</span>
+<span class="fc" id="L543">        break;</span>
+      case PHRASES:
+<span class="pc bpc" id="L545" title="1 of 2 branches missed.">        if (inPhrases) {</span>
+<span class="fc" id="L546">          inPhrases = false;</span>
+        }
+        break;
+      case UNIFICATION:
+<span class="fc" id="L550">        inUnificationDef = false;</span>
+<span class="fc" id="L551">        break;</span>
+      case FEATURE:
+<span class="fc" id="L553">        equivalenceFeatures.put(uFeature, uTypeList);</span>
+<span class="fc" id="L554">        uTypeList = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L555">        break;</span>
+      case UNIFY:
+<span class="fc" id="L557">        inUnification = false;</span>
+        //clear the features...
+<span class="fc" id="L559">        equivalenceFeatures = new HashMap&lt;&gt;();</span>
+        //set negation on the last token only!
+<span class="fc" id="L561">        int lastElement = patternTokens.size() - 1;</span>
+<span class="fc" id="L562">        patternTokens.get(lastElement).setLastInUnification();</span>
+<span class="fc bfc" id="L563" title="All 2 branches covered.">        if (uniNegation) {</span>
+<span class="fc" id="L564">          patternTokens.get(lastElement).setUniNegation();</span>
+        }
+        break;
+      case UNIFY_IGNORE:
+<span class="fc" id="L568">        inUnificationNeutral = false;</span>
+        break;
+    }
+<span class="fc" id="L571">  }</span>
+
+  /**
+   * Create rule from an Element list.
+   * In case of OR groups, several rules are created recursively.
+   * @since 2.3
+   * 
+   * @param elemList The complete original Element list
+   * @param tmpPatternTokens Temporary list being created
+   * @param numElement Index of elemList being analyzed
+   */
+  private void createRules(List&lt;PatternToken&gt; elemList,
+    List&lt;PatternToken&gt; tmpPatternTokens, int numElement) {
+<span class="fc" id="L584">    String shortMessage = &quot;&quot;;</span>
+<span class="pc bpc" id="L585" title="1 of 4 branches missed.">    if (this.shortMessage != null &amp;&amp; this.shortMessage.length() &gt; 0) {</span>
+<span class="fc" id="L586">      shortMessage = this.shortMessage.toString();</span>
+<span class="pc bpc" id="L587" title="2 of 4 branches missed.">    } else if (shortMessageForRuleGroup != null &amp;&amp; shortMessageForRuleGroup.length() &gt; 0) {</span>
+<span class="nc" id="L588">      shortMessage = this.shortMessageForRuleGroup.toString();</span>
+    }
+<span class="fc bfc" id="L590" title="All 2 branches covered.">    if (numElement &gt;= elemList.size()) {</span>
+      AbstractPatternRule rule;
+<span class="fc bfc" id="L592" title="All 2 branches covered.">      if (tmpPatternTokens.size() &gt; 0) {</span>
+<span class="fc" id="L593">        rule = new PatternRule(id, language, tmpPatternTokens, name,</span>
+<span class="fc" id="L594">                message.toString(), shortMessage,</span>
+<span class="fc bfc" id="L595" title="All 2 branches covered.">                suggestionsOutMsg.toString(), phrasePatternTokens.size() &gt; 1, interpretPosTagsPreDisambiguation);</span>
+<span class="fc" id="L596">        rule.addTags(ruleTags);</span>
+<span class="fc" id="L597">        rule.addTags(ruleGroupTags);</span>
+<span class="fc" id="L598">        rule.addTags(categoryTags);</span>
+<span class="fc" id="L599">        rule.setSourceFile(sourceFile);</span>
+<span class="pc bpc" id="L600" title="1 of 2 branches missed.">      } else if (regex.length() &gt; 0) {</span>
+<span class="pc bpc" id="L601" title="1 of 2 branches missed.">        int flags = regexCaseSensitive ? 0 : Pattern.CASE_INSENSITIVE|Pattern.UNICODE_CASE;</span>
+<span class="fc" id="L602">        String regexStr = regex.toString();</span>
+<span class="pc bpc" id="L603" title="1 of 2 branches missed.">        if (regexMode == RegexpMode.SMART) {</span>
+          // Note: it's not that easy to add \b because the regex might look like '(foo)' or '\d' so we cannot just look at the last character
+<span class="fc" id="L605">          regexStr = replaceSpacesInRegex(regexStr);</span>
+        }
+<span class="pc bpc" id="L607" title="2 of 4 branches missed.">        if (ruleAntiPatterns.size() &gt; 0 || rulegroupAntiPatterns.size() &gt; 0) {</span>
+<span class="nc" id="L608">          throw new RuntimeException(&quot;&lt;regexp&gt; rules currently cannot be used together with &lt;antipattern&gt;. Rule id: &quot; + id + &quot;[&quot; + subId + &quot;]&quot;);</span>
+        }
+<span class="fc" id="L610">        rule = new RegexPatternRule(id, name, message.toString(), shortMessage, suggestionsOutMsg.toString(), language, Pattern.compile(regexStr, flags), regexpMark);</span>
+<span class="fc" id="L611">        rule.setSourceFile(sourceFile);</span>
+<span class="fc" id="L612">      } else {</span>
+<span class="nc" id="L613">        throw new IllegalStateException(&quot;Neither '&lt;pattern&gt;' tokens nor '&lt;regex&gt;' is set in rule '&quot; + id + &quot;'&quot;);</span>
+      }
+<span class="fc" id="L615">      setRuleFilter(filterClassName, filterArgs, rule);</span>
+<span class="fc" id="L616">      prepareRule(rule);</span>
+<span class="fc" id="L617">      rules.add(rule);</span>
+<span class="fc" id="L618">    } else {</span>
+<span class="fc" id="L619">      PatternToken patternToken = elemList.get(numElement);</span>
+<span class="fc bfc" id="L620" title="All 2 branches covered.">      if (patternToken.hasOrGroup()) {</span>
+        // When creating a new rule, we finally clear the backed-up variables. All the elements in
+        // the OR group should share the values of backed-up variables. That's why these variables
+        // are backed-up.
+<span class="fc" id="L624">        List&lt;Match&gt; suggestionMatchesBackup = new ArrayList&lt;&gt;(suggestionMatches);</span>
+<span class="fc" id="L625">        List&lt;Match&gt; suggestionMatchesOutMsgBackup =  new ArrayList&lt;&gt;(suggestionMatchesOutMsg);</span>
+<span class="fc" id="L626">        int startPosBackup = startPos;</span>
+<span class="fc" id="L627">        int endPosBackup = endPos;</span>
+<span class="fc" id="L628">        List&lt;DisambiguationPatternRule&gt; ruleAntiPatternsBackup = new ArrayList&lt;&gt;(ruleAntiPatterns);</span>
+<span class="fc bfc" id="L629" title="All 2 branches covered.">        for (PatternToken patternTokenOfOrGroup : patternToken.getOrGroup()) {</span>
+<span class="fc" id="L630">          List&lt;PatternToken&gt; tmpElements2 = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L631">          tmpElements2.addAll(tmpPatternTokens);</span>
+<span class="fc" id="L632">          tmpElements2.add(ObjectUtils.clone(patternTokenOfOrGroup));</span>
+<span class="fc" id="L633">          createRules(elemList, tmpElements2, numElement + 1);</span>
+<span class="fc" id="L634">          startPos = startPosBackup;</span>
+<span class="fc" id="L635">          endPos = endPosBackup;</span>
+<span class="fc" id="L636">          suggestionMatches = suggestionMatchesBackup;</span>
+<span class="fc" id="L637">          suggestionMatchesOutMsg = suggestionMatchesOutMsgBackup;</span>
+<span class="fc" id="L638">          ruleAntiPatterns.addAll(ruleAntiPatternsBackup);</span>
+<span class="fc" id="L639">        }</span>
+      }
+<span class="fc" id="L641">      tmpPatternTokens.add(ObjectUtils.clone(patternToken));</span>
+<span class="fc" id="L642">      createRules(elemList, tmpPatternTokens, numElement + 1);</span>
+    }
+<span class="fc" id="L644">  }</span>
+
+  String replaceSpacesInRegex(String s) {
+<span class="fc" id="L647">    StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L648">    boolean inBracket = false;</span>
+<span class="fc bfc" id="L649" title="All 2 branches covered.">    for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="fc" id="L650">      char c = s.charAt(i);</span>
+<span class="fc bfc" id="L651" title="All 2 branches covered.">      if (c == '[') {</span>
+<span class="fc" id="L652">        inBracket = true;</span>
+<span class="fc bfc" id="L653" title="All 2 branches covered.">      } else if (c == ']') {</span>
+<span class="fc" id="L654">        inBracket = false;</span>
+      }
+<span class="fc bfc" id="L656" title="All 4 branches covered.">      if (c == ' ' &amp;&amp; !inBracket) {</span>
+<span class="fc" id="L657">        sb.append(&quot;(?:[\\s\u00A0\u202F]+)&quot;);</span>
+      } else {
+<span class="fc" id="L659">        sb.append(c);</span>
+      }
+    }
+<span class="fc" id="L662">    return sb.toString();</span>
+  }
+
+  protected void prepareRule(AbstractPatternRule rule) {
+<span class="fc" id="L666">    rule.setSourceFile(sourceFile);</span>
+<span class="pc bpc" id="L667" title="1 of 4 branches missed.">    if (startPos != -1 &amp;&amp; endPos != -1) {</span>
+<span class="fc" id="L668">      rule.setStartPositionCorrection(startPos);</span>
+<span class="fc" id="L669">      rule.setEndPositionCorrection(endPos - tokenCountForMarker);</span>
+    }
+<span class="fc" id="L671">    startPos = -1;</span>
+<span class="fc" id="L672">    endPos = -1;</span>
+<span class="fc bfc" id="L673" title="All 2 branches covered.">    if (!correctExamples.isEmpty()) {</span>
+<span class="fc" id="L674">      rule.setCorrectExamples(correctExamples);</span>
+    }
+<span class="pc bpc" id="L676" title="1 of 2 branches missed.">    if (!incorrectExamples.isEmpty()) {</span>
+<span class="fc" id="L677">      rule.setIncorrectExamples(incorrectExamples);</span>
+    }
+<span class="fc bfc" id="L679" title="All 2 branches covered.">    if (!errorTriggeringExamples.isEmpty()) {</span>
+<span class="fc" id="L680">      rule.setErrorTriggeringExamples(errorTriggeringExamples);</span>
+    }
+<span class="fc" id="L682">    rule.setCategory(category);</span>
+<span class="fc bfc" id="L683" title="All 2 branches covered.">    if (!rulegroupAntiPatterns.isEmpty()) {</span>
+<span class="fc" id="L684">      rule.setAntiPatterns(rulegroupAntiPatterns);</span>
+    }
+<span class="fc bfc" id="L686" title="All 2 branches covered.">    if (!ruleAntiPatterns.isEmpty()) {</span>
+<span class="fc" id="L687">      rule.setAntiPatterns(ruleAntiPatterns);</span>
+<span class="fc" id="L688">      ruleAntiPatterns.clear();</span>
+    }
+<span class="fc" id="L690">    rule.addTags(ruleTags);</span>
+<span class="fc" id="L691">    rule.addTags(ruleGroupTags);</span>
+<span class="fc" id="L692">    rule.addTags(categoryTags);</span>
+<span class="fc bfc" id="L693" title="All 2 branches covered.">    if (inRuleGroup) {</span>
+<span class="fc" id="L694">      rule.setSubId(Integer.toString(subId));</span>
+    } else {
+<span class="fc" id="L696">      rule.setSubId(&quot;1&quot;);</span>
+    }
+<span class="fc" id="L698">    caseSensitive = false;</span>
+<span class="fc bfc" id="L699" title="All 2 branches covered.">    for (Match m : suggestionMatches) {</span>
+<span class="fc" id="L700">      rule.addSuggestionMatch(m);</span>
+<span class="fc" id="L701">    }</span>
+<span class="fc bfc" id="L702" title="All 2 branches covered.">    if (phrasePatternTokens.size() &lt;= 1) {</span>
+<span class="fc" id="L703">      suggestionMatches.clear();</span>
+    }
+<span class="fc bfc" id="L705" title="All 2 branches covered.">    for (Match m : suggestionMatchesOutMsg) {</span>
+<span class="fc" id="L706">      rule.addSuggestionMatchOutMsg(m);</span>
+<span class="fc" id="L707">    }</span>
+<span class="fc" id="L708">    suggestionMatchesOutMsg.clear();</span>
+<span class="pc bpc" id="L709" title="1 of 2 branches missed.">    if (category == null) {</span>
+<span class="nc" id="L710">      throw new RuntimeException(&quot;Cannot activate rule '&quot; + id + &quot;', it is outside of a &lt;category&gt;...&lt;/category&gt;&quot;);</span>
+    }
+<span class="fc bfc" id="L712" title="All 2 branches covered.">    if (defaultOff) {</span>
+<span class="fc" id="L713">      rule.setDefaultOff();</span>
+    }
+<span class="fc bfc" id="L715" title="All 2 branches covered.">    if (defaultTempOff) {</span>
+<span class="fc" id="L716">      rule.setDefaultTempOff();</span>
+    }
+<span class="pc bpc" id="L718" title="1 of 4 branches missed.">    if (url != null &amp;&amp; url.length() &gt; 0) {</span>
+      try {
+<span class="fc" id="L720">        rule.setUrl(new URL(url.toString()));</span>
+<span class="nc" id="L721">      } catch (MalformedURLException e) {</span>
+<span class="nc" id="L722">        throw new RuntimeException(&quot;Could not parse URL for rule: &quot; + rule + &quot;: '&quot; + url + &quot;'&quot;, e);</span>
+<span class="fc" id="L723">      }</span>
+<span class="pc bpc" id="L724" title="1 of 4 branches missed.">    } else if (urlForRuleGroup != null &amp;&amp; urlForRuleGroup.length() &gt; 0) {</span>
+      try {
+<span class="fc" id="L726">        rule.setUrl(new URL(urlForRuleGroup.toString()));</span>
+<span class="nc" id="L727">      } catch (MalformedURLException e) {</span>
+<span class="nc" id="L728">        throw new RuntimeException(&quot;Could not parse URL for rule: &quot; + rule + &quot;: '&quot; + urlForRuleGroup + &quot;'&quot;, e);</span>
+<span class="fc" id="L729">      }</span>
+    }
+    // inheritance of values - if no type value is defined for a rule, take the rule group's value etc:
+<span class="fc bfc" id="L732" title="All 2 branches covered.">    if (ruleIssueType != null) {</span>
+<span class="fc" id="L733">      rule.setLocQualityIssueType(ITSIssueType.getIssueType(ruleIssueType));</span>
+<span class="fc bfc" id="L734" title="All 2 branches covered.">    } else if (ruleGroupIssueType != null) {</span>
+<span class="fc" id="L735">      rule.setLocQualityIssueType(ITSIssueType.getIssueType(ruleGroupIssueType));</span>
+<span class="fc bfc" id="L736" title="All 2 branches covered.">    } else if (categoryIssueType != null) {</span>
+<span class="fc" id="L737">      rule.setLocQualityIssueType(ITSIssueType.getIssueType(categoryIssueType));</span>
+    }
+<span class="fc" id="L739">  }</span>
+
+  @Override
+  public void characters(char[] buf, int offset, int len) {
+<span class="fc" id="L743">    String s = new String(buf, offset, len);</span>
+<span class="fc bfc" id="L744" title="All 2 branches covered.">    if (inException) {</span>
+<span class="fc" id="L745">      exceptions.append(s);</span>
+<span class="fc bfc" id="L746" title="All 2 branches covered.">    } else if (inToken) {</span>
+<span class="fc" id="L747">      elements.append(s);</span>
+<span class="fc bfc" id="L748" title="All 2 branches covered.">    } else if (inCorrectExample) {</span>
+<span class="fc" id="L749">      correctExample.append(s);</span>
+<span class="fc bfc" id="L750" title="All 2 branches covered.">    } else if (inIncorrectExample) {</span>
+<span class="fc" id="L751">      incorrectExample.append(s);</span>
+<span class="fc bfc" id="L752" title="All 2 branches covered.">    } else if (inErrorTriggerExample) {</span>
+<span class="fc" id="L753">      errorTriggerExample.append(s);</span>
+<span class="fc bfc" id="L754" title="All 2 branches covered.">    } else if (inMatch) {</span>
+<span class="fc" id="L755">      match.append(s);</span>
+<span class="fc bfc" id="L756" title="All 2 branches covered.">    } else if (inMessage) {</span>
+<span class="fc" id="L757">      message.append(s);</span>
+<span class="fc bfc" id="L758" title="All 2 branches covered.">    } else if (inSuggestion) {  //Suggestion outside message</span>
+<span class="fc" id="L759">      suggestionsOutMsg.append(s);</span>
+<span class="fc bfc" id="L760" title="All 2 branches covered.">    } else if (inShortMessage) {</span>
+<span class="fc" id="L761">      shortMessage.append(s);</span>
+<span class="pc bpc" id="L762" title="1 of 2 branches missed.">    } else if (inShortMessageForRuleGroup) {</span>
+<span class="nc" id="L763">      shortMessageForRuleGroup.append(s);</span>
+<span class="fc bfc" id="L764" title="All 2 branches covered.">    } else if (inUrl) {</span>
+<span class="fc" id="L765">      url.append(s);</span>
+<span class="fc bfc" id="L766" title="All 2 branches covered.">    } else if (inUrlForRuleGroup) {</span>
+<span class="fc" id="L767">      urlForRuleGroup.append(s);</span>
+<span class="fc bfc" id="L768" title="All 2 branches covered.">    } else if (inRegex) {</span>
+<span class="fc" id="L769">      regex.append(s);</span>
+    }
+<span class="fc" id="L771">  }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

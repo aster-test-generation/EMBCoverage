@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Hunspell.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules.spelling.hunspell</a> &gt; <span class="el_source">Hunspell.java</span></div><h1>Hunspell.java</h1><pre class="source lang-java linenums">package org.languagetool.rules.spelling.hunspell;
+
+import dumonts.hunspell.bindings.HunspellLibrary;
+import org.bridj.Pointer;
+import org.languagetool.JLanguageTool;
+import org.languagetool.broker.ResourceDataBroker;
+
+import java.io.*;
+import java.nio.charset.Charset;
+import java.nio.file.*;
+import java.util.*;
+import java.util.stream.Collectors;
+
+public class Hunspell implements Closeable {
+  private final Pointer&lt;HunspellLibrary.Hunhandle&gt; handle;
+  private final Charset charset;
+  
+<span class="fc" id="L18">  private static final Map&lt;LanguageAndPath, Hunspell&gt; map = new HashMap&lt;&gt;();</span>
+  
+  static class LanguageAndPath {
+    private final Path dictionary;
+    private final Path affix;
+<span class="fc" id="L23">    LanguageAndPath(Path dictionary, Path affix) {</span>
+<span class="fc" id="L24">      this.dictionary = Objects.requireNonNull(dictionary);</span>
+<span class="fc" id="L25">      this.affix = Objects.requireNonNull(affix);</span>
+<span class="fc" id="L26">    }</span>
+    @Override
+    public boolean equals(Object o) {
+<span class="nc bnc" id="L29" title="All 2 branches missed.">      if (this == o) return true;</span>
+<span class="nc bnc" id="L30" title="All 4 branches missed.">      if (o == null || getClass() != o.getClass()) return false;</span>
+<span class="nc" id="L31">      LanguageAndPath that = (LanguageAndPath) o;</span>
+<span class="nc bnc" id="L32" title="All 2 branches missed.">      return Objects.equals(dictionary, that.dictionary) &amp;&amp;</span>
+<span class="nc bnc" id="L33" title="All 2 branches missed.">        Objects.equals(affix, that.affix);</span>
+    }
+    @Override
+    public int hashCode() {
+<span class="fc" id="L37">      return Objects.hash(dictionary, affix);</span>
+    }
+  }
+
+<span class="fc" id="L41">  public Hunspell(Path dictionary, Path affix) {</span>
+    try {
+<span class="fc" id="L43">      Pointer&lt;Byte&gt; aff = Pointer.pointerToCString(affix.toString());</span>
+<span class="fc" id="L44">      Pointer&lt;Byte&gt; dic = Pointer.pointerToCString(dictionary.toString());</span>
+<span class="fc" id="L45">      handle = HunspellLibrary.Hunspell_create(aff, dic);</span>
+<span class="fc" id="L46">      charset = Charset.forName(HunspellLibrary.Hunspell_get_dic_encoding(handle).getCString());</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">      if (this.handle == null) {</span>
+<span class="nc" id="L48">        throw new RuntimeException(&quot;Unable to create Hunspell instance&quot;);</span>
+      }
+<span class="nc" id="L50">    } catch (UnsatisfiedLinkError e) {</span>
+<span class="nc" id="L51">      throw new RuntimeException(&quot;Could not create hunspell instance. Please note that only 64 bit platforms &quot; +</span>
+        &quot;(Linux, Windows, Mac) are supported by LanguageTool and that your JVM (Java) also needs to b 64 bit.&quot;, e);
+<span class="fc" id="L53">    }</span>
+<span class="fc" id="L54">  }</span>
+  
+  public synchronized static Hunspell getInstance(Path dictionary, Path affix) {
+<span class="fc" id="L57">    LanguageAndPath key = new LanguageAndPath(dictionary, affix);</span>
+<span class="fc" id="L58">    Hunspell hunspell = map.get(key);</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">    if (hunspell != null) {</span>
+<span class="nc" id="L60">      return hunspell;</span>
+    }
+<span class="fc" id="L62">    Hunspell newHunspell = new Hunspell(dictionary, affix);</span>
+<span class="fc" id="L63">    map.put(key, newHunspell);</span>
+<span class="fc" id="L64">    return newHunspell;</span>
+  }
+
+  public static Hunspell forDictionaryInResources(String language, String resourcePath) {
+    try {
+<span class="nc" id="L69">      ResourceDataBroker broker = JLanguageTool.getDataBroker();</span>
+<span class="nc" id="L70">      InputStream dictionaryStream = broker.getAsStream(resourcePath + language + &quot;.dic&quot;);</span>
+<span class="nc" id="L71">      InputStream affixStream = broker.getAsStream(resourcePath + language + &quot;.aff&quot;);</span>
+<span class="nc bnc" id="L72" title="All 4 branches missed.">      if (dictionaryStream == null || affixStream == null) {</span>
+<span class="nc" id="L73">        throw new RuntimeException(&quot;Could not find dictionary for language \&quot;&quot; + language + &quot;\&quot; in classpath&quot;);</span>
+      }
+<span class="nc" id="L75">      Path dictionary = Files.createTempFile(language, &quot;.dic&quot;);</span>
+<span class="nc" id="L76">      Path affix = Files.createTempFile(language, &quot;.aff&quot;);</span>
+<span class="nc" id="L77">      Files.copy(dictionaryStream, dictionary, StandardCopyOption.REPLACE_EXISTING);</span>
+<span class="nc" id="L78">      Files.copy(affixStream, affix, StandardCopyOption.REPLACE_EXISTING);</span>
+<span class="nc" id="L79">      return new Hunspell(dictionary, affix);</span>
+<span class="nc" id="L80">    } catch (IOException e) {</span>
+<span class="nc" id="L81">      throw new RuntimeException(&quot;Could not create temporary dictionaries for language \&quot;&quot; + language + &quot;\&quot;&quot;, e);</span>
+    }
+  }
+
+  public static Hunspell forDictionaryInResources(String language) {
+<span class="nc" id="L86">    return forDictionaryInResources(language, &quot;&quot;);</span>
+  }
+
+  public boolean spell(String word) {
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">    if (handle == null) {</span>
+<span class="nc" id="L91">      throw new RuntimeException(&quot;Attempt to use hunspell instance after closing&quot;);</span>
+    }
+    @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L94">    Pointer&lt;Byte&gt; str = (Pointer&lt;Byte&gt;) Pointer.pointerToString(word, Pointer.StringType.C, charset);</span>
+<span class="fc" id="L95">    int result = HunspellLibrary.Hunspell_spell(handle, str);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">    return result != 0;</span>
+  }
+
+  public void add(String word) {
+<span class="nc bnc" id="L100" title="All 2 branches missed.">    if (handle == null) {</span>
+<span class="nc" id="L101">      throw new RuntimeException(&quot;Attempt to use hunspell instance after closing&quot;);</span>
+    }
+    @SuppressWarnings(&quot;unchecked&quot;)
+<span class="nc" id="L104">    Pointer&lt;Byte&gt; str = (Pointer&lt;Byte&gt;) Pointer.pointerToString(word, Pointer.StringType.C, charset);</span>
+<span class="nc" id="L105">    HunspellLibrary.Hunspell_add(handle, str);</span>
+<span class="nc" id="L106">  }</span>
+
+  public List&lt;String&gt; suggest(String word) {
+    // Create pointer to native string
+    @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L111">    Pointer&lt;Byte&gt; str = (Pointer&lt;Byte&gt;) Pointer.pointerToString(word, Pointer.StringType.C, charset);</span>
+    // Create pointer to native string array
+<span class="fc" id="L113">    Pointer&lt;Pointer&lt;Pointer&lt;Byte&gt;&gt;&gt; nativeSuggestionArray = Pointer.allocatePointerPointer(Byte.class);</span>
+    // Hunspell will allocate the array and fill it with suggestions
+<span class="fc" id="L115">    int suggestionCount = HunspellLibrary.Hunspell_suggest(handle, nativeSuggestionArray, str);</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">    if (suggestionCount == 0) {</span>
+      // Return early and don't try to free the array
+<span class="fc" id="L118">      return new ArrayList&lt;&gt;();</span>
+    }
+    // Ask bridj for a `java.util.List` that wraps `nativeSuggestionArray`
+<span class="fc" id="L121">    List&lt;Pointer&lt;Byte&gt;&gt; nativeSuggestionList = nativeSuggestionArray.get().validElements(suggestionCount).asList();</span>
+    // Convert C Strings to java strings
+<span class="fc" id="L123">    List&lt;String&gt; suggestions = nativeSuggestionList.stream().map((p) -&gt; p.getStringAtOffset(0, Pointer.StringType.C, charset)).collect(Collectors.toList());</span>
+
+    // We can free the underlying buffer now because Java's `String` owns it's own memory
+<span class="fc" id="L126">    HunspellLibrary.Hunspell_free_list(handle, nativeSuggestionArray, suggestionCount);</span>
+<span class="fc" id="L127">    return suggestions;</span>
+  }
+
+  public void close() {
+<span class="nc bnc" id="L131" title="All 2 branches missed.">    if (handle != null) {</span>
+<span class="nc" id="L132">      HunspellLibrary.Hunspell_destroy(handle);</span>
+    }
+<span class="nc" id="L134">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

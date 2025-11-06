@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SuggestedReplacement.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules</a> &gt; <span class="el_source">SuggestedReplacement.java</span></div><h1>SuggestedReplacement.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2019 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules;
+
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.SortedMap;
+import java.util.stream.Collectors;
+
+/**
+ * @since 4.5
+ */
+public class SuggestedReplacement {
+
+  private String replacement;
+  private String shortDescription;
+  private String suffix;
+<span class="nc" id="L38">  private SortedMap&lt;String, Float&gt; features = Collections.emptySortedMap();</span>
+<span class="nc" id="L39">  private Float confidence = null;</span>
+<span class="nc" id="L40">  private SuggestionType type = SuggestionType.Default;</span>
+
+  /**
+    classify the type of the suggestion
+    so that downstream tasks (e.g. resorting, as in {@link BERTSuggestionRanking})
+    can treat them accordingly
+    Default - default, no special treatment
+    Translation - offers to translate words from native language into text language;
+      suggestion ranking extends size of list of candidates
+    Curated - a manually curated suggestion / special case / ...; don't resort
+   */
+<span class="nc" id="L51">  public enum SuggestionType {</span>
+<span class="nc" id="L52">    Default, Translation, Curated</span>
+  }
+
+  public SuggestedReplacement(String replacement) {
+<span class="nc" id="L56">    this(replacement, null, null);</span>
+<span class="nc" id="L57">  }</span>
+
+  public SuggestedReplacement(String replacement, String shortDescription) {
+<span class="nc" id="L60">    this(replacement, shortDescription, null);</span>
+<span class="nc" id="L61">  }</span>
+
+<span class="nc" id="L63">  public SuggestedReplacement(String replacement, String shortDescription, String suffix) {</span>
+<span class="nc" id="L64">    this.replacement = Objects.requireNonNull(replacement);</span>
+<span class="nc" id="L65">    this.shortDescription = shortDescription;</span>
+<span class="nc" id="L66">    this.suffix = suffix;</span>
+<span class="nc" id="L67">  }</span>
+
+<span class="nc" id="L69">  public SuggestedReplacement(SuggestedReplacement repl) {</span>
+<span class="nc" id="L70">    this.replacement = repl.replacement;</span>
+<span class="nc" id="L71">    this.suffix = repl.suffix;</span>
+<span class="nc" id="L72">    setShortDescription(repl.getShortDescription());</span>
+<span class="nc" id="L73">    setConfidence(repl.getConfidence());</span>
+<span class="nc" id="L74">    setFeatures(repl.getFeatures());</span>
+<span class="nc" id="L75">    setType(repl.getType());</span>
+<span class="nc" id="L76">  }</span>
+
+  public String getReplacement() {
+<span class="nc" id="L79">    return replacement;</span>
+  }
+
+  public void setReplacement(String replacement) {
+<span class="nc" id="L83">    this.replacement = Objects.requireNonNull(replacement);</span>
+<span class="nc" id="L84">  }</span>
+
+  @Nullable
+  public String getShortDescription() {
+<span class="nc" id="L88">    return shortDescription;</span>
+  }
+
+  public void setShortDescription(String desc) {
+<span class="nc" id="L92">    this.shortDescription = desc;</span>
+<span class="nc" id="L93">  }</span>
+
+  /** @since 4.9 */
+  public void setType(SuggestionType type) {
+<span class="nc" id="L97">    this.type = Objects.requireNonNull(type);</span>
+<span class="nc" id="L98">  }</span>
+
+  /** @since 4.9 */
+  @NotNull
+  public SuggestionType getType() {
+<span class="nc" id="L103">    return type;</span>
+  }
+
+  /**
+   * Value shown in the UI after the replacement (but not part of it).
+   */
+  @Nullable
+  public String getSuffix() {
+<span class="nc" id="L111">    return suffix;</span>
+  }
+
+  public void setSuffix(String val) {
+<span class="nc" id="L115">    this.suffix = val;</span>
+<span class="nc" id="L116">  }</span>
+
+  @Override
+  public String toString() {
+<span class="nc" id="L120">    return replacement + '(' + shortDescription + ')';</span>
+  }
+
+  @Override
+  public boolean equals(Object o) {
+<span class="nc bnc" id="L125" title="All 2 branches missed.">    if (this == o) return true;</span>
+<span class="nc bnc" id="L126" title="All 4 branches missed.">    if (o == null || getClass() != o.getClass()) return false;</span>
+<span class="nc" id="L127">    SuggestedReplacement that = (SuggestedReplacement) o;</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">    return replacement.equals(that.replacement) &amp;&amp;</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">            Objects.equals(shortDescription, that.shortDescription);</span>
+  }
+
+  @Override
+  public int hashCode() {
+<span class="nc" id="L134">    return Objects.hash(replacement, shortDescription);</span>
+  }
+
+  @Nullable
+  public Float getConfidence() {
+<span class="nc" id="L139">    return confidence;</span>
+  }
+
+  public void setConfidence(@Nullable Float confidence) {
+<span class="nc" id="L143">    this.confidence = confidence;</span>
+<span class="nc" id="L144">  }</span>
+
+  @NotNull
+  public SortedMap&lt;String, Float&gt; getFeatures() {
+<span class="nc" id="L148">    return Collections.unmodifiableSortedMap(features);</span>
+  }
+
+  public void setFeatures(@NotNull SortedMap&lt;String, Float&gt; features) {
+<span class="nc" id="L152">    this.features = features;</span>
+<span class="nc" id="L153">  }</span>
+
+  public static List&lt;SuggestedReplacement&gt; convert(List&lt;String&gt; suggestions) {
+<span class="nc" id="L156">    return suggestions.stream().map(SuggestedReplacement::new).collect(Collectors.toList());</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MorfologikSpeller.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules.spelling.morfologik</a> &gt; <span class="el_source">MorfologikSpeller.java</span></div><h1>MorfologikSpeller.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2012 Marcin Miłkowski (http://www.languagetool.org)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules.spelling.morfologik;
+
+import com.google.common.cache.*;
+import morfologik.speller.Speller;
+import morfologik.stemming.Dictionary;
+import org.jetbrains.annotations.NotNull;
+import org.languagetool.JLanguageTool;
+import org.languagetool.broker.ResourceDataBroker;
+import org.languagetool.rules.spelling.SpellingCheckRule;
+import org.languagetool.tools.StringTools;
+
+import java.io.IOException;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Morfologik-based spell checker.
+ */
+public class MorfologikSpeller {
+
+  // Speed up the server use case, where rules get initialized for every call.
+  // See https://github.com/morfologik/morfologik-stemming/issues/69 for confirmation that
+  // Dictionary is thread-safe:
+<span class="nc" id="L44">  private static final LoadingCache&lt;String, Dictionary&gt; dictCache = CacheBuilder.newBuilder()</span>
+      //.maximumSize(0)
+<span class="nc" id="L46">      .expireAfterWrite(10, TimeUnit.MINUTES)</span>
+<span class="nc" id="L47">      .build(new CacheLoader&lt;String, Dictionary&gt;() {</span>
+        @Override
+        public Dictionary load(@NotNull String fileInClassPath) throws IOException {
+<span class="nc" id="L50">          ResourceDataBroker dataBroker = JLanguageTool.getDataBroker();</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">          if (dataBroker.resourceExists(fileInClassPath)) {</span>
+<span class="nc" id="L52">            return Dictionary.read(dataBroker.getFromResourceDirAsUrl(fileInClassPath));</span>
+          } else {
+<span class="nc" id="L54">            return Dictionary.read(Paths.get(fileInClassPath));</span>
+          }
+        }
+      });
+
+  private final Dictionary dictionary;
+  private final Speller speller;
+  private final int maxEditDistance;
+
+  /**
+   * Creates a speller with the given maximum edit distance.
+   * @param fileInClassPath path in classpath to morfologik dictionary
+   */
+  public MorfologikSpeller(String fileInClassPath, int maxEditDistance) {
+<span class="nc" id="L68">    this(dictCache.getUnchecked(fileInClassPath), maxEditDistance);</span>
+<span class="nc" id="L69">  }</span>
+
+  /**
+   * Creates a speller with a maximum edit distance of one.
+   * @param fileInClassPath path in classpath to morfologik dictionary
+   */
+  public MorfologikSpeller(String fileInClassPath) throws IOException {
+<span class="nc" id="L76">    this(fileInClassPath, 1);</span>
+<span class="nc" id="L77">  }</span>
+
+  /** @since 2.9 */
+<span class="nc" id="L80">  MorfologikSpeller(Dictionary dictionary, int maxEditDistance) {</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">    if (maxEditDistance &lt;= 0) {</span>
+<span class="nc" id="L82">      throw new RuntimeException(&quot;maxEditDistance must be &gt; 0: &quot; + maxEditDistance);</span>
+    }
+<span class="nc" id="L84">    this.dictionary = dictionary;</span>
+<span class="nc" id="L85">    this.maxEditDistance = maxEditDistance;</span>
+<span class="nc" id="L86">    speller = new Speller(dictionary, maxEditDistance);</span>
+<span class="nc" id="L87">  }</span>
+
+  public boolean isMisspelled(String word) {
+<span class="nc bnc" id="L90" title="All 2 branches missed.">    return word.length() &gt; 0 </span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">            &amp;&amp; !SpellingCheckRule.LANGUAGETOOL.equals(word)</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">            &amp;&amp; !SpellingCheckRule.LANGUAGETOOLER.equals(word)</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">            &amp;&amp; speller.isMisspelled(word);</span>
+  }
+
+  public Speller getSpeller() {
+<span class="nc" id="L97">    return speller;</span>
+  }
+
+  public List&lt;WeightedSuggestion&gt; getSuggestions(String word) {
+<span class="nc" id="L101">    List&lt;WeightedSuggestion&gt; suggestions = new ArrayList&lt;&gt;();</span>
+    // needs to be reset every time, possible bug: HMatrix for distance computation is not reset;
+    // output changes when reused
+<span class="nc" id="L104">    Speller speller = new Speller(dictionary, maxEditDistance);</span>
+    List&lt;Speller.CandidateData&gt; replacementCandidates;
+<span class="nc bnc" id="L106" title="All 2 branches missed.">    if (word.length() &lt; 50) {   // slow for long words (the limit is arbitrary)</span>
+<span class="nc" id="L107">      replacementCandidates = speller.findReplacementCandidates(word);</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">      for (Speller.CandidateData candidate : replacementCandidates) {</span>
+<span class="nc" id="L109">        suggestions.add(new WeightedSuggestion(candidate.getWord(), candidate.getDistance()));</span>
+<span class="nc" id="L110">      }</span>
+    }
+<span class="nc" id="L112">    List&lt;Speller.CandidateData&gt; runOnCandidates = speller.replaceRunOnWordCandidates(word);</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">    for (Speller.CandidateData runOnCandidate : runOnCandidates) {</span>
+<span class="nc" id="L114">      suggestions.add(new WeightedSuggestion(runOnCandidate.getWord(), runOnCandidate.getDistance()));</span>
+<span class="nc" id="L115">    }</span>
+    
+    // capitalize suggestions if necessary
+<span class="nc bnc" id="L118" title="All 4 branches missed.">    if (dictionary.metadata.isConvertingCase() &amp;&amp; StringTools.startsWithUppercase(word)) {</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">      for (int i = 0; i &lt; suggestions.size(); i++) {</span>
+<span class="nc" id="L120">        WeightedSuggestion sugg = suggestions.get(i);</span>
+<span class="nc" id="L121">        String uppercaseFirst = StringTools.uppercaseFirstChar(sugg.getWord());</span>
+        // do not use capitalized word if it matches the original word or it's mixed case
+<span class="nc bnc" id="L123" title="All 4 branches missed.">        if (uppercaseFirst.equals(word) || StringTools.isMixedCase(suggestions.get(i).getWord())) {</span>
+<span class="nc" id="L124">          uppercaseFirst = sugg.getWord();</span>
+        }
+        // remove capitalized duplicates
+<span class="nc" id="L127">        int auxIndex = getSuggestionIndex(suggestions, uppercaseFirst);</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        if (auxIndex &gt; i) {</span>
+<span class="nc" id="L129">          suggestions.remove(auxIndex);</span>
+        }
+<span class="nc bnc" id="L131" title="All 4 branches missed.">        if (auxIndex &gt; -1 &amp;&amp; auxIndex &lt; i) {</span>
+<span class="nc" id="L132">          suggestions.remove(i);</span>
+<span class="nc" id="L133">          i--;</span>
+        } else {
+<span class="nc" id="L135">          suggestions.set(i, new WeightedSuggestion(uppercaseFirst, sugg.getWeight()));</span>
+        }
+      }
+    }
+<span class="nc" id="L139">    return suggestions;</span>
+  }
+
+  private int getSuggestionIndex(List&lt;WeightedSuggestion&gt; suggestions, String uppercaseFirst) {
+<span class="nc" id="L143">    int i = 0;</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">    for (WeightedSuggestion suggestion : suggestions) {</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">      if (suggestion.getWord().equals(uppercaseFirst)) {</span>
+<span class="nc" id="L146">        return i;</span>
+      }
+<span class="nc" id="L148">      i++;</span>
+<span class="nc" id="L149">    }</span>
+<span class="nc" id="L150">    return -1;</span>
+  }
+
+  /**
+   * Determines whether the dictionary uses case conversions.
+   * @return True when the speller uses spell conversions.
+   * @since 2.5
+   */
+  public boolean convertsCase() {
+<span class="nc" id="L159">    return speller.convertsCase();</span>
+  }
+
+  @Override
+  public String toString() {
+<span class="nc" id="L164">    return &quot;dist=&quot; + maxEditDistance;</span>
+  }
+
+  public int getFrequency(String word) {
+<span class="nc" id="L168">    int freq = speller.getFrequency(word);</span>
+<span class="nc bnc" id="L169" title="All 4 branches missed.">    if (freq == 0 &amp;&amp; !word.equals(word.toLowerCase())) {</span>
+<span class="nc" id="L170">      freq = speller.getFrequency(word.toLowerCase());</span>
+    }
+<span class="nc" id="L172">    return freq;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

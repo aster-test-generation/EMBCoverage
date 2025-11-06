@@ -1,0 +1,542 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DisambiguationRuleHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.tagging.disambiguation.rules</a> &gt; <span class="el_source">DisambiguationRuleHandler.java</span></div><h1>DisambiguationRuleHandler.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2015 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.tagging.disambiguation.rules;
+
+import org.languagetool.AnalyzedToken;
+import org.languagetool.Languages;
+import org.languagetool.rules.patterns.*;
+import org.xml.sax.Attributes;
+import org.xml.sax.SAXException;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+
+<span class="fc" id="L32">class DisambiguationRuleHandler extends XMLRuleHandler {</span>
+
+  private static final String WD = &quot;wd&quot;;
+  private static final String ACTION = &quot;action&quot;;
+  private static final String DISAMBIG = &quot;disambig&quot;;
+
+<span class="fc" id="L38">  private final List&lt;DisambiguationPatternRule&gt; rules = new ArrayList&lt;&gt;();</span>
+
+  private boolean inDisambiguation;
+  private int subId;
+  private String name;
+  private String ruleGroupId;
+  private String ruleGroupName;
+  protected String filterClassName;
+  protected String filterArgs;
+<span class="fc" id="L47">  private StringBuilder disamb = new StringBuilder();</span>
+<span class="fc" id="L48">  private StringBuilder wd = new StringBuilder();</span>
+<span class="fc" id="L49">  private StringBuilder example = new StringBuilder();</span>
+
+<span class="fc" id="L51">  private int antiPatternCounter = 0;</span>
+  private boolean inRule;
+<span class="fc" id="L53">  private List&lt;DisambiguationPatternRule&gt; rulegroupAntiPatterns = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L54">  private List&lt;DisambiguationPatternRule&gt; ruleAntiPatterns = new ArrayList&lt;&gt;();</span>
+  private boolean inAntiPattern;
+
+  private boolean inWord;
+
+  private String disambiguatedPOS;
+
+<span class="fc" id="L61">  private int startPos = -1;</span>
+<span class="fc" id="L62">  private int endPos = -1;</span>
+  private int tokenCountForMarker;
+
+  private Match posSelector;
+
+  private int uniCounter;
+
+  private List&lt;AnalyzedToken&gt; newWdList;
+  private String wdLemma;
+  private String wdPos;
+
+  private boolean inExample;
+  private boolean untouched;
+  private List&lt;String&gt; untouchedExamples;
+  private List&lt;DisambiguatedExample&gt; disambExamples;
+  private String input;
+  private String output;
+
+  private DisambiguationPatternRule.DisambiguatorAction disambigAction;
+
+  List&lt;DisambiguationPatternRule&gt; getDisambRules() {
+<span class="fc" id="L83">    return rules;</span>
+  }
+
+  // ===========================================================
+  // SAX DocumentHandler methods
+  // ===========================================================
+
+  @Override
+  public void startElement(String namespaceURI, String lName,
+                           String qName, Attributes attrs) throws SAXException {
+<span class="pc bpc" id="L93" title="2 of 21 branches missed.">    switch (qName) {</span>
+      case RULE:
+<span class="fc" id="L95">        inRule = true;</span>
+<span class="fc" id="L96">        id = attrs.getValue(ID);</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (inRuleGroup) {</span>
+<span class="fc" id="L98">          subId++;</span>
+        }
+<span class="fc" id="L100">        name = attrs.getValue(NAME);</span>
+<span class="fc bfc" id="L101" title="All 4 branches covered.">        if (inRuleGroup &amp;&amp; id == null) {</span>
+<span class="fc" id="L102">          id = ruleGroupId;</span>
+        }
+<span class="fc bfc" id="L104" title="All 4 branches covered.">        if (inRuleGroup &amp;&amp; name == null) {</span>
+<span class="fc" id="L105">          name = ruleGroupName;</span>
+        }
+        break;
+      case &quot;rules&quot;:
+<span class="fc" id="L109">        language = Languages.getLanguageForShortCode(attrs.getValue(&quot;lang&quot;));</span>
+<span class="fc" id="L110">        break;</span>
+      case PATTERN:
+<span class="fc" id="L112">        inPattern = true;</span>
+<span class="fc" id="L113">        tokenCountForMarker = 0;</span>
+<span class="pc bpc" id="L114" title="1 of 4 branches missed.">        if (attrs.getValue(CASE_SENSITIVE) != null &amp;&amp; YES.equals(attrs.getValue(CASE_SENSITIVE))) {</span>
+<span class="fc" id="L115">          caseSensitive = true;</span>
+        }
+        break;
+      case ANTIPATTERN:
+<span class="fc" id="L119">        inAntiPattern = true;</span>
+<span class="fc" id="L120">        antiPatternCounter++;</span>
+<span class="fc" id="L121">        caseSensitive = YES.equals(attrs.getValue(CASE_SENSITIVE));</span>
+<span class="fc" id="L122">        tokenCounter = 0;</span>
+<span class="fc" id="L123">        tokenCountForMarker = 0;</span>
+<span class="fc" id="L124">        break;</span>
+      case EXCEPTION:
+<span class="fc" id="L126">        setExceptions(attrs);</span>
+<span class="fc" id="L127">        break;</span>
+      case AND:
+<span class="fc" id="L129">        inAndGroup = true;</span>
+<span class="fc" id="L130">        tokenCountForMarker++;</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (inUnification) {</span>
+<span class="fc" id="L132">          uniCounter++;</span>
+        }
+        break;
+      case UNIFY:
+<span class="fc" id="L136">        inUnification = true;</span>
+<span class="fc" id="L137">        uniNegation = YES.equals(attrs.getValue(NEGATE));</span>
+<span class="fc" id="L138">        uniCounter = 0;</span>
+<span class="fc" id="L139">        break;</span>
+      case UNIFY_IGNORE:
+<span class="fc" id="L141">        inUnificationNeutral = true;</span>
+<span class="fc" id="L142">        break;</span>
+      case &quot;feature&quot;:
+<span class="fc" id="L144">        uFeature = attrs.getValue(ID);</span>
+<span class="fc" id="L145">        break;</span>
+      case TYPE:
+<span class="nc" id="L147">        uType = attrs.getValue(ID);</span>
+<span class="nc" id="L148">        uTypeList.add(uType);</span>
+<span class="nc" id="L149">        break;</span>
+      case TOKEN:
+<span class="fc" id="L151">        setToken(attrs);</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (!inAndGroup) {</span>
+<span class="fc" id="L153">          tokenCountForMarker++;</span>
+        }
+        break;
+      case DISAMBIG:
+<span class="fc" id="L157">        inDisambiguation = true;</span>
+<span class="fc" id="L158">        disambiguatedPOS = attrs.getValue(POSTAG);</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        if (attrs.getValue(ACTION) == null) {</span>
+          // default mode:
+<span class="fc" id="L161">          disambigAction = DisambiguationPatternRule.DisambiguatorAction.REPLACE;</span>
+        } else {
+<span class="fc" id="L163">          disambigAction = DisambiguationPatternRule.DisambiguatorAction</span>
+<span class="fc" id="L164">                  .valueOf(attrs.getValue(ACTION).toUpperCase(Locale.ENGLISH));</span>
+        }
+<span class="fc" id="L166">        disamb = new StringBuilder();</span>
+<span class="fc" id="L167">        break;</span>
+      case MATCH:
+<span class="fc" id="L169">        inMatch = true;</span>
+<span class="fc" id="L170">        match = new StringBuilder();</span>
+<span class="fc" id="L171">        Match.CaseConversion caseConversion = Match.CaseConversion.NONE;</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        if (attrs.getValue(&quot;case_conversion&quot;) != null) {</span>
+<span class="nc" id="L173">          caseConversion = Match.CaseConversion.valueOf(attrs</span>
+<span class="nc" id="L174">                  .getValue(&quot;case_conversion&quot;).toUpperCase(Locale.ENGLISH));</span>
+        }
+<span class="fc" id="L176">        Match.IncludeRange includeRange = Match.IncludeRange.NONE;</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (attrs.getValue(&quot;include_skipped&quot;) != null) {</span>
+<span class="nc" id="L178">          includeRange = Match.IncludeRange.valueOf(attrs</span>
+<span class="nc" id="L179">                  .getValue(&quot;include_skipped&quot;).toUpperCase(Locale.ENGLISH));</span>
+        }
+<span class="fc" id="L181">        Match mWorker = new Match(attrs.getValue(POSTAG), attrs</span>
+<span class="fc" id="L182">                .getValue(&quot;postag_replace&quot;), YES</span>
+<span class="fc" id="L183">                .equals(attrs.getValue(POSTAG_REGEXP)), attrs</span>
+<span class="fc" id="L184">                .getValue(&quot;regexp_match&quot;), attrs.getValue(&quot;regexp_replace&quot;),</span>
+<span class="fc" id="L185">                caseConversion, YES.equals(attrs.getValue(&quot;setpos&quot;)),</span>
+<span class="fc" id="L186">                YES.equals(attrs.getValue(&quot;suppress_mispelled&quot;)),</span>
+                includeRange);
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        if (inDisambiguation) {</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">          if (attrs.getValue(NO) != null) {</span>
+<span class="fc" id="L190">            int refNumber = Integer.parseInt(attrs.getValue(NO));</span>
+<span class="fc" id="L191">            refNumberSanityCheck(refNumber);</span>
+<span class="fc" id="L192">            mWorker.setTokenRef(refNumber);</span>
+<span class="fc" id="L193">            posSelector = mWorker;</span>
+<span class="fc" id="L194">          }</span>
+<span class="pc bpc" id="L195" title="2 of 4 branches missed.">        } else if (inToken &amp;&amp; attrs.getValue(NO) != null) {</span>
+<span class="fc" id="L196">          int refNumber = Integer.parseInt(attrs.getValue(NO));</span>
+<span class="fc" id="L197">          refNumberSanityCheck(refNumber);</span>
+<span class="fc" id="L198">          mWorker.setTokenRef(refNumber);</span>
+<span class="fc" id="L199">          tokenReference = mWorker;</span>
+<span class="fc" id="L200">          elements.append('\\');</span>
+<span class="fc" id="L201">          elements.append(refNumber);</span>
+<span class="fc" id="L202">        }</span>
+        break;
+      case RULEGROUP:
+<span class="fc" id="L205">        ruleGroupId = attrs.getValue(ID);</span>
+<span class="fc" id="L206">        ruleGroupName = attrs.getValue(NAME);</span>
+<span class="fc" id="L207">        inRuleGroup = true;</span>
+<span class="fc" id="L208">        subId = 0;</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        if (rulegroupAntiPatterns != null) {</span>
+<span class="fc" id="L210">          rulegroupAntiPatterns.clear();</span>
+        }
+<span class="fc" id="L212">        antiPatternCounter = 0;</span>
+<span class="fc" id="L213">        break;</span>
+      case UNIFICATION:
+<span class="fc" id="L215">        uFeature = attrs.getValue(FEATURE);</span>
+<span class="fc" id="L216">        inUnificationDef = true;</span>
+<span class="fc" id="L217">        break;</span>
+      case &quot;equivalence&quot;:
+<span class="fc" id="L219">        uType = attrs.getValue(TYPE);</span>
+<span class="fc" id="L220">        break;</span>
+      case WD:
+<span class="fc" id="L222">        wdLemma = attrs.getValue(&quot;lemma&quot;);</span>
+<span class="fc" id="L223">        wdPos = attrs.getValue(&quot;pos&quot;);</span>
+<span class="fc" id="L224">        inWord = true;</span>
+<span class="fc" id="L225">        wd = new StringBuilder();</span>
+<span class="fc" id="L226">        break;</span>
+      case EXAMPLE:
+<span class="fc" id="L228">        inExample = true;</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        if (untouchedExamples == null) {</span>
+<span class="fc" id="L230">          untouchedExamples = new ArrayList&lt;&gt;();</span>
+        }
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        if (disambExamples == null) {</span>
+<span class="fc" id="L233">          disambExamples = new ArrayList&lt;&gt;();</span>
+        }
+<span class="fc" id="L235">        untouched = attrs.getValue(TYPE).equals(&quot;untouched&quot;);</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        if (attrs.getValue(TYPE).equals(&quot;ambiguous&quot;)) {</span>
+<span class="fc" id="L237">          input = attrs.getValue(&quot;inputform&quot;);</span>
+<span class="fc" id="L238">          output = attrs.getValue(&quot;outputform&quot;);</span>
+        }
+<span class="fc" id="L240">        example = new StringBuilder();</span>
+<span class="fc" id="L241">        break;</span>
+      case &quot;filter&quot;:
+<span class="fc" id="L243">        filterClassName = attrs.getValue(&quot;class&quot;);</span>
+<span class="fc" id="L244">        filterArgs = attrs.getValue(&quot;args&quot;);</span>
+<span class="fc" id="L245">        break;</span>
+      case MARKER:
+<span class="fc" id="L247">        example.append(&quot;&lt;marker&gt;&quot;);</span>
+<span class="pc bpc" id="L248" title="1 of 4 branches missed.">        if (inPattern || inAntiPattern) {</span>
+<span class="fc" id="L249">          startPos = tokenCounter;</span>
+<span class="fc" id="L250">          inMarker = true;</span>
+        }
+        break;
+    }
+<span class="fc" id="L254">  }</span>
+
+  private void refNumberSanityCheck(int refNumber) throws SAXException {
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">    if (refNumber &gt; patternTokens.size()) {</span>
+<span class="nc" id="L258">      throw new SAXException(&quot;Only backward references in match elements are possible, tried to specify token &quot;</span>
+<span class="nc" id="L259">              + refNumber + &quot;\n Line: &quot; + pLocator.getLineNumber()</span>
+<span class="nc" id="L260">              + &quot;, column: &quot; + pLocator.getColumnNumber() + &quot;.&quot;);</span>
+    }
+<span class="fc" id="L262">  }</span>
+
+  @Override
+  public void endElement(String namespaceURI, String sName,
+                         String qName) throws SAXException {
+<span class="fc bfc" id="L267" title="All 17 branches covered.">    switch (qName) {</span>
+      case RULE:
+<span class="fc" id="L269">        DisambiguationPatternRule rule = new DisambiguationPatternRule(id,</span>
+                name, language, patternTokens, disambiguatedPOS, posSelector,
+                disambigAction);
+
+<span class="fc" id="L273">        endPositionCorrection = endPos - tokenCountForMarker;</span>
+<span class="pc bpc" id="L274" title="1 of 4 branches missed.">        if (startPos != -1 &amp;&amp; endPos != -1) {</span>
+<span class="fc" id="L275">          rule.setStartPositionCorrection(startPos);</span>
+<span class="fc" id="L276">          rule.setEndPositionCorrection(endPositionCorrection);</span>
+        } else {
+<span class="fc" id="L278">          startPos = 0;</span>
+<span class="fc" id="L279">          endPos = tokenCountForMarker;</span>
+        }
+<span class="fc bfc" id="L281" title="All 2 branches covered.">        rule.setSubId(inRuleGroup ? Integer.toString(subId) : &quot;1&quot;);</span>
+
+<span class="fc" id="L283">        int matchedTokenCount = endPos - startPos;</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">        if (newWdList != null) {</span>
+<span class="fc bfc" id="L285" title="All 6 branches covered.">          if (disambigAction == DisambiguationPatternRule.DisambiguatorAction.ADD || disambigAction == DisambiguationPatternRule.DisambiguatorAction.REMOVE</span>
+                  || disambigAction == DisambiguationPatternRule.DisambiguatorAction.REPLACE) {
+<span class="fc bfc" id="L287" title="All 4 branches covered.">            if ((!newWdList.isEmpty() &amp;&amp; disambigAction == DisambiguationPatternRule.DisambiguatorAction.REPLACE)</span>
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">                    &amp;&amp; newWdList.size() != matchedTokenCount) {</span>
+<span class="nc" id="L289">              throw new SAXException(</span>
+<span class="nc" id="L290">                      language.getName() + &quot; rule error. The number of interpretations specified with wd: &quot;</span>
+<span class="nc" id="L291">                              + newWdList.size()</span>
+                              + &quot; must be equal to the number of matched tokens (&quot; + matchedTokenCount + &quot;)&quot;
+<span class="nc" id="L293">                              + &quot;\n Line: &quot; + pLocator.getLineNumber() + &quot;, column: &quot;</span>
+<span class="nc" id="L294">                              + pLocator.getColumnNumber() + &quot;.&quot;);</span>
+            }
+<span class="fc" id="L296">            rule.setNewInterpretations(newWdList.toArray(new AnalyzedToken[0]));</span>
+          }
+<span class="fc" id="L298">          newWdList.clear();</span>
+        }
+<span class="fc" id="L300">        caseSensitive = false;</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">        if (disambExamples != null) {</span>
+<span class="fc" id="L302">          rule.setExamples(disambExamples);</span>
+        }
+<span class="fc bfc" id="L304" title="All 2 branches covered.">        if (untouchedExamples != null) {</span>
+<span class="fc" id="L305">          rule.setUntouchedExamples(untouchedExamples);</span>
+        }
+<span class="fc" id="L307">        setRuleFilter(filterClassName, filterArgs, rule);</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">        if (!rulegroupAntiPatterns.isEmpty()) {</span>
+<span class="fc" id="L309">          rule.setAntiPatterns(rulegroupAntiPatterns);</span>
+        }
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        if (!ruleAntiPatterns.isEmpty()) {</span>
+<span class="fc" id="L312">          rule.setAntiPatterns(ruleAntiPatterns);</span>
+<span class="fc" id="L313">          ruleAntiPatterns.clear();</span>
+        }
+<span class="fc" id="L315">        rules.add(rule);</span>
+<span class="pc bpc" id="L316" title="1 of 4 branches missed.">        if (disambigAction == DisambiguationPatternRule.DisambiguatorAction.UNIFY &amp;&amp; matchedTokenCount != uniCounter) {</span>
+<span class="nc" id="L317">          throw new SAXException(language.getName() + &quot; rule error. The number unified tokens: &quot;</span>
+                  + uniCounter + &quot; must be equal to the number of matched tokens: &quot; + matchedTokenCount
+<span class="nc" id="L319">                  + &quot;\n Line: &quot; + pLocator.getLineNumber() + &quot;, column: &quot;</span>
+<span class="nc" id="L320">                  + pLocator.getColumnNumber() + &quot;.&quot;);</span>
+        }
+<span class="fc bfc" id="L322" title="All 2 branches covered.">        boolean singleTokenCorrection = endPos - startPos &gt; 1;</span>
+<span class="pc bpc" id="L323" title="1 of 8 branches missed.">        if ((!singleTokenCorrection &amp;&amp; (disambigAction == DisambiguationPatternRule.DisambiguatorAction.FILTER || disambigAction == DisambiguationPatternRule.DisambiguatorAction.REPLACE))</span>
+                &amp;&amp; (matchedTokenCount &gt; 1)) {
+<span class="nc" id="L325">          throw new SAXException(</span>
+<span class="nc" id="L326">                  language.getName() + &quot; rule error. Cannot replace or filter more than one token at a time.&quot;</span>
+<span class="nc" id="L327">                          + &quot;\n Line: &quot; + pLocator.getLineNumber() + &quot;, column: &quot;</span>
+<span class="nc" id="L328">                          + pLocator.getColumnNumber() + &quot;.&quot;);</span>
+        }
+<span class="fc" id="L330">        patternTokens.clear();</span>
+<span class="fc" id="L331">        posSelector = null;</span>
+<span class="fc" id="L332">        disambExamples = null;</span>
+<span class="fc" id="L333">        untouchedExamples = null;</span>
+<span class="fc" id="L334">        startPos = -1;</span>
+<span class="fc" id="L335">        endPos = -1;</span>
+<span class="fc" id="L336">        filterClassName = null;</span>
+<span class="fc" id="L337">        filterArgs = null;</span>
+<span class="fc" id="L338">        inRule = false;</span>
+<span class="fc" id="L339">        break;</span>
+      case EXCEPTION:
+<span class="fc" id="L341">        finalizeExceptions();</span>
+<span class="fc" id="L342">        break;</span>
+      case AND:
+<span class="fc" id="L344">        inAndGroup = false;</span>
+<span class="fc" id="L345">        andGroupCounter = 0;</span>
+<span class="fc" id="L346">        tokenCounter++;</span>
+<span class="fc" id="L347">        break;</span>
+      case TOKEN:
+<span class="pc bpc" id="L349" title="1 of 4 branches missed.">        if (!exceptionSet || patternToken == null) {</span>
+<span class="fc" id="L350">          boolean tokenCase = caseSensitive;</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">          if (tokenLevelCaseSet) {</span>
+<span class="fc" id="L352">            tokenCase = tokenLevelCaseSensitive;</span>
+          }
+<span class="fc" id="L354">          patternToken = new PatternToken(elements.toString(), tokenCase,</span>
+                  regExpression, tokenInflected);
+<span class="fc" id="L356">          patternToken.setNegation(tokenNegated);</span>
+<span class="fc" id="L357">        } else {</span>
+<span class="fc" id="L358">          patternToken.setStringElement(elements.toString());</span>
+        }
+<span class="fc bfc" id="L360" title="All 2 branches covered.">        if (skipPos != 0) {</span>
+<span class="fc" id="L361">          patternToken.setSkipNext(skipPos);</span>
+<span class="fc" id="L362">          skipPos = 0;</span>
+        }
+<span class="fc bfc" id="L364" title="All 2 branches covered.">        if (minOccurrence == 0) {</span>
+<span class="fc" id="L365">          patternToken.setMinOccurrence(0);</span>
+        }
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        if (maxOccurrence != 1) {</span>
+<span class="fc" id="L368">          patternToken.setMaxOccurrence(maxOccurrence);</span>
+<span class="fc" id="L369">          maxOccurrence = 1;</span>
+        }
+<span class="fc bfc" id="L371" title="All 2 branches covered.">        if (posToken != null) {</span>
+<span class="fc" id="L372">          patternToken.setPosToken(new PatternToken.PosToken(posToken, posRegExp, posNegation));</span>
+<span class="fc" id="L373">          posToken = null;</span>
+        }
+
+<span class="fc bfc" id="L376" title="All 2 branches covered.">        if (chunkTag != null) {</span>
+<span class="fc" id="L377">          patternToken.setChunkTag(chunkTag);</span>
+<span class="fc" id="L378">          chunkTag = null;</span>
+        }
+
+<span class="fc bfc" id="L381" title="All 2 branches covered.">        if (tokenReference != null) {</span>
+<span class="fc" id="L382">          patternToken.setMatch(tokenReference);</span>
+        }
+
+<span class="fc bfc" id="L385" title="All 4 branches covered.">        if (inAndGroup &amp;&amp; andGroupCounter &gt; 0) {</span>
+<span class="fc" id="L386">          patternTokens.get(patternTokens.size() - 1)</span>
+<span class="fc" id="L387">                  .setAndGroupElement(patternToken);</span>
+<span class="pc bpc" id="L388" title="2 of 4 branches missed.">          if (minOccurrence != 1 || maxOccurrence != 1) {</span>
+<span class="nc" id="L389">            throw new SAXException(&quot;Please set min and max attributes on the &quot; +</span>
+                    &quot;first token in the AND group.\n You attempted to set these &quot; +
+                    &quot;attributes on the token no. &quot; + (andGroupCounter + 1) + &quot;.&quot; + &quot;\n Line: &quot;
+<span class="nc" id="L392">                    + pLocator.getLineNumber() + &quot;, column: &quot;</span>
+<span class="nc" id="L393">                    + pLocator.getColumnNumber() + &quot;.&quot;);</span>
+          }
+        } else {
+<span class="fc bfc" id="L396" title="All 2 branches covered.">          if (minOccurrence &lt; 1) {</span>
+<span class="fc" id="L397">            patternTokens.add(patternToken);</span>
+          }
+<span class="fc bfc" id="L399" title="All 2 branches covered.">          for (int i = 1; i &lt;= minOccurrence; i++) {</span>
+<span class="fc" id="L400">            patternTokens.add(patternToken);</span>
+          }
+<span class="fc" id="L402">          minOccurrence = 1;</span>
+        }
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        if (inAndGroup) {</span>
+<span class="fc" id="L405">          andGroupCounter++;</span>
+        }
+<span class="fc bfc" id="L407" title="All 2 branches covered.">        if (inUnification) {</span>
+<span class="fc" id="L408">          patternToken.setUnification(equivalenceFeatures);</span>
+<span class="fc bfc" id="L409" title="All 2 branches covered.">          if (!inAndGroup) {</span>
+<span class="fc" id="L410">            uniCounter++;</span>
+          }
+<span class="fc bfc" id="L412" title="All 2 branches covered.">          if (inUnificationNeutral) {</span>
+<span class="fc" id="L413">            patternToken.setUnificationNeutral();</span>
+          }
+        }
+<span class="fc bfc" id="L416" title="All 2 branches covered.">        if (inUnificationDef) {</span>
+<span class="fc" id="L417">          language.getDisambiguationUnifierConfiguration().setEquivalence(uFeature, uType, patternToken);</span>
+<span class="fc" id="L418">          patternTokens.clear();</span>
+        }
+
+<span class="fc" id="L421">        patternToken.setInsideMarker(inMarker);</span>
+
+<span class="fc bfc" id="L423" title="All 2 branches covered.">        if (tokenSpaceBeforeSet) {</span>
+<span class="fc" id="L424">          patternToken.setWhitespaceBefore(tokenSpaceBefore);</span>
+        }
+<span class="fc" id="L426">        resetToken();</span>
+<span class="fc" id="L427">        break;</span>
+      case PATTERN:
+<span class="fc" id="L429">        inPattern = false;</span>
+<span class="fc" id="L430">        tokenCounter = 0;</span>
+<span class="fc" id="L431">        break;</span>
+      case MATCH:
+<span class="fc bfc" id="L433" title="All 2 branches covered.">        if (inDisambiguation) {</span>
+<span class="fc" id="L434">          posSelector.setLemmaString(match.toString());</span>
+<span class="pc bpc" id="L435" title="1 of 2 branches missed.">        } else if (inToken) {</span>
+<span class="fc" id="L436">          tokenReference.setLemmaString(match.toString());</span>
+        }
+<span class="fc" id="L438">        inMatch = false;</span>
+<span class="fc" id="L439">        break;</span>
+      case DISAMBIG:
+<span class="fc" id="L441">        inDisambiguation = false;</span>
+<span class="fc" id="L442">        break;</span>
+      case RULEGROUP:
+<span class="fc" id="L444">        inRuleGroup = false;</span>
+<span class="fc" id="L445">        break;</span>
+      case UNIFICATION:
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">        if (inUnificationDef){</span>
+<span class="fc" id="L448">          inUnificationDef = false;</span>
+<span class="fc" id="L449">          tokenCounter = 0;</span>
+        }
+        break;
+      case &quot;feature&quot;:
+<span class="fc" id="L453">        equivalenceFeatures.put(uFeature, uTypeList);</span>
+<span class="fc" id="L454">        uTypeList = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L455">        break;</span>
+      case UNIFY:
+<span class="fc" id="L457">        inUnification = false;</span>
+<span class="fc" id="L458">        equivalenceFeatures = new HashMap&lt;&gt;();</span>
+        //set negation on the last token only!
+<span class="fc" id="L460">        int lastElement = patternTokens.size() - 1;</span>
+<span class="fc" id="L461">        patternTokens.get(lastElement).setLastInUnification();</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">        if (uniNegation) {</span>
+<span class="fc" id="L463">          patternTokens.get(lastElement).setUniNegation();</span>
+        }
+        break;
+      case UNIFY_IGNORE:
+<span class="fc" id="L467">        inUnificationNeutral = false;</span>
+<span class="fc" id="L468">        break;</span>
+      case WD:
+<span class="fc" id="L470">        addNewWord(wd.toString(), wdLemma, wdPos);</span>
+<span class="fc" id="L471">        inWord = false;</span>
+<span class="fc" id="L472">        break;</span>
+      case ANTIPATTERN:
+<span class="fc" id="L474">        final DisambiguationPatternRule disRule = new DisambiguationPatternRule(</span>
+                id + &quot;_antipattern:&quot; + antiPatternCounter,
+                &quot;antipattern&quot;, language, patternTokens, null, null,
+                DisambiguationPatternRule.DisambiguatorAction.IMMUNIZE);
+<span class="pc bpc" id="L478" title="3 of 4 branches missed.">        if (startPos != -1 &amp;&amp; endPos != -1) {</span>
+<span class="nc" id="L479">          disRule.setStartPositionCorrection(startPos);</span>
+<span class="nc" id="L480">          disRule.setEndPositionCorrection(endPos - tokenCountForMarker);</span>
+        }
+<span class="fc" id="L482">        patternTokens.clear();</span>
+<span class="fc bfc" id="L483" title="All 2 branches covered.">        if (inRule) {</span>
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">          if (ruleAntiPatterns == null) {</span>
+<span class="nc" id="L485">            ruleAntiPatterns = new ArrayList&lt;&gt;();</span>
+          }
+<span class="fc" id="L487">          ruleAntiPatterns.add(disRule);</span>
+        } else { // a rulegroup shares all antipatterns not included in a single rule
+<span class="pc bpc" id="L489" title="1 of 2 branches missed.">          if (rulegroupAntiPatterns == null) {</span>
+<span class="nc" id="L490">            rulegroupAntiPatterns = new ArrayList&lt;&gt;();</span>
+          }
+<span class="fc" id="L492">          rulegroupAntiPatterns.add(disRule);</span>
+        }
+<span class="fc" id="L494">        tokenCounter = 0;</span>
+<span class="fc" id="L495">        inAntiPattern = false;</span>
+<span class="fc" id="L496">        break;</span>
+      case EXAMPLE:
+<span class="fc" id="L498">        inExample = false;</span>
+<span class="fc bfc" id="L499" title="All 2 branches covered.">        if (untouched) {</span>
+<span class="fc" id="L500">          untouchedExamples.add(example.toString());</span>
+        } else {
+<span class="fc" id="L502">          disambExamples.add(new DisambiguatedExample(example.toString(), input, output));</span>
+        }
+<span class="fc" id="L504">        break;</span>
+      case MARKER:
+<span class="fc" id="L506">        example.append(&quot;&lt;/marker&gt;&quot;);</span>
+<span class="pc bpc" id="L507" title="1 of 4 branches missed.">        if (inPattern || inAntiPattern) {</span>
+<span class="fc" id="L508">          endPos = tokenCountForMarker;</span>
+<span class="fc" id="L509">          inMarker = false;</span>
+        }
+        break;
+    }
+<span class="fc" id="L513">  }</span>
+
+  private void addNewWord(String word, String lemma, String pos) {
+<span class="fc" id="L516">    AnalyzedToken newWd = new AnalyzedToken(word, pos, lemma);</span>
+<span class="fc bfc" id="L517" title="All 2 branches covered.">    if (newWdList == null) {</span>
+<span class="fc" id="L518">      newWdList = new ArrayList&lt;&gt;();</span>
+    }
+<span class="fc" id="L520">    newWdList.add(newWd);</span>
+<span class="fc" id="L521">  }</span>
+
+  @Override
+  public final void characters(char[] buf, int offset, int len) {
+<span class="fc" id="L525">    String s = new String(buf, offset, len);</span>
+<span class="fc bfc" id="L526" title="All 2 branches covered.">    if (inException) {</span>
+<span class="fc" id="L527">      exceptions.append(s);</span>
+<span class="pc bpc" id="L528" title="1 of 6 branches missed.">    } else if (inToken &amp;&amp; (inPattern || inAntiPattern)) {</span>
+<span class="fc" id="L529">      elements.append(s);</span>
+<span class="pc bpc" id="L530" title="1 of 2 branches missed.">    } else if (inMatch) {</span>
+<span class="nc" id="L531">      match.append(s);</span>
+<span class="fc bfc" id="L532" title="All 2 branches covered.">    } else if (inWord) {</span>
+<span class="fc" id="L533">      wd.append(s);</span>
+<span class="fc bfc" id="L534" title="All 2 branches covered.">    } else if (inDisambiguation) {</span>
+<span class="fc" id="L535">      disamb.append(s);</span>
+<span class="fc bfc" id="L536" title="All 2 branches covered.">    } else if (inExample) {</span>
+<span class="fc" id="L537">      example.append(s);</span>
+    }
+<span class="fc" id="L539">  }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

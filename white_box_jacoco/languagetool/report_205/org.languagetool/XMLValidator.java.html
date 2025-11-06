@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XMLValidator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool</a> &gt; <span class="el_source">XMLValidator.java</span></div><h1>XMLValidator.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker 
+ * Copyright (C) 2007 Daniel Naber (http://www.danielnaber.de)
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool;
+
+import org.languagetool.tools.StringTools;
+import org.languagetool.tools.Tools;
+import org.w3c.dom.*;
+import org.xml.sax.*;
+import org.xml.sax.helpers.DefaultHandler;
+
+import javax.xml.XMLConstants;
+import javax.xml.parsers.*;
+import javax.xml.transform.Source;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamSource;
+import javax.xml.validation.*;
+import java.io.*;
+import java.net.URL;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Validate XML files with a given DTD or XML Schema (XSD).
+ * 
+ * @author Daniel Naber
+ */
+public final class XMLValidator {
+
+<span class="nc" id="L45">  public XMLValidator() {</span>
+<span class="nc" id="L46">    Tools.setPasswordAuthenticator();</span>
+<span class="nc" id="L47">  }</span>
+
+  /**
+   * Check some limits of our simplified XML output.
+   */
+  public void checkSimpleXMLString(String xml) throws IOException {
+<span class="nc" id="L53">    Pattern pattern = Pattern.compile(&quot;(&lt;error.*?/&gt;)&quot;, Pattern.DOTALL|Pattern.MULTILINE);</span>
+<span class="nc" id="L54">    Matcher matcher = pattern.matcher(xml);</span>
+<span class="nc" id="L55">    int pos = 0;</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">    while (matcher.find(pos)) {</span>
+<span class="nc" id="L57">      String errorElement = matcher.group();</span>
+<span class="nc" id="L58">      pos = matcher.end();</span>
+<span class="nc bnc" id="L59" title="All 4 branches missed.">      if (errorElement.contains(&quot;\n&quot;) || errorElement.contains(&quot;\r&quot;)) {</span>
+<span class="nc" id="L60">        throw new IOException(&quot;&lt;error ...&gt; may not contain line breaks&quot;);</span>
+      }
+<span class="nc" id="L62">      char beforeError = xml.charAt(matcher.start()-1);</span>
+<span class="nc bnc" id="L63" title="All 4 branches missed.">      if (beforeError != '\n' &amp;&amp; beforeError != '\r') {</span>
+<span class="nc" id="L64">        throw new IOException(&quot;Each &lt;error ...&gt; must start on a new line&quot;);</span>
+      }
+<span class="nc" id="L66">    }</span>
+<span class="nc" id="L67">  }</span>
+
+  /**
+   * Validate XML with the given DTD. Throws exception on error. 
+   */
+  public void validateXMLString(String xml, String dtdFile, String docType) throws SAXException, IOException, ParserConfigurationException {
+<span class="nc" id="L73">    validateInternal(xml, dtdFile, docType);</span>
+<span class="nc" id="L74">  }</span>
+
+  /**
+   * Validate XML file in classpath with the given DTD. Throws exception on error.
+   */
+  public void validateWithDtd(String filename, String dtdPath, String docType) throws IOException {
+<span class="nc" id="L80">    try (InputStream xmlStream = JLanguageTool.getDataBroker().getAsStream(filename)) {</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">      if (xmlStream == null) {</span>
+<span class="nc" id="L82">        throw new IOException(&quot;Not found in classpath: &quot; + filename);</span>
+      }
+      try {
+<span class="nc" id="L85">        String xml = StringTools.readStream(xmlStream, &quot;utf-8&quot;);</span>
+<span class="nc" id="L86">        validateInternal(xml, dtdPath, docType);</span>
+<span class="nc" id="L87">      } catch (Exception e) {</span>
+<span class="nc" id="L88">        throw new IOException(&quot;Cannot load or parse '&quot; + filename + &quot;'&quot;, e);</span>
+<span class="nc" id="L89">      }</span>
+    }
+<span class="nc" id="L91">  }</span>
+
+  /**
+   * Validate XML file using the given XSD. Throws an exception on error.
+   * @param filename File in classpath to validate
+   * @param xmlSchemaPath XML schema file in classpath
+   */
+  public void validateWithXmlSchema(String filename, String xmlSchemaPath) throws IOException {
+<span class="nc" id="L99">    try (InputStream xmlStream = JLanguageTool.getDataBroker().getAsStream(filename)) {</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">      if (xmlStream == null) {</span>
+<span class="nc" id="L101">        throw new IOException(&quot;File not found in classpath: &quot; + filename);</span>
+      }
+<span class="nc" id="L103">      URL schemaUrl = this.getClass().getResource(xmlSchemaPath);</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">      if (schemaUrl == null) {</span>
+<span class="nc" id="L105">        throw new IOException(&quot;XML schema not found in classpath: &quot; + xmlSchemaPath);</span>
+      }
+<span class="nc" id="L107">      validateInternal(new StreamSource(xmlStream), schemaUrl);</span>
+<span class="nc" id="L108">    } catch (Exception e) {</span>
+<span class="nc" id="L109">      throw new IOException(&quot;Cannot load or parse '&quot; + filename + &quot;'&quot;, e);</span>
+<span class="nc" id="L110">    }</span>
+<span class="nc" id="L111">  }</span>
+
+  /**
+   * Validate XML file using the given XSD. Throws an exception on error.
+   * @param baseFilename File to prepend common parts (unification) from before validating main file
+   * @param filename File in classpath to validate
+   * @param xmlSchemaPath XML schema file in classpath
+   */
+  public void validateWithXmlSchema(String baseFilename, String filename, String xmlSchemaPath) throws IOException {
+<span class="nc" id="L120">    try (InputStream xmlStream = JLanguageTool.getDataBroker().getAsStream(filename);</span>
+<span class="nc" id="L121">         InputStream baseXmlStream = JLanguageTool.getDataBroker().getAsStream(baseFilename)) {</span>
+<span class="nc bnc" id="L122" title="All 4 branches missed.">      if (xmlStream == null || baseXmlStream == null ) {</span>
+<span class="nc" id="L123">        throw new IOException(&quot;Files not found in classpath: &quot; + filename + &quot;, &quot; + baseFilename);</span>
+      }
+<span class="nc" id="L125">      URL schemaUrl = this.getClass().getResource(xmlSchemaPath);</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">      if (schemaUrl == null) {</span>
+<span class="nc" id="L127">        throw new IOException(&quot;XML schema not found in classpath: &quot; + xmlSchemaPath);</span>
+      }
+<span class="nc" id="L129">      validateInternal(mergeIntoSource(baseXmlStream, xmlStream), schemaUrl);</span>
+<span class="nc" id="L130">    } catch (Exception e) {</span>
+<span class="nc" id="L131">      throw new IOException(&quot;Cannot load or parse '&quot; + filename + &quot;'&quot;, e);</span>
+<span class="nc" id="L132">    }</span>
+<span class="nc" id="L133">  }</span>
+
+
+  private static Source mergeIntoSource(InputStream baseXmlStream, InputStream xmlStream) throws Exception {
+<span class="nc" id="L137">    DocumentBuilderFactory domFactory = DocumentBuilderFactory.newInstance();</span>
+<span class="nc" id="L138">    domFactory.setIgnoringComments(true);</span>
+<span class="nc" id="L139">    domFactory.setValidating(false);</span>
+<span class="nc" id="L140">    domFactory.setNamespaceAware(true);</span>
+
+<span class="nc" id="L142">    DocumentBuilder builder = domFactory.newDocumentBuilder();</span>
+<span class="nc" id="L143">    Document baseDoc = builder.parse(baseXmlStream);</span>
+<span class="nc" id="L144">    Document ruleDoc = builder.parse(xmlStream);</span>
+
+    // Shall this be more generic, i.e. reuse not just unification ???
+<span class="nc" id="L147">    NodeList unificationNodes = baseDoc.getElementsByTagName(&quot;unification&quot;);</span>
+<span class="nc" id="L148">    Node ruleNode = ruleDoc.getElementsByTagName(&quot;rules&quot;).item(0);</span>
+<span class="nc" id="L149">    Node firstChildRuleNode = ruleNode.getChildNodes().item(1);</span>
+
+<span class="nc bnc" id="L151" title="All 2 branches missed.">    for (int i = 0; i &lt; unificationNodes.getLength(); i++) {</span>
+<span class="nc" id="L152">      Node unificationNode = ruleDoc.importNode(unificationNodes.item(i), true);</span>
+<span class="nc" id="L153">      ruleNode.insertBefore(unificationNode, firstChildRuleNode);</span>
+    }
+
+<span class="nc" id="L156">    return new DOMSource(ruleDoc);</span>
+  }
+  
+  /**
+   * Validate XML file using the given XSD. Throws an exception on error.
+   * @param xml the XML string to be validated
+   * @param xmlSchemaPath XML schema file in classpath
+   * @since 2.3
+   */
+  public void validateStringWithXmlSchema(String xml, String xmlSchemaPath) throws IOException {
+    try {
+<span class="nc" id="L167">      URL schemaUrl = this.getClass().getResource(xmlSchemaPath);</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">      if (schemaUrl == null) {</span>
+<span class="nc" id="L169">        throw new IOException(&quot;XML schema not found in classpath: &quot; + xmlSchemaPath);</span>
+      }
+<span class="nc" id="L171">      try (ByteArrayInputStream stream = new ByteArrayInputStream(xml.getBytes(&quot;utf-8&quot;))) {</span>
+<span class="nc" id="L172">        validateInternal(new StreamSource(stream), schemaUrl);</span>
+      }
+<span class="nc" id="L174">    } catch (SAXException e) {</span>
+<span class="nc" id="L175">      throw new RuntimeException(e);</span>
+<span class="nc" id="L176">    }</span>
+<span class="nc" id="L177">  }</span>
+
+  private void validateInternal(String xml, String dtdPath, String docType) throws SAXException, IOException, ParserConfigurationException {
+<span class="nc" id="L180">    SAXParserFactory factory = SAXParserFactory.newInstance();</span>
+<span class="nc" id="L181">    factory.setValidating(true);</span>
+<span class="nc" id="L182">    SAXParser saxParser = factory.newSAXParser();</span>
+    //used for removing existing DOCTYPE from grammar.xml files
+<span class="nc" id="L184">    String cleanXml = xml.replaceAll(&quot;&lt;!DOCTYPE.+&gt;&quot;, &quot;&quot;);</span>
+<span class="nc" id="L185">    String decl = &quot;&lt;?xml version=\&quot;1.0\&quot;&quot;;</span>
+<span class="nc" id="L186">    String endDecl = &quot;?&gt;&quot;;</span>
+<span class="nc" id="L187">    URL dtdUrl = this.getClass().getResource(dtdPath);</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">    if (dtdUrl == null) {</span>
+<span class="nc" id="L189">      throw new RuntimeException(&quot;DTD not found in classpath: &quot; + dtdPath);</span>
+    }
+<span class="nc" id="L191">    String dtd = &quot;&lt;!DOCTYPE &quot; + docType + &quot; PUBLIC \&quot;-//W3C//DTD Rules 0.1//EN\&quot; \&quot;&quot; + dtdUrl + &quot;\&quot;&gt;&quot;;</span>
+<span class="nc" id="L192">    int pos = cleanXml.indexOf(decl);</span>
+<span class="nc" id="L193">    int endPos = cleanXml.indexOf(endDecl);</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">    if (pos == -1) {</span>
+<span class="nc" id="L195">      throw new IOException(&quot;No XML declaration found in '&quot; + cleanXml.substring(0, Math.min(100, cleanXml.length())) + &quot;...'&quot;);</span>
+    }
+<span class="nc" id="L197">    String newXML = cleanXml.substring(0, endPos+endDecl.length()) + &quot;\r\n&quot; + dtd + cleanXml.substring(endPos+endDecl.length());</span>
+<span class="nc" id="L198">    InputSource is = new InputSource(new StringReader(newXML));</span>
+<span class="nc" id="L199">    saxParser.parse(is, new ErrorHandler());</span>
+<span class="nc" id="L200">  }</span>
+
+  private void validateInternal(Source xmlSrc, URL xmlSchema) throws SAXException, IOException {
+<span class="nc" id="L203">    Validator validator = getValidator(xmlSchema);</span>
+<span class="nc" id="L204">    validator.validate(xmlSrc);</span>
+<span class="nc" id="L205">  }</span>
+
+  private Validator getValidator(URL xmlSchema) throws SAXException {
+<span class="nc" id="L208">    SchemaFactory sf = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);</span>
+<span class="nc" id="L209">    Schema schema = sf.newSchema(xmlSchema);</span>
+<span class="nc" id="L210">    Validator validator = schema.newValidator();</span>
+<span class="nc" id="L211">    validator.setErrorHandler(new ErrorHandler());</span>
+<span class="nc" id="L212">    return validator;</span>
+  }
+
+  /**
+   * XML handler that throws exception on error and warning, does nothing otherwise.
+   */
+<span class="nc" id="L218">  static class ErrorHandler extends DefaultHandler {</span>
+
+    @Override
+    public void warning (SAXParseException e) throws SAXException {
+<span class="nc" id="L222">      System.err.println(e.getMessage()</span>
+<span class="nc" id="L223">              + &quot; Problem found at line &quot; + e.getLineNumber()</span>
+<span class="nc" id="L224">              + &quot;, column &quot; + e.getColumnNumber() + &quot;.&quot;);</span>
+<span class="nc" id="L225">      throw e;</span>
+    }
+
+    @Override
+    public void error (SAXParseException e) throws SAXException {
+<span class="nc" id="L230">      System.err.println(e.getMessage()</span>
+<span class="nc" id="L231">              + &quot; Problem found at line &quot; + e.getLineNumber()</span>
+<span class="nc" id="L232">              + &quot;, column &quot; + e.getColumnNumber() + &quot;.&quot;);</span>
+<span class="nc" id="L233">      throw e;</span>
+    }
+
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

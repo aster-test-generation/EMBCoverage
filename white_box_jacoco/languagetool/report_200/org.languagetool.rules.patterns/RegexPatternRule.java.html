@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RegexPatternRule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules.patterns</a> &gt; <span class="el_source">RegexPatternRule.java</span></div><h1>RegexPatternRule.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2015 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules.patterns;
+
+import org.apache.commons.lang3.tuple.Pair;
+import org.jetbrains.annotations.NotNull;
+import org.languagetool.AnalyzedSentence;
+import org.languagetool.Language;
+import org.languagetool.rules.RuleMatch;
+import org.languagetool.tools.InterruptibleCharSequence;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Matches 'regexp' elements from XML rules against sentences.
+ *
+ * @since 3.2
+ */
+public class RegexPatternRule extends AbstractPatternRule implements RuleMatcher {
+
+<span class="nc" id="L41">  private static final Pattern suggestionPattern = Pattern.compile(&quot;&lt;suggestion&gt;(.*?)&lt;/suggestion&gt;&quot;);  // TODO: this needs to be cleaned up, there should be no need to parse this?</span>
+<span class="nc" id="L42">  private static final Pattern matchPattern = Pattern.compile(&quot;\\\\\\d&quot;);</span>
+
+  // in suggestions tokens are numbered from 1, anywhere else tokens are numbered from 0.
+  // see: https://dev.languagetool.org/development-overview
+  // But most of the rules tend to use 1 to refer the first capturing group, so keeping that behavior as default
+  private static final int MATCHES_IN_SUGGESTIONS_NUMBERED_FROM = 0;
+
+  private final Pattern pattern;
+  private final int markGroup;
+  private final String shortMessage;
+
+  public RegexPatternRule(String id, String description, String message, String shortMessage, String suggestionsOutMsg, Language language, Pattern regex, int regexpMark) {
+<span class="nc" id="L54">    super(id, description, language, regex, regexpMark);</span>
+<span class="nc" id="L55">    this.message = message;</span>
+<span class="nc" id="L56">    this.pattern = regex;</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">    this.shortMessage = shortMessage == null ? &quot;&quot; : shortMessage;</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">    this.suggestionsOutMsg = suggestionsOutMsg.isEmpty() ? &quot;&quot; : suggestionsOutMsg;;</span>
+<span class="nc" id="L59">    markGroup = regexpMark;</span>
+<span class="nc" id="L60">  }</span>
+
+  public Pattern getPattern() {
+<span class="nc" id="L63">    return pattern;</span>
+  }
+
+  @Override
+  public RuleMatch[] match(AnalyzedSentence sentenceObj) throws IOException {
+
+<span class="nc" id="L69">    List&lt;Pair&lt;Integer, Integer&gt;&gt; suggestionsInMessage = getClausePositionsInMessage(suggestionPattern, message);</span>
+<span class="nc" id="L70">    List&lt;Pair&lt;Integer, Integer&gt;&gt; backReferencesInMessage = getClausePositionsInMessage(matchPattern, message);</span>
+
+<span class="nc" id="L72">    List&lt;Pair&lt;Integer, Integer&gt;&gt; suggestionsInSuggestionsOutMsg = getClausePositionsInMessage(suggestionPattern, suggestionsOutMsg);</span>
+<span class="nc" id="L73">    List&lt;Pair&lt;Integer, Integer&gt;&gt; backReferencesInSuggestionsOutMsg = getClausePositionsInMessage(matchPattern, suggestionsOutMsg);</span>
+
+<span class="nc" id="L75">    Matcher patternMatcher = pattern.matcher(new InterruptibleCharSequence(sentenceObj.getText()));</span>
+<span class="nc" id="L76">    List&lt;RuleMatch&gt; matches = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L77">    int startPos = 0;</span>
+
+<span class="nc bnc" id="L79" title="All 2 branches missed.">    while (patternMatcher.find(startPos)) {</span>
+      try {
+<span class="nc" id="L81">        int markStart = patternMatcher.start(markGroup);</span>
+<span class="nc" id="L82">        int markEnd = patternMatcher.end(markGroup);</span>
+
+<span class="nc" id="L84">        String processedMessage = processMessage(patternMatcher, message, backReferencesInMessage, suggestionsInMessage, getSuggestionMatches());</span>
+<span class="nc" id="L85">        String processedSuggestionsOutMsg = processMessage(patternMatcher, suggestionsOutMsg, backReferencesInSuggestionsOutMsg,</span>
+<span class="nc" id="L86">                suggestionsInSuggestionsOutMsg, getSuggestionMatchesOutMsg());</span>
+
+<span class="nc bnc" id="L88" title="All 4 branches missed.">        boolean startsWithUpperCase = patternMatcher.start() == 0 &amp;&amp; Character.isUpperCase(sentenceObj.getText().charAt(patternMatcher.start()));</span>
+<span class="nc" id="L89">        RuleMatch ruleMatch = new RuleMatch(this, sentenceObj, markStart, markEnd, patternMatcher.start(), patternMatcher.end(),</span>
+                processedMessage, shortMessage, startsWithUpperCase, processedSuggestionsOutMsg);
+<span class="nc" id="L91">        matches.add(ruleMatch);</span>
+
+<span class="nc" id="L93">        startPos = patternMatcher.end();</span>
+<span class="nc" id="L94">      } catch (IndexOutOfBoundsException e){</span>
+<span class="nc" id="L95">        throw new RuntimeException(String.format(&quot;Unexpected reference to capturing group in rule with id %s.&quot;, this.getFullId()), e);</span>
+<span class="nc" id="L96">      } catch (Exception e) {</span>
+<span class="nc" id="L97">        throw new RuntimeException(String.format(&quot;Unexpected exception when processing regexp in rule with id %s.&quot;, this.getFullId()), e);</span>
+<span class="nc" id="L98">      }</span>
+    }
+<span class="nc" id="L100">    return matches.toArray(new RuleMatch[0]);</span>
+  }
+
+  @NotNull
+  private List&lt;Pair&lt;Integer, Integer&gt;&gt; getClausePositionsInMessage(Pattern pattern, String message) {
+<span class="nc" id="L105">    Matcher matcher = pattern.matcher(message);</span>
+<span class="nc" id="L106">    List&lt;Pair&lt;Integer, Integer&gt;&gt; clausePositionsInMessage = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">    while (matcher.find()) {</span>
+<span class="nc" id="L108">      clausePositionsInMessage.add(Pair.of(matcher.start(), matcher.end()));</span>
+    }
+<span class="nc" id="L110">    return clausePositionsInMessage;</span>
+  }
+
+  private String processMessage(Matcher matcher, String message, List&lt;Pair&lt;Integer, Integer&gt;&gt; backReferences,
+                                List&lt;Pair&lt;Integer, Integer&gt;&gt; suggestions, List&lt;Match&gt; matches) {
+
+<span class="nc" id="L116">    int closestSuggestionPosition = -1;</span>
+<span class="nc" id="L117">    boolean allSuggestionsPassed = suggestions.isEmpty();</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">    if (!suggestions.isEmpty()) {</span>
+<span class="nc" id="L119">      closestSuggestionPosition = 0;</span>
+    }
+
+    boolean insideSuggestion;
+<span class="nc" id="L123">    StringBuilder processedMessage = new StringBuilder();</span>
+<span class="nc" id="L124">    int startOfProcessingPart = 0;</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">    for (int i = 0; i &lt; backReferences.size(); i++) {</span>
+<span class="nc" id="L126">      Pair&lt;Integer, Integer&gt; reference = backReferences.get(i);</span>
+
+<span class="nc bnc" id="L128" title="All 4 branches missed.">      while (!allSuggestionsPassed &amp;&amp; (reference.getLeft() &gt; suggestions.get(closestSuggestionPosition).getRight())) {</span>
+<span class="nc" id="L129">        closestSuggestionPosition += 1;</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">        if (closestSuggestionPosition == suggestions.size()) {</span>
+<span class="nc" id="L131">          allSuggestionsPassed = true;</span>
+        }
+      }
+
+<span class="nc bnc" id="L135" title="All 4 branches missed.">      insideSuggestion = !allSuggestionsPassed &amp;&amp; reference.getLeft() &gt;= suggestions.get(closestSuggestionPosition).getLeft();</span>
+
+<span class="nc" id="L137">      int inXMLMatchReferenceNo = Integer.parseInt(message.substring(reference.getLeft(), reference.getRight()).split(&quot;\\\\&quot;)[1]);</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">      int actualMatchReferenceNo = inXMLMatchReferenceNo - (insideSuggestion ? MATCHES_IN_SUGGESTIONS_NUMBERED_FROM : 0);</span>
+
+<span class="nc" id="L140">      String matchReferenceStringValue = matcher.group(actualMatchReferenceNo);</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">      if (matchReferenceStringValue == null) {</span>
+<span class="nc" id="L142">        matchReferenceStringValue = &quot;&quot;;</span>
+      }
+
+<span class="nc" id="L145">      Match currentProcessingMatch = matches.get(i);</span>
+<span class="nc" id="L146">      String regexReplace = currentProcessingMatch.getRegexReplace();</span>
+      String suggestion;
+<span class="nc bnc" id="L148" title="All 2 branches missed.">      if (regexReplace != null) {</span>
+<span class="nc" id="L149">        suggestion = currentProcessingMatch.getRegexMatch().matcher(matchReferenceStringValue).replaceFirst(regexReplace);</span>
+<span class="nc" id="L150">        suggestion = CaseConversionHelper.convertCase(currentProcessingMatch.getCaseConversionType(), suggestion, matchReferenceStringValue, getLanguage());</span>
+      } else {
+<span class="nc" id="L152">        suggestion = matchReferenceStringValue;</span>
+      }
+<span class="nc" id="L154">      processedMessage.append(message, startOfProcessingPart, reference.getLeft()).append(suggestion);</span>
+
+<span class="nc" id="L156">      startOfProcessingPart = reference.getRight();</span>
+    }
+<span class="nc" id="L158">    processedMessage.append(message.substring(startOfProcessingPart));</span>
+
+<span class="nc" id="L160">    return processedMessage.toString();</span>
+  }
+
+  @Override
+  public int estimateContextForSureMatch() {
+<span class="nc" id="L165">    return -1;</span>
+  }
+  
+  @Override
+  public String toString() {
+<span class="nc" id="L170">    return pattern + &quot;/flags:&quot; + pattern.flags();</span>
+  }
+
+  /* (non-Javadoc)
+   * @see org.languagetool.rules.patterns.AbstractPatternRule#getShortMessage()
+   */
+  @Override
+  String getShortMessage() {
+<span class="nc" id="L178">    return shortMessage;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

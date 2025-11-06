@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FalseFriendRuleHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules.patterns</a> &gt; <span class="el_source">FalseFriendRuleHandler.java</span></div><h1>FalseFriendRuleHandler.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2015 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules.patterns;
+
+import org.apache.commons.lang3.StringUtils;
+import org.languagetool.*;
+import org.languagetool.rules.*;
+import org.xml.sax.Attributes;
+import org.xml.sax.SAXException;
+
+import java.text.MessageFormat;
+import java.util.*;
+import java.util.stream.Collectors;
+
+class FalseFriendRuleHandler extends XMLRuleHandler {
+
+  // Definitions of values in XML files:
+  private static final String TRANSLATION = &quot;translation&quot;;
+
+  private final ResourceBundle englishMessages;
+  private final ResourceBundle messages;
+  private final MessageFormat formatter;
+  private final Language textLanguage;
+  private final Language motherTongue;
+<span class="fc" id="L41">  private final Map&lt;String, List&lt;String&gt;&gt; suggestionMap = new HashMap&lt;&gt;();  // rule ID -&gt; list of translations</span>
+<span class="fc" id="L42">  private final List&lt;String&gt; suggestions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L43">  private final List&lt;StringBuilder&gt; translations = new ArrayList&lt;&gt;();</span>
+  private final String falseFriendHint;
+
+  private boolean defaultOff;
+  private Language language;
+  private Language translationLanguage;
+  private Language currentTranslationLanguage;
+<span class="fc" id="L50">  private StringBuilder translation = new StringBuilder();</span>
+  private boolean inTranslation;
+
+<span class="fc" id="L53">  FalseFriendRuleHandler(Language textLanguage, Language motherTongue, String falseFriendHint) {</span>
+<span class="fc" id="L54">    englishMessages = ResourceBundleTools.getMessageBundle(Languages.getLanguageForShortCode(&quot;en-US&quot;));</span>
+<span class="fc" id="L55">    messages = ResourceBundleTools.getMessageBundle(motherTongue);</span>
+<span class="fc" id="L56">    formatter = new MessageFormat(&quot;&quot;);</span>
+<span class="fc" id="L57">    formatter.setLocale(motherTongue.getLocale());</span>
+<span class="fc" id="L58">    this.textLanguage = textLanguage;</span>
+<span class="fc" id="L59">    this.motherTongue = motherTongue;</span>
+<span class="fc" id="L60">    this.falseFriendHint = falseFriendHint;</span>
+<span class="fc" id="L61">  }</span>
+
+  public Map&lt;String, List&lt;String&gt;&gt; getSuggestionMap() {
+<span class="fc" id="L64">    return suggestionMap;</span>
+  }
+
+  // ===========================================================
+  // SAX DocumentHandler methods
+  // ===========================================================
+
+  @Override
+  public void startElement(String namespaceURI, String lName,
+      String qName, Attributes attrs) throws SAXException {
+<span class="fc bfc" id="L74" title="All 2 branches covered.">    if (qName.equals(RULE)) {</span>
+<span class="fc" id="L75">      translations.clear();</span>
+<span class="fc" id="L76">      id = attrs.getValue(&quot;id&quot;);</span>
+<span class="pc bpc" id="L77" title="1 of 4 branches missed.">      if (!(inRuleGroup &amp;&amp; defaultOff)) {</span>
+<span class="fc" id="L78">        defaultOff = &quot;off&quot;.equals(attrs.getValue(&quot;default&quot;));</span>
+      }
+<span class="pc bpc" id="L80" title="2 of 4 branches missed.">      if (inRuleGroup &amp;&amp; id == null) {</span>
+<span class="fc" id="L81">        id = ruleGroupId;</span>
+      }
+<span class="fc" id="L83">      correctExamples = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L84">      incorrectExamples = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">    } else if (qName.equals(PATTERN)) {</span>
+<span class="fc" id="L86">      inPattern = true;</span>
+<span class="fc" id="L87">      String languageStr = attrs.getValue(&quot;lang&quot;);</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">      if (Languages.isLanguageSupported(languageStr)) {</span>
+<span class="fc" id="L89">        language = Languages.getLanguageForShortCode(languageStr);</span>
+      }
+<span class="fc bfc" id="L91" title="All 2 branches covered.">    } else if (qName.equals(TOKEN)) {</span>
+<span class="fc" id="L92">      setToken(attrs);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">    } else if (qName.equals(TRANSLATION)) {</span>
+<span class="fc" id="L94">      inTranslation = true;</span>
+<span class="fc" id="L95">      String languageStr = attrs.getValue(&quot;lang&quot;);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">      if (Languages.isLanguageSupported(languageStr)) {</span>
+<span class="fc" id="L97">        Language tmpLang = Languages.getLanguageForShortCode(languageStr);</span>
+<span class="fc" id="L98">        currentTranslationLanguage = tmpLang;</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (tmpLang.equalsConsiderVariantsIfSpecified(motherTongue)) {</span>
+<span class="fc" id="L100">          translationLanguage = tmpLang;</span>
+        }
+      }
+<span class="fc bfc" id="L103" title="All 2 branches covered.">    } else if (qName.equals(EXAMPLE)) {</span>
+<span class="fc" id="L104">      correctExample = new StringBuilder();</span>
+<span class="fc" id="L105">      incorrectExample = new StringBuilder();</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">      if (attrs.getValue(TYPE).equals(&quot;incorrect&quot;)) {</span>
+<span class="fc" id="L107">        inIncorrectExample = true;</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">      } else if (attrs.getValue(TYPE).equals(&quot;correct&quot;)) {</span>
+<span class="fc" id="L109">        inCorrectExample = true;</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">      } else if (attrs.getValue(TYPE).equals(&quot;triggers_error&quot;)) {</span>
+<span class="nc" id="L111">        throw new RuntimeException(&quot;'triggers_error' is not supported for false friend XML&quot;);</span>
+      }
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">    } else if (qName.equals(MESSAGE)) {</span>
+<span class="nc" id="L114">      inMessage = true;</span>
+<span class="nc" id="L115">      message = new StringBuilder();</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">    } else if (qName.equals(RULEGROUP)) {</span>
+<span class="fc" id="L117">      ruleGroupId = attrs.getValue(&quot;id&quot;);</span>
+<span class="fc" id="L118">      inRuleGroup = true;</span>
+<span class="fc" id="L119">      defaultOff = &quot;off&quot;.equals(attrs.getValue(DEFAULT));</span>
+    }
+<span class="fc" id="L121">  }</span>
+
+  @Override
+  public void endElement(String namespaceURI, String sName,
+      String qName) throws SAXException {
+<span class="pc bpc" id="L126" title="1 of 8 branches missed.">    switch (qName) {</span>
+      case RULE:
+<span class="fc bfc" id="L128" title="All 4 branches covered.">        if (language.equalsConsiderVariantsIfSpecified(textLanguage) &amp;&amp; translationLanguage != null</span>
+<span class="pc bpc" id="L129" title="1 of 4 branches missed.">                &amp;&amp; translationLanguage.equalsConsiderVariantsIfSpecified(motherTongue) &amp;&amp; language != motherTongue</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">                &amp;&amp; !translations.isEmpty()) {</span>
+<span class="fc" id="L131">          formatter.applyPattern(falseFriendHint);</span>
+<span class="fc" id="L132">          String tokensAsString = StringUtils.join(patternTokens, &quot; &quot;).replace('|', '/');</span>
+<span class="fc" id="L133">          Object[] messageArguments = {tokensAsString,</span>
+<span class="fc" id="L134">                  englishMessages.getString(textLanguage.getShortCode()),</span>
+<span class="fc" id="L135">                  formatTranslations(translations),</span>
+<span class="fc" id="L136">                  englishMessages.getString(motherTongue.getShortCode())};</span>
+<span class="fc" id="L137">          String description = formatter.format(messageArguments);</span>
+<span class="fc" id="L138">          PatternRule rule = new FalseFriendPatternRule(id, language, patternTokens,</span>
+<span class="fc" id="L139">                  messages.getString(&quot;false_friend_desc&quot;) + &quot; &quot;</span>
+<span class="fc" id="L140">                          + tokensAsString, description, messages.getString(&quot;false_friend&quot;));</span>
+<span class="fc" id="L141">          rule.setCorrectExamples(correctExamples);</span>
+<span class="fc" id="L142">          rule.setIncorrectExamples(incorrectExamples);</span>
+<span class="fc" id="L143">          rule.setCategory(Categories.FALSE_FRIENDS.getCategory(messages));</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">          if (defaultOff) {</span>
+<span class="fc" id="L145">            rule.setDefaultOff();</span>
+          }
+<span class="fc" id="L147">          rules.add(rule);</span>
+        }
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (patternTokens != null) {</span>
+<span class="fc" id="L150">          patternTokens.clear();</span>
+        }
+        break;
+      case TOKEN:
+<span class="fc" id="L154">        finalizeTokens();</span>
+<span class="fc" id="L155">        break;</span>
+      case PATTERN:
+<span class="fc" id="L157">        inPattern = false;</span>
+<span class="fc" id="L158">        break;</span>
+      case TRANSLATION:
+<span class="fc bfc" id="L160" title="All 4 branches covered.">        if (currentTranslationLanguage != null &amp;&amp; currentTranslationLanguage.equalsConsiderVariantsIfSpecified(motherTongue)) {</span>
+          // currentTranslationLanguage can be null if the language is not supported
+<span class="fc" id="L162">          translations.add(translation);</span>
+        }
+<span class="fc bfc" id="L164" title="All 4 branches covered.">        if (currentTranslationLanguage != null &amp;&amp; currentTranslationLanguage.equalsConsiderVariantsIfSpecified(textLanguage)</span>
+<span class="fc bfc" id="L165" title="All 4 branches covered.">                &amp;&amp; language.equalsConsiderVariantsIfSpecified(motherTongue) &amp;&amp; !suggestions.contains(translation.toString())) {</span>
+<span class="fc" id="L166">          suggestions.add(translation.toString());</span>
+        }
+<span class="fc" id="L168">        translation = new StringBuilder();</span>
+<span class="fc" id="L169">        inTranslation = false;</span>
+<span class="fc" id="L170">        currentTranslationLanguage = null;</span>
+<span class="fc" id="L171">        break;</span>
+      case EXAMPLE:
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (inCorrectExample) {</span>
+<span class="fc" id="L174">          correctExamples.add(new CorrectExample(correctExample.toString()));</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">        } else if (inIncorrectExample) {</span>
+<span class="fc" id="L176">          incorrectExamples.add(new IncorrectExample(incorrectExample.toString()));</span>
+        }
+<span class="fc" id="L178">        inCorrectExample = false;</span>
+<span class="fc" id="L179">        inIncorrectExample = false;</span>
+<span class="fc" id="L180">        correctExample = new StringBuilder();</span>
+<span class="fc" id="L181">        incorrectExample = new StringBuilder();</span>
+<span class="fc" id="L182">        break;</span>
+      case MESSAGE:
+<span class="nc" id="L184">        inMessage = false;</span>
+<span class="nc" id="L185">        break;</span>
+      case RULEGROUP:
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        if (!suggestions.isEmpty()) {</span>
+<span class="fc" id="L188">          List&lt;String&gt; l = new ArrayList&lt;&gt;(suggestions);</span>
+<span class="fc" id="L189">          suggestionMap.put(id, l);</span>
+<span class="fc" id="L190">          suggestions.clear();</span>
+        }
+<span class="fc" id="L192">        inRuleGroup = false;</span>
+        break;
+    }
+<span class="fc" id="L195">  }</span>
+
+  private String formatTranslations(List&lt;StringBuilder&gt; translations) {
+<span class="fc" id="L198">    return translations.stream().map(o -&gt; &quot;\&quot;&quot; + o + &quot;\&quot;&quot;).collect(Collectors.joining(&quot;, &quot;));</span>
+  }
+
+  @Override
+  public void characters(char[] buf, int offset, int len) {
+<span class="fc" id="L203">    String s = new String(buf, offset, len);</span>
+<span class="pc bpc" id="L204" title="1 of 4 branches missed.">    if (inToken &amp;&amp; inPattern) {</span>
+<span class="fc" id="L205">      elements.append(s);</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">    } else if (inCorrectExample) {</span>
+<span class="fc" id="L207">      correctExample.append(s);</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">    } else if (inIncorrectExample) {</span>
+<span class="fc" id="L209">      incorrectExample.append(s);</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">    } else if (inTranslation) {</span>
+<span class="fc" id="L211">      translation.append(s);</span>
+    }
+<span class="fc" id="L213">  }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

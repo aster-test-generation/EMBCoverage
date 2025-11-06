@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SimpleInputSentence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool</a> &gt; <span class="el_source">SimpleInputSentence.java</span></div><h1>SimpleInputSentence.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2017 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool;
+
+import java.util.Objects;
+
+/**
+ * For internal use only. Used as a key for caching analysis results.
+ * @since 3.7
+ */
+class SimpleInputSentence {
+
+  private final String text;
+  private final Language lang;
+  
+<span class="nc" id="L32">  SimpleInputSentence(String text, Language lang) {</span>
+<span class="nc" id="L33">    this.text = Objects.requireNonNull(text);</span>
+<span class="nc" id="L34">    this.lang = Objects.requireNonNull(lang);</span>
+<span class="nc" id="L35">  }</span>
+
+  /** @since 4.1 */
+  public String getText() {
+<span class="nc" id="L39">    return text;</span>
+  }
+
+  @Override
+  public boolean equals(Object o) {
+<span class="nc bnc" id="L44" title="All 2 branches missed.">    if (o == null) return false;</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">    if (o == this) return true;</span>
+<span class="nc bnc" id="L46" title="All 2 branches missed.">    if (o.getClass() != getClass()) return false;</span>
+<span class="nc" id="L47">    SimpleInputSentence other = (SimpleInputSentence) o;</span>
+<span class="nc bnc" id="L48" title="All 2 branches missed.">    return Objects.equals(text, other.text) &amp;&amp; </span>
+<span class="nc bnc" id="L49" title="All 2 branches missed.">           Objects.equals(lang, other.lang);</span>
+  }
+
+  @Override
+  public int hashCode() {
+<span class="nc" id="L54">    return Objects.hash(text, lang);</span>
+  }
+
+  @Override
+  public String toString() {
+<span class="nc" id="L59">    return text;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

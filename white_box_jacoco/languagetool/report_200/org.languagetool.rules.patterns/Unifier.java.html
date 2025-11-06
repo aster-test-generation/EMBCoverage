@@ -1,0 +1,465 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Unifier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules.patterns</a> &gt; <span class="el_source">Unifier.java</span></div><h1>Unifier.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2006 Daniel Naber (http://www.danielnaber.de)
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+
+package org.languagetool.rules.patterns;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.jetbrains.annotations.Nullable;
+import org.languagetool.AnalyzedToken;
+import org.languagetool.AnalyzedTokenReadings;
+
+/**
+ * Implements unification of features over tokens.
+ * 
+ * @author Marcin Milkowski
+ */
+public class Unifier {
+
+  private static final String UNIFY_IGNORE = &quot;unify-ignore&quot;;
+    
+  private final List&lt;AnalyzedTokenReadings&gt; tokSequence;
+
+  /**
+   * List of all equivalences matched per tokens in the sequence, kept exactly
+   * in sync with the list in tokSequence, so that a reading 2 of token 1 has its
+   * equivalence map addressable as tokSequenceEquivalences.get(1).get(2).
+   */
+  private final List&lt;List&lt;Map&lt;String, Set&lt;String&gt;&gt;&gt;&gt; tokSequenceEquivalences;
+
+  /**
+   * A Map for storing the equivalence types for features. Features are
+   * specified as Strings, and map into types defined as maps from Strings to
+   * Elements.
+   */
+  private final Map&lt;EquivalenceTypeLocator, PatternToken&gt; equivalenceTypes;
+
+  /**
+   * A Map that stores all possible equivalence types listed for features.
+   */
+  private final Map&lt;String, List&lt;String&gt;&gt; equivalenceFeatures;
+
+  /**
+   * Map of sets of matched equivalences in the unified sequence.
+   */
+  private final List&lt;Map&lt;String, Set&lt;String&gt;&gt;&gt; equivalencesMatched;
+
+  private boolean allFeatsIn;
+  private int tokCnt;
+  private int readingsCounter;
+
+  // Marks found interpretations in subsequent tokens:
+  private List&lt;Boolean&gt; featuresFound;
+
+  // For checking the current token:
+  private List&lt;Boolean&gt; tmpFeaturesFound;
+
+  // Maps that store equivalences to be removed or kept after every next token has been analyzed:
+  private final Map&lt;String, Set&lt;String&gt;&gt; equivalencesToBeKept;
+
+  // stores uFeatures to keep the same signature of some methods...:
+  private Map&lt;String, List&lt;String&gt;&gt; unificationFeats;
+
+  private boolean inUnification;
+  private boolean uniMatched;
+  private boolean uniAllMatched;
+
+  /**
+   * Instantiates the unifier.
+   */
+<span class="nc" id="L87">  public Unifier(Map&lt;EquivalenceTypeLocator, PatternToken&gt; equivalenceTypes, Map&lt;String, List&lt;String&gt;&gt; equivalenceFeatures) {</span>
+<span class="nc" id="L88">    tokCnt = 0;</span>
+<span class="nc" id="L89">    readingsCounter = 1;</span>
+<span class="nc" id="L90">    equivalencesMatched = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L91">    this.equivalenceTypes = equivalenceTypes;</span>
+<span class="nc" id="L92">    this.equivalenceFeatures = equivalenceFeatures;</span>
+<span class="nc" id="L93">    equivalencesToBeKept = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="nc" id="L94">    featuresFound = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L95">    tmpFeaturesFound = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L96">    tokSequence = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L97">    tokSequenceEquivalences = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L98">  }</span>
+
+  /**
+   * Tests if a token has shared features with other tokens.
+   * 
+   * @param aToken token to be tested
+   * @param uFeatures features to be tested
+   * @return true if the token shares this type of feature with other tokens
+   */
+  protected final boolean isSatisfied(AnalyzedToken aToken,
+      Map&lt;String, List&lt;String&gt;&gt; uFeatures) {
+
+<span class="nc bnc" id="L110" title="All 4 branches missed.">    if (allFeatsIn &amp;&amp; equivalencesMatched.isEmpty()) {</span>
+<span class="nc" id="L111">      return false;</span>
+    }
+<span class="nc bnc" id="L113" title="All 2 branches missed.">    if (uFeatures == null) {</span>
+<span class="nc" id="L114">      throw new RuntimeException(&quot;isSatisfied called without features being set&quot;);</span>
+    }
+<span class="nc" id="L116">    unificationFeats = uFeatures;</span>
+
+<span class="nc" id="L118">    boolean unified = true;</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">    if (allFeatsIn) {</span>
+<span class="nc" id="L120">      unified = checkNext(aToken, uFeatures);</span>
+    } else {
+<span class="nc bnc" id="L122" title="All 2 branches missed.">      while (equivalencesMatched.size() &lt;= tokCnt) {</span>
+<span class="nc" id="L123">        equivalencesMatched.add(new ConcurrentHashMap&lt;&gt;());</span>
+      }
+<span class="nc bnc" id="L125" title="All 2 branches missed.">      for (Map.Entry&lt;String, List&lt;String&gt;&gt; feat : uFeatures.entrySet()) {</span>
+<span class="nc" id="L126">        List&lt;String&gt; types = feat.getValue();</span>
+<span class="nc bnc" id="L127" title="All 4 branches missed.">        if (types == null || types.isEmpty()) {</span>
+<span class="nc" id="L128">          types = equivalenceFeatures.get(feat.getKey());</span>
+        }
+<span class="nc bnc" id="L130" title="All 2 branches missed.">        for (String typeName : types) {</span>
+<span class="nc" id="L131">          PatternToken testElem = equivalenceTypes</span>
+<span class="nc" id="L132">              .get(new EquivalenceTypeLocator(feat.getKey(), typeName));</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">          if (testElem == null) {</span>
+<span class="nc" id="L134">            return false;</span>
+          }
+<span class="nc bnc" id="L136" title="All 2 branches missed.">          if (testElem.isMatched(aToken)) {</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">            if (!equivalencesMatched.get(tokCnt).containsKey(feat.getKey())) {</span>
+<span class="nc" id="L138">              Set&lt;String&gt; typeSet = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L139">              typeSet.add(typeName);</span>
+<span class="nc" id="L140">              equivalencesMatched.get(tokCnt).put(feat.getKey(), typeSet);</span>
+<span class="nc" id="L141">            } else {</span>
+<span class="nc" id="L142">              equivalencesMatched.get(tokCnt).get(feat.getKey()).add(typeName);</span>
+            }
+          }
+<span class="nc" id="L145">        }</span>
+<span class="nc" id="L146">        unified = equivalencesMatched.get(tokCnt).containsKey(feat.getKey());</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">        if (!unified) {</span>
+<span class="nc" id="L148">          equivalencesMatched.remove(tokCnt);</span>
+<span class="nc" id="L149">          break;</span>
+        }
+<span class="nc" id="L151">      }</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">      if (unified) {</span>
+<span class="nc bnc" id="L153" title="All 4 branches missed.">        if (tokCnt == 0 || tokSequence.isEmpty()) {</span>
+<span class="nc" id="L154">          tokSequence.add(new AnalyzedTokenReadings(aToken, 0));</span>
+<span class="nc" id="L155">          List&lt;Map&lt;String, Set&lt;String&gt;&gt;&gt; equivList = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L156">          equivList.add(equivalencesMatched.get(tokCnt));</span>
+<span class="nc" id="L157">          tokSequenceEquivalences.add(equivList);</span>
+<span class="nc" id="L158">        } else {</span>
+<span class="nc" id="L159">          tokSequence.get(0).addReading(aToken, &quot;Unifier&quot;);</span>
+<span class="nc" id="L160">          tokSequenceEquivalences.get(0).add(equivalencesMatched.get(tokCnt));</span>
+        }
+<span class="nc" id="L162">        tokCnt++;</span>
+      }
+    }
+<span class="nc" id="L165">    return unified;</span>
+  }
+
+  private boolean checkNext(AnalyzedToken aToken,
+                            Map&lt;String, List&lt;String&gt;&gt; uFeatures) {
+<span class="nc" id="L170">    boolean anyFeatUnified = false;</span>
+<span class="nc" id="L171">    List&lt;Boolean&gt; tokenFeaturesFound = new ArrayList&lt;&gt;(tmpFeaturesFound);</span>
+<span class="nc" id="L172">    Map&lt;String, Set&lt;String&gt;&gt; equivalencesMatchedHere = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">    if (allFeatsIn) {</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">      for (int i = 0; i &lt; tokCnt; i++) {</span>
+<span class="nc" id="L175">        boolean allFeatsUnified = true;</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        for (Map.Entry&lt;String, List&lt;String&gt;&gt; feat : uFeatures.entrySet()) {</span>
+<span class="nc" id="L177">          boolean featUnified = false;</span>
+<span class="nc" id="L178">          List&lt;String&gt; types = feat.getValue();</span>
+<span class="nc bnc" id="L179" title="All 4 branches missed.">          if (types == null || types.isEmpty()) {</span>
+<span class="nc" id="L180">            types = equivalenceFeatures.get(feat.getKey());</span>
+          }
+<span class="nc bnc" id="L182" title="All 2 branches missed.">          for (String typeName : types) {</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">            if (equivalencesMatched.get(i).containsKey(feat.getKey())</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">                &amp;&amp; equivalencesMatched.get(i).get(feat.getKey()).contains(typeName)) {</span>
+<span class="nc" id="L185">              PatternToken testElem = equivalenceTypes.get(new EquivalenceTypeLocator(feat.getKey(), typeName));</span>
+<span class="nc" id="L186">              boolean matched = testElem.isMatched(aToken);</span>
+<span class="nc bnc" id="L187" title="All 4 branches missed.">              featUnified = featUnified || matched;</span>
+              //Stores equivalences to be kept
+<span class="nc bnc" id="L189" title="All 2 branches missed.">              if (matched) {</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">                if (!equivalencesToBeKept.containsKey(feat.getKey())) {</span>
+<span class="nc" id="L191">                  Set&lt;String&gt; typeSet = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L192">                  typeSet.add(typeName);</span>
+<span class="nc" id="L193">                  equivalencesToBeKept.put(feat.getKey(), typeSet);</span>
+<span class="nc" id="L194">                } else {</span>
+<span class="nc" id="L195">                  equivalencesToBeKept.get(feat.getKey()).add(typeName);</span>
+                }
+<span class="nc bnc" id="L197" title="All 2 branches missed.">                if (!equivalencesMatchedHere.containsKey(feat.getKey())) { // just for this reading</span>
+<span class="nc" id="L198">                  Set&lt;String&gt; typeSet = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L199">                  typeSet.add(typeName);</span>
+<span class="nc" id="L200">                  equivalencesMatchedHere.put(feat.getKey(), typeSet);</span>
+<span class="nc" id="L201">                } else {</span>
+<span class="nc" id="L202">                  equivalencesMatchedHere.get(feat.getKey()).add(typeName);</span>
+                }
+              }
+            }
+<span class="nc" id="L206">          }</span>
+<span class="nc" id="L207">          allFeatsUnified &amp;= featUnified;</span>
+<span class="nc" id="L208">        }</span>
+<span class="nc bnc" id="L209" title="All 4 branches missed.">        tokenFeaturesFound.set(i, tokenFeaturesFound.get(i) || allFeatsUnified);</span>
+<span class="nc bnc" id="L210" title="All 4 branches missed.">        anyFeatUnified = anyFeatUnified || allFeatsUnified;</span>
+      }
+<span class="nc bnc" id="L212" title="All 2 branches missed.">      if (anyFeatUnified) {</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">        if (tokSequence.size() == readingsCounter) {</span>
+<span class="nc" id="L214">          tokSequence.add(new AnalyzedTokenReadings(aToken, 0));</span>
+<span class="nc" id="L215">          List&lt;Map&lt;String, Set&lt;String&gt;&gt;&gt; equivList = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L216">          equivList.add(equivalencesMatchedHere);</span>
+<span class="nc" id="L217">          tokSequenceEquivalences.add(equivList);</span>
+<span class="nc" id="L218">        } else {</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">          if (readingsCounter &lt; tokSequence.size()) {</span>
+<span class="nc" id="L220">            tokSequence.get(readingsCounter).addReading(aToken, &quot;Unifier&quot;);</span>
+<span class="nc" id="L221">            tokSequenceEquivalences.get(readingsCounter).add(equivalencesMatchedHere);</span>
+          } else {
+<span class="nc" id="L223">            anyFeatUnified = false;</span>
+          }
+        }
+<span class="nc" id="L226">        tmpFeaturesFound = tokenFeaturesFound;</span>
+      }
+    }
+<span class="nc" id="L229">    return anyFeatUnified;</span>
+  }
+
+  /**
+   * Call after every complete token (AnalyzedTokenReadings) checked.
+   */
+  public final void startNextToken() {
+<span class="nc" id="L236">    featuresFound = new ArrayList&lt;&gt;(tmpFeaturesFound);</span>
+<span class="nc" id="L237">    readingsCounter++;</span>
+    // Removes features
+<span class="nc bnc" id="L239" title="All 2 branches missed.">    for (int j = 0; j &lt; tokSequence.size(); j++) {</span>
+<span class="nc bnc" id="L240" title="All 2 branches missed.">      for (int i = 0; i &lt; tokSequenceEquivalences.get(j).size(); i++) {</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">        for (Map.Entry&lt;String, List&lt;String&gt;&gt; feat : equivalenceFeatures.entrySet()) {</span>
+<span class="nc bnc" id="L242" title="All 2 branches missed.">          if (!UNIFY_IGNORE.equals(feat.getKey())) {</span>
+<span class="nc bnc" id="L243" title="All 2 branches missed.">            if (tokSequenceEquivalences.get(j).get(i).containsKey(feat.getKey())) {</span>
+<span class="nc bnc" id="L244" title="All 2 branches missed.">              if (equivalencesToBeKept.containsKey(feat.getKey())) {</span>
+<span class="nc" id="L245">                tokSequenceEquivalences.get(j).get(i).get(feat.getKey()).retainAll(equivalencesToBeKept.get(feat.getKey()));</span>
+              } else {
+<span class="nc" id="L247">                tokSequenceEquivalences.get(j).get(i).remove(feat.getKey());</span>
+              }
+            } else {
+<span class="nc" id="L250">              tokSequenceEquivalences.get(j).get(i).remove(feat.getKey());</span>
+            }
+          }
+<span class="nc" id="L253">        }</span>
+      }
+    }
+<span class="nc" id="L256">    equivalencesToBeKept.clear();</span>
+<span class="nc" id="L257">  }</span>
+
+  /**
+   * Starts testing only those equivalences that were previously matched.
+   */
+  public final void startUnify() {
+<span class="nc" id="L263">    allFeatsIn = true;</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">    for (int i = 0; i &lt; tokCnt; i++) {</span>
+<span class="nc" id="L265">      featuresFound.add(false);</span>
+    }
+<span class="nc" id="L267">    tmpFeaturesFound = new ArrayList&lt;&gt;(featuresFound);</span>
+<span class="nc" id="L268">  }</span>
+
+  /**
+   * Make sure that we really matched all the required features of the unification.
+   * @param uFeatures Features to be checked
+   * @return True if the token sequence has been found.
+   * @since 2.5
+   */
+  public final boolean getFinalUnificationValue(Map&lt;String, List&lt;String&gt;&gt; uFeatures) {
+<span class="nc" id="L277">    int tokUnified = 0;</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">    for (int j = 0; j &lt; tokSequence.size(); j++) {</span>
+<span class="nc" id="L279">      boolean unifiedTokensFound = false; // assume that nothing has been found</span>
+<span class="nc bnc" id="L280" title="All 2 branches missed.">      for (int i = 0; i &lt; tokSequenceEquivalences.get(j).size(); i++) {</span>
+<span class="nc" id="L281">        int featUnified = 0;</span>
+<span class="nc bnc" id="L282" title="All 2 branches missed.">        if (tokSequenceEquivalences.get(j).get(i).containsKey(UNIFY_IGNORE)) {</span>
+<span class="nc bnc" id="L283" title="All 2 branches missed.">          if (i == 0) {</span>
+<span class="nc" id="L284">            tokUnified++;</span>
+          }
+<span class="nc" id="L286">          unifiedTokensFound = true;</span>
+<span class="nc" id="L287">          continue;</span>
+        } else {
+<span class="nc bnc" id="L289" title="All 2 branches missed.">          for (Map.Entry&lt;String, List&lt;String&gt;&gt; feat : uFeatures.entrySet()) {</span>
+<span class="nc bnc" id="L290" title="All 2 branches missed.">            if (tokSequenceEquivalences.get(j).get(i).containsKey(feat.getKey()) &amp;&amp;</span>
+<span class="nc bnc" id="L291" title="All 2 branches missed.">                tokSequenceEquivalences.get(j).get(i).get(feat.getKey()).isEmpty()) {</span>
+<span class="nc" id="L292">              featUnified = 0;</span>
+            } else {
+<span class="nc" id="L294">              featUnified++;</span>
+            }
+<span class="nc bnc" id="L296" title="All 4 branches missed.">            if (featUnified == unificationFeats.entrySet().size() &amp;&amp; tokUnified &lt;= j) {</span>
+<span class="nc" id="L297">              tokUnified++;</span>
+<span class="nc" id="L298">              unifiedTokensFound = true;</span>
+<span class="nc" id="L299">              break;</span>
+            }
+<span class="nc" id="L301">          }</span>
+        }
+
+      }
+<span class="nc bnc" id="L305" title="All 2 branches missed.">      if (!unifiedTokensFound) {</span>
+<span class="nc" id="L306">        return false;</span>
+      }
+    }
+<span class="nc bnc" id="L309" title="All 2 branches missed.">    if (tokUnified == tokSequence.size()) {</span>
+<span class="nc" id="L310">      return true;</span>
+    }
+<span class="nc" id="L312">    return false;</span>
+  }
+
+  /**
+   * Resets after use of unification. Required.
+   */
+  public final void reset() {
+<span class="nc" id="L319">    equivalencesMatched.clear();</span>
+<span class="nc" id="L320">    allFeatsIn = false;</span>
+<span class="nc" id="L321">    tokCnt = 0;</span>
+<span class="nc" id="L322">    featuresFound.clear();</span>
+<span class="nc" id="L323">    tmpFeaturesFound.clear();</span>
+<span class="nc" id="L324">    tokSequence.clear();</span>
+<span class="nc" id="L325">    tokSequenceEquivalences.clear();</span>
+<span class="nc" id="L326">    readingsCounter = 1;</span>
+<span class="nc" id="L327">    uniMatched = false;</span>
+<span class="nc" id="L328">    uniAllMatched = false;</span>
+<span class="nc" id="L329">    inUnification = false;</span>
+<span class="nc" id="L330">  }</span>
+
+  /**
+   * Gets a full sequence of filtered tokens.
+   * @return Array of AnalyzedTokenReadings that match equivalence relation
+   *         defined for features tested, or {@code null}
+   */
+  @Nullable
+  public final AnalyzedTokenReadings[] getUnifiedTokens() {
+<span class="nc bnc" id="L339" title="All 2 branches missed.">    if (tokSequence.isEmpty()) {</span>
+<span class="nc" id="L340">      return null;</span>
+    }
+<span class="nc" id="L342">    List&lt;AnalyzedTokenReadings&gt; uTokens = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L343" title="All 2 branches missed.">    for (int j = 0; j &lt; tokSequence.size(); j++) {</span>
+<span class="nc" id="L344">      boolean unifiedTokensFound = false; // assume that nothing has been found</span>
+<span class="nc bnc" id="L345" title="All 2 branches missed.">      for (int i = 0; i &lt; tokSequenceEquivalences.get(j).size(); i++) {</span>
+<span class="nc" id="L346">        int featUnified = 0;</span>
+<span class="nc bnc" id="L347" title="All 2 branches missed.">        if (tokSequenceEquivalences.get(j).get(i).containsKey(UNIFY_IGNORE)) {</span>
+<span class="nc" id="L348">          addTokenToSequence(uTokens, tokSequence.get(j).getAnalyzedToken(i), j);</span>
+<span class="nc" id="L349">          unifiedTokensFound = true;</span>
+        } else {
+<span class="nc bnc" id="L351" title="All 2 branches missed.">          for (Map.Entry&lt;String, List&lt;String&gt;&gt; feat : unificationFeats.entrySet()) {</span>
+<span class="nc bnc" id="L352" title="All 2 branches missed.">            if (tokSequenceEquivalences.get(j).get(i).containsKey(feat.getKey()) &amp;&amp;</span>
+<span class="nc bnc" id="L353" title="All 2 branches missed.">                    tokSequenceEquivalences.get(j).get(i).get(feat.getKey()).isEmpty()) {</span>
+<span class="nc" id="L354">              featUnified = 0;</span>
+            } else {
+<span class="nc" id="L356">              featUnified++;</span>
+            }
+<span class="nc bnc" id="L358" title="All 2 branches missed.">            if (featUnified == unificationFeats.entrySet().size()) {</span>
+<span class="nc" id="L359">              addTokenToSequence(uTokens, tokSequence.get(j).getAnalyzedToken(i), j);</span>
+<span class="nc" id="L360">              unifiedTokensFound = true;</span>
+            }
+<span class="nc" id="L362">          }</span>
+        }
+      }
+<span class="nc bnc" id="L365" title="All 2 branches missed.">      if (!unifiedTokensFound) {</span>
+<span class="nc" id="L366">        return null;</span>
+      }
+    }
+<span class="nc" id="L369">    return uTokens.toArray(new AnalyzedTokenReadings[0]);</span>
+  }
+
+  private void addTokenToSequence(List&lt;AnalyzedTokenReadings&gt; tokenSequence, AnalyzedToken token, int pos) {
+<span class="nc bnc" id="L373" title="All 4 branches missed.">    if (tokenSequence.size() &lt;= pos || tokenSequence.isEmpty()) {</span>
+<span class="nc" id="L374">      AnalyzedTokenReadings tmpATR = new AnalyzedTokenReadings(token, 0);</span>
+<span class="nc" id="L375">      tokenSequence.add(tmpATR);</span>
+<span class="nc" id="L376">    } else {</span>
+<span class="nc" id="L377">      tokenSequence.get(pos).addReading(token, &quot;Unifier&quot;);</span>
+    }
+<span class="nc" id="L379">  }</span>
+
+  /**
+   * Tests if the token sequence is unified.
+   * 
+   * &lt;p&gt;Usage note: to test if the sequence of tokens is unified (i.e.,
+   * shares a group of features, such as the same gender, number,
+   * grammatical case etc.), you need to test all tokens but the last one
+   * in the following way: call {@code isUnified()} for every reading of a token,
+   * and set {@code lastReading} to {@code true}. For the last token, check the
+   * truth value returned by this method. In previous cases, it may actually be
+   * discarded before the final check. See {@link AbstractPatternRule} for
+   * an example.&lt;/p&gt;
+   * 
+   * To make it work in XML rules, the Elements built based on {@code &lt;token&gt;}s inside
+   * the unify block have to be processed in a special way: namely the last Element has to be
+   * marked as the last one (by using {@link PatternToken#setLastInUnification}).
+   * 
+   * @param matchToken {@link AnalyzedToken} token to unify
+   * @param lastReading true when the matchToken is the last reading in the {@link AnalyzedTokenReadings}
+   * @param isMatched true if the reading matches the element in the pattern rule,
+   *          otherwise the reading is not considered in the unification
+   * @return true if the tokens in the sequence are unified
+   */
+  public final boolean isUnified(AnalyzedToken matchToken,
+      Map&lt;String, List&lt;String&gt;&gt; uFeatures, boolean lastReading, boolean isMatched) {
+<span class="nc bnc" id="L405" title="All 2 branches missed.">    if (inUnification) {</span>
+<span class="nc bnc" id="L406" title="All 2 branches missed.">      if (isMatched) {</span>
+<span class="nc" id="L407">        uniMatched |= isSatisfied(matchToken, uFeatures);</span>
+      }
+<span class="nc" id="L409">      uniAllMatched = uniMatched;</span>
+
+<span class="nc bnc" id="L411" title="All 2 branches missed.">      if (lastReading) {</span>
+<span class="nc" id="L412">        startNextToken();</span>
+<span class="nc" id="L413">        uniMatched = false;</span>
+      }
+<span class="nc bnc" id="L415" title="All 4 branches missed.">      return uniAllMatched &amp;&amp; getFinalUnificationValue(uFeatures);</span>
+    } else {
+<span class="nc bnc" id="L417" title="All 2 branches missed.">      if (isMatched) {</span>
+<span class="nc" id="L418">        isSatisfied(matchToken, uFeatures);</span>
+      }
+    }
+<span class="nc bnc" id="L421" title="All 2 branches missed.">    if (lastReading) {</span>
+<span class="nc" id="L422">      inUnification = true;</span>
+<span class="nc" id="L423">      uniMatched = false;</span>
+<span class="nc" id="L424">      startUnify();</span>
+    }
+<span class="nc" id="L426">    return true;</span>
+  }
+
+  public final boolean isUnified(AnalyzedToken matchToken,
+      Map&lt;String, List&lt;String&gt;&gt; uFeatures, boolean lastReading) {
+<span class="nc" id="L431">    return this.isUnified(matchToken, uFeatures, lastReading, true);</span>
+  }
+
+  /**
+   * Used to add neutral elements ({@link AnalyzedTokenReadings} to the
+   * unified sequence. Useful if the sequence contains punctuation or connectives, for example.
+   * @param analyzedTokenReadings A neutral element to be added.
+   * @since 2.5
+   */
+  public final void addNeutralElement(AnalyzedTokenReadings analyzedTokenReadings) {
+<span class="nc" id="L441">    tokSequence.add(analyzedTokenReadings);</span>
+<span class="nc" id="L442">    List&lt;Map&lt;String, Set&lt;String&gt;&gt;&gt; tokEquivs = new ArrayList&lt;&gt;(analyzedTokenReadings.getReadingsLength());</span>
+<span class="nc" id="L443">    Map&lt;String, Set&lt;String&gt;&gt; map = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="nc" id="L444">    map.put(UNIFY_IGNORE, new HashSet&lt;&gt;());</span>
+<span class="nc bnc" id="L445" title="All 2 branches missed.">    for (int i = 0; i &lt; analyzedTokenReadings.getReadingsLength(); i++) {</span>
+<span class="nc" id="L446">      tokEquivs.add(map);</span>
+    }
+<span class="nc" id="L448">    tokSequenceEquivalences.add(tokEquivs);</span>
+<span class="nc" id="L449">    readingsCounter++;</span>
+<span class="nc" id="L450">  }</span>
+
+  /**
+   * Used for getting a unified sequence in case when simple test method
+   * {@link #isUnified(AnalyzedToken, Map, boolean)}} was used.
+   * @return An array of {@link AnalyzedTokenReadings} or {@code null} when not in unification
+   */
+  @Nullable
+  public final AnalyzedTokenReadings[] getFinalUnified() {
+<span class="nc bnc" id="L459" title="All 2 branches missed.">    if (inUnification) {</span>
+<span class="nc" id="L460">      return getUnifiedTokens();</span>
+    }
+<span class="nc" id="L462">    return null;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractStyleRepeatedWordRule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules</a> &gt; <span class="el_source">AbstractStyleRepeatedWordRule.java</span></div><h1>AbstractStyleRepeatedWordRule.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker 
+ * Copyright (C) 2005 Daniel Naber (http://www.danielnaber.de)
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules;
+
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.ResourceBundle;
+
+import org.languagetool.AnalyzedSentence;
+import org.languagetool.AnalyzedToken;
+import org.languagetool.AnalyzedTokenReadings;
+import org.languagetool.Language;
+import org.languagetool.LinguServices;
+import org.languagetool.UserConfig;
+import org.languagetool.rules.Categories;
+import org.languagetool.rules.ITSIssueType;
+import org.languagetool.rules.RuleMatch;
+import org.languagetool.rules.TextLevelRule;
+
+/**
+ * An abstract rule checks the appearance of same words in a sentence or in two consecutive sentences.
+ * The isTokenToCheck method can be used to check only specific words (e.g. substantive, verbs and adjectives).
+ * This rule detects no grammar error but a stylistic problem (default off)
+ * @author Fred Kruse
+ * @since 4.1
+ */
+public abstract class AbstractStyleRepeatedWordRule  extends TextLevelRule {
+  
+  private static final int MAX_TOKEN_TO_CHECK = 5;
+  
+  private final LinguServices linguServices;
+  private final Language lang;
+  
+<span class="nc" id="L53">  protected int maxDistanceOfSentences = 1;</span>
+
+  public AbstractStyleRepeatedWordRule(ResourceBundle messages, Language lang, UserConfig userConfig) {
+<span class="nc" id="L56">    super(messages);</span>
+<span class="nc" id="L57">    super.setCategory(Categories.STYLE.getCategory(messages));</span>
+<span class="nc" id="L58">    setLocQualityIssueType(ITSIssueType.Style);</span>
+<span class="nc" id="L59">    setDefaultOff();</span>
+<span class="nc" id="L60">    this.lang = lang;</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">    if (userConfig != null) {</span>
+<span class="nc" id="L62">      linguServices = userConfig.getLinguServices();</span>
+<span class="nc" id="L63">      int confDistance = userConfig.getConfigValueByID(getId());</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">      if (confDistance &gt;= 0) {</span>
+<span class="nc" id="L65">        this.maxDistanceOfSentences = confDistance;</span>
+      }
+<span class="nc" id="L67">    } else {</span>
+<span class="nc" id="L68">      linguServices = null;</span>
+    }
+<span class="nc" id="L70">  }</span>
+
+  /**
+   * Override this ID by adding a language acronym (e.g. STYLE_REPEATED_WORD_RULE_DE)
+   * to use adjustment of maxWords by option panel
+   * @since 4.1
+   */   
+  @Override
+  public String getId() {
+<span class="nc" id="L79">    return &quot;STYLE_REPEATED_WORD_RULE&quot;;</span>
+  }
+
+  @Override
+  public String getDescription() {
+<span class="nc" id="L84">    return &quot;Repeated words in consecutive sentences&quot;;</span>
+  }
+  
+  /*
+   * Message for repeated word in same sentence
+   */
+  protected abstract String messageSameSentence();
+  
+  /*
+   * Message for repeated word in sentence before
+   */
+  protected abstract String messageSentenceBefore();
+  
+  /*
+   * Message for repeated word in sentence after
+   */
+  protected abstract String messageSentenceAfter();
+  
+  /*
+   * get maximal Distance of words in number of sentences
+   * @since 4.1
+   */
+  @Override
+  public int getDefaultValue() {
+<span class="nc" id="L108">    return maxDistanceOfSentences;</span>
+  }
+  
+  /**
+   * @since 4.2
+   */
+  @Override
+  public boolean hasConfigurableValue() {
+<span class="nc" id="L116">    return true;</span>
+  }
+
+  /**
+   * @since 4.2
+   */
+  @Override
+  public int getMinConfigurableValue() {
+<span class="nc" id="L124">    return 0;</span>
+  }
+
+  /**
+   * @since 4.2
+   */
+  @Override
+  public int getMaxConfigurableValue() {
+<span class="nc" id="L132">    return 5;</span>
+  }
+
+  /**
+   * @since 4.2
+   */
+  public String getConfigureText() {
+<span class="nc" id="L139">    return messages.getString(&quot;guiStyleRepeatedWordText&quot;);</span>
+  }
+
+  /*
+   * Check only special words (e.g substantive, verbs, adjectives)
+   * (German example: return (token.matchesPosTagRegex(&quot;(SUB|EIG|VER|ADJ):.*&quot;) 
+   *              &amp;&amp; !token.matchesPosTagRegex(&quot;ART:.*|ADV:.*|VER:(AUX|MOD):.*&quot;));
+   */
+  protected abstract boolean isTokenToCheck(AnalyzedTokenReadings token);
+    
+  /*
+   * Is checked word part of pairs like &quot;arm in arm&quot;, &quot;side by side&quot;, etc. (exclude such pairs)
+   */
+  protected abstract boolean isTokenPair(AnalyzedTokenReadings[] tokens, int n, boolean before);
+  
+  /*
+   * listings are excluded
+   */
+  private static boolean hasBreakToken(AnalyzedTokenReadings[] tokens) {
+<span class="nc bnc" id="L158" title="All 4 branches missed.">    for (int i = 0; i &lt; tokens.length &amp;&amp; i &lt; MAX_TOKEN_TO_CHECK; i++) {</span>
+<span class="nc bnc" id="L159" title="All 6 branches missed.">      if (tokens[i].getToken().equals(&quot;-&quot;) || tokens[i].getToken().equals(&quot;—&quot;) || tokens[i].getToken().equals(&quot;–&quot;)) {</span>
+<span class="nc" id="L160">        return true;</span>
+      }
+    }
+<span class="nc" id="L163">    return false;</span>
+  }
+  
+  private boolean isTokenInSentence(AnalyzedTokenReadings testToken, AnalyzedTokenReadings[] tokens) {
+<span class="nc" id="L167">    return isTokenInSentence(testToken, tokens, -1);</span>
+  }
+  
+  /* 
+   *  true if token is part of composite word in sentence
+   *  override for languages like German which contents composed words
+   */
+  protected boolean isPartOfWord(String testTokenText, String tokenText) {
+<span class="nc" id="L175">    return false;</span>
+  }
+
+  /* 
+   * Set a URL to a synonym dictionary for a token
+   */
+  protected URL setURL(AnalyzedTokenReadings token ) throws MalformedURLException {
+<span class="nc" id="L182">    return null;</span>
+  }
+  
+  /**
+   * get synonyms for a word
+   */
+  public List&lt;String&gt; getSynonymsForWord(String word) {
+<span class="nc" id="L189">    List&lt;String&gt; synonyms = new ArrayList&lt;String&gt;();</span>
+<span class="nc" id="L190">    List&lt;String&gt; rawSynonyms = linguServices.getSynonyms(word, lang);</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">    for (String synonym : rawSynonyms) {</span>
+<span class="nc" id="L192">      synonym = synonym.replaceAll(&quot;\\(.*\\)&quot;, &quot;&quot;).trim();</span>
+<span class="nc bnc" id="L193" title="All 4 branches missed.">      if (!synonym.isEmpty() &amp;&amp; !synonyms.contains(synonym)) {</span>
+<span class="nc" id="L194">        synonyms.add(synonym);</span>
+      }
+<span class="nc" id="L196">    }</span>
+<span class="nc" id="L197">    return synonyms;</span>
+  }
+
+  /**
+   * get synonyms for a repeated word
+   */
+  public List&lt;String&gt; getSynonyms(AnalyzedTokenReadings token) {
+<span class="nc" id="L204">    List&lt;String&gt; synonyms = new ArrayList&lt;String&gt;();</span>
+<span class="nc bnc" id="L205" title="All 4 branches missed.">    if(linguServices == null || token == null) {</span>
+<span class="nc" id="L206">      return synonyms;</span>
+    }
+<span class="nc" id="L208">    List&lt;AnalyzedToken&gt; readings = token.getReadings();</span>
+<span class="nc bnc" id="L209" title="All 2 branches missed.">    for (AnalyzedToken reading : readings) {</span>
+<span class="nc" id="L210">      String lemma = reading.getLemma();</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">      if (lemma != null) {</span>
+<span class="nc" id="L212">        synonyms = getSynonymsForWord(lemma);</span>
+      }
+<span class="nc" id="L214">    }</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">    if(synonyms.isEmpty()) {</span>
+<span class="nc" id="L216">      synonyms = getSynonymsForWord(token.getToken());</span>
+    }
+<span class="nc" id="L218">    return synonyms;</span>
+  }
+
+  /* 
+   *  true if token is found in sentence
+   */
+  private boolean isTokenInSentence(AnalyzedTokenReadings testToken, AnalyzedTokenReadings[] tokens, int notCheck) {
+<span class="nc bnc" id="L225" title="All 4 branches missed.">    if (testToken == null || tokens == null) {</span>
+<span class="nc" id="L226">      return false;</span>
+    }
+<span class="nc" id="L228">    List&lt;AnalyzedToken&gt; readings = testToken.getReadings();</span>
+<span class="nc" id="L229">    List&lt;String&gt; lemmas = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L230" title="All 2 branches missed.">    for (AnalyzedToken reading : readings) {</span>
+<span class="nc bnc" id="L231" title="All 2 branches missed.">      if (reading.getLemma() != null) {</span>
+<span class="nc" id="L232">        lemmas.add(reading.getLemma());</span>
+      }
+<span class="nc" id="L234">    }</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">    for (int i = 0; i &lt; tokens.length; i++) {</span>
+<span class="nc bnc" id="L236" title="All 4 branches missed.">      if (i != notCheck &amp;&amp; isTokenToCheck(tokens[i])) {</span>
+<span class="nc bnc" id="L237" title="All 4 branches missed.">        if ((!lemmas.isEmpty() &amp;&amp; tokens[i].hasAnyLemma(lemmas.toArray(new String[0]))) </span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">            || isPartOfWord(testToken.getToken(), tokens[i].getToken())) {</span>
+<span class="nc bnc" id="L239" title="All 2 branches missed.">          if (notCheck &gt;= 0) {</span>
+<span class="nc bnc" id="L240" title="All 2 branches missed.">            if (notCheck == i - 2) {</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">              return !isTokenPair(tokens, i, true);</span>
+<span class="nc bnc" id="L242" title="All 2 branches missed.">            } else if (notCheck == i + 2) {</span>
+<span class="nc bnc" id="L243" title="All 2 branches missed.">              return !isTokenPair(tokens, i, false);</span>
+<span class="nc bnc" id="L244" title="All 4 branches missed.">            } else if ((notCheck == i + 1 || notCheck == i - 1) </span>
+<span class="nc bnc" id="L245" title="All 2 branches missed.">                &amp;&amp; testToken.getToken().equals(tokens[i].getToken())) {</span>
+<span class="nc" id="L246">              return false;</span>
+            }
+          }
+<span class="nc" id="L249">          return true;</span>
+        }
+      }
+    }
+<span class="nc" id="L253">    return false;</span>
+  }
+
+  @Override
+  public RuleMatch[] match(List&lt;AnalyzedSentence&gt; sentences) throws IOException {
+<span class="nc" id="L258">    List&lt;RuleMatch&gt; ruleMatches = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L259">    List&lt;AnalyzedTokenReadings[]&gt; tokenList = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L260">    int pos = 0;</span>
+<span class="nc bnc" id="L261" title="All 4 branches missed.">    for (int n = 0; n &lt; maxDistanceOfSentences &amp;&amp; n &lt; sentences.size(); n++) {</span>
+<span class="nc" id="L262">      tokenList.add(sentences.get(n).getTokensWithoutWhitespace());</span>
+    }
+<span class="nc bnc" id="L264" title="All 2 branches missed.">    for (int n = 0; n &lt; sentences.size(); n++) {</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">      if (n + maxDistanceOfSentences &lt; sentences.size()) {</span>
+<span class="nc" id="L266">        tokenList.add(sentences.get(n + maxDistanceOfSentences).getTokensWithoutWhitespace());</span>
+      }
+<span class="nc bnc" id="L268" title="All 2 branches missed.">      if (tokenList.size() &gt; 2 * maxDistanceOfSentences + 1) {</span>
+<span class="nc" id="L269">        tokenList.remove(0);</span>
+      }
+<span class="nc" id="L271">      int nTok = maxDistanceOfSentences;</span>
+<span class="nc bnc" id="L272" title="All 2 branches missed.">      if (n &lt; maxDistanceOfSentences) {</span>
+<span class="nc" id="L273">        nTok = n;</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">      } else if (n &gt;= sentences.size() - maxDistanceOfSentences) {</span>
+<span class="nc" id="L275">        nTok = tokenList.size() - (sentences.size() - n);</span>
+      }
+<span class="nc bnc" id="L277" title="All 2 branches missed.">      if (!hasBreakToken(tokenList.get(nTok))) {</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">        for (int i = 0; i &lt; tokenList.get(nTok).length; i++) {</span>
+<span class="nc" id="L279">          AnalyzedTokenReadings token = tokenList.get(nTok)[i];</span>
+<span class="nc bnc" id="L280" title="All 2 branches missed.">          if (isTokenToCheck(token)) {</span>
+<span class="nc" id="L281">            int isRepeated = 0;</span>
+<span class="nc bnc" id="L282" title="All 2 branches missed.">            if (isTokenInSentence(token, tokenList.get(nTok), i)) {</span>
+<span class="nc" id="L283">              isRepeated = 1;</span>
+            }
+<span class="nc bnc" id="L285" title="All 6 branches missed.">            for(int j = nTok - 1; isRepeated == 0 &amp;&amp; j &gt;= 0 &amp;&amp; j &gt;= nTok - maxDistanceOfSentences; j--) {</span>
+<span class="nc bnc" id="L286" title="All 2 branches missed.">              if (isTokenInSentence(token, tokenList.get(j))) {</span>
+<span class="nc" id="L287">                isRepeated = 2;</span>
+              }
+            }
+<span class="nc bnc" id="L290" title="All 6 branches missed.">            for(int j = nTok + 1; isRepeated == 0 &amp;&amp; j &lt; tokenList.size() &amp;&amp; j &lt;= nTok + maxDistanceOfSentences; j++) {</span>
+<span class="nc bnc" id="L291" title="All 2 branches missed.">              if (isTokenInSentence(token, tokenList.get(j))) {</span>
+<span class="nc" id="L292">                isRepeated = 3;</span>
+              }
+            }
+<span class="nc bnc" id="L295" title="All 2 branches missed.">            if (isRepeated != 0) {</span>
+              String msg;
+<span class="nc bnc" id="L297" title="All 2 branches missed.">              if (isRepeated == 1) {</span>
+<span class="nc" id="L298">                msg = messageSameSentence();</span>
+<span class="nc bnc" id="L299" title="All 2 branches missed.">              } else if (isRepeated == 2) {</span>
+<span class="nc" id="L300">                msg = messageSentenceBefore();</span>
+              } else {
+<span class="nc" id="L302">                msg = messageSentenceAfter();</span>
+              }
+<span class="nc" id="L304">              int startPos = pos + token.getStartPos();</span>
+<span class="nc" id="L305">              int endPos = pos + token.getEndPos();</span>
+<span class="nc" id="L306">              RuleMatch ruleMatch = new RuleMatch(this, startPos, endPos, msg);</span>
+<span class="nc" id="L307">              List&lt;String&gt; suggestions = getSynonyms(token);</span>
+<span class="nc bnc" id="L308" title="All 2 branches missed.">              if(!suggestions.isEmpty()) {</span>
+<span class="nc" id="L309">                ruleMatch.setSuggestedReplacements(suggestions);</span>
+              }
+<span class="nc" id="L311">              URL url = setURL(token);</span>
+<span class="nc bnc" id="L312" title="All 2 branches missed.">              if(url != null) {</span>
+<span class="nc" id="L313">                ruleMatch.setUrl(url);</span>
+              }
+<span class="nc" id="L315">              ruleMatches.add(ruleMatch);</span>
+            }
+          } 
+        }
+      }
+<span class="nc" id="L320">      pos += sentences.get(n).getCorrectedTextLength();</span>
+    }
+<span class="nc" id="L322">    return toRuleMatchArray(ruleMatches);</span>
+  }
+  
+  @Override
+  public int minToCheckParagraph() {
+<span class="nc" id="L327">    return maxDistanceOfSentences;</span>
+  }
+  
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractSpaceBeforeRule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules</a> &gt; <span class="el_source">AbstractSpaceBeforeRule.java</span></div><h1>AbstractSpaceBeforeRule.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2014 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.ResourceBundle;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.languagetool.AnalyzedSentence;
+import org.languagetool.AnalyzedTokenReadings;
+import org.languagetool.Language;
+
+/**
+ * An abstract rule that checks if there is a missing space before some conjunctions.
+ *
+ * @since 2.7
+ */
+public abstract class AbstractSpaceBeforeRule extends Rule {
+
+  protected abstract Pattern getConjunctions();
+
+<span class="nc" id="L40">  public AbstractSpaceBeforeRule(ResourceBundle messages, Language language) {</span>
+<span class="nc" id="L41">    super.setCategory(Categories.MISC.getCategory(messages));</span>
+<span class="nc" id="L42">  }</span>
+
+  @Override
+  public String getId() {
+<span class="nc" id="L46">    return &quot;SPACE_BEFORE_CONJUNCTION&quot;;</span>
+  }
+
+  @Override
+  public String getDescription() {
+<span class="nc" id="L51">    return &quot;Checks for missing space before some conjunctions&quot;;</span>
+  }
+
+  protected String getShort() {
+<span class="nc" id="L55">    return &quot;Missing white space&quot;;</span>
+  }
+
+  protected String getSuggestion() {
+<span class="nc" id="L59">    return &quot;Missing white space before conjunction&quot;;</span>
+  }
+
+  @Override
+  public final RuleMatch[] match(AnalyzedSentence sentence) {
+<span class="nc" id="L64">    List&lt;RuleMatch&gt; ruleMatches = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L65">    AnalyzedTokenReadings[] tokens = sentence.getTokens();</span>
+
+<span class="nc bnc" id="L67" title="All 2 branches missed.">    for (int i = 1; i &lt; tokens.length; i++) {</span>
+<span class="nc" id="L68">      String token = tokens[i].getToken();</span>
+<span class="nc" id="L69">      Matcher matcher = getConjunctions().matcher(token);</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">      if (matcher.matches()) {</span>
+<span class="nc" id="L71">        String previousToken = tokens[i - 1].getToken();</span>
+<span class="nc bnc" id="L72" title="All 4 branches missed.">        if (!(previousToken.equals(&quot; &quot;) || previousToken.equals(&quot;(&quot;))) {</span>
+<span class="nc" id="L73">          String replacement = &quot; &quot; + token;</span>
+<span class="nc" id="L74">          String msg = getSuggestion();</span>
+<span class="nc" id="L75">          int pos = tokens[i].getStartPos();</span>
+<span class="nc" id="L76">          RuleMatch potentialRuleMatch = new RuleMatch(this, sentence, pos, pos</span>
+<span class="nc" id="L77">              + token.length(), msg, getShort());</span>
+<span class="nc" id="L78">          potentialRuleMatch.setSuggestedReplacement(replacement);</span>
+<span class="nc" id="L79">          ruleMatches.add(potentialRuleMatch);</span>
+        }
+      }
+    }
+<span class="nc" id="L83">    return toRuleMatchArray(ruleMatches);</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GRPCRule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules</a> &gt; <span class="el_source">GRPCRule.java</span></div><h1>GRPCRule.java</h1><pre class="source lang-java linenums">/*
+ *  LanguageTool, a natural language style checker
+ *  * Copyright (C) 2018 Fabian Richter
+ *  *
+ *  * This library is free software; you can redistribute it and/or
+ *  * modify it under the terms of the GNU Lesser General Public
+ *  * License as published by the Free Software Foundation; either
+ *  * version 2.1 of the License, or (at your option) any later version.
+ *  *
+ *  * This library is distributed in the hope that it will be useful,
+ *  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *  * Lesser General Public License for more details.
+ *  *
+ *  * You should have received a copy of the GNU Lesser General Public
+ *  * License along with this library; if not, write to the Free Software
+ *  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ *  * USA
+ *
+ */
+
+package org.languagetool.rules;
+
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import com.google.common.collect.Streams;
+import io.grpc.ManagedChannel;
+import io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts;
+import io.grpc.netty.shaded.io.grpc.netty.NegotiationType;
+import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContextBuilder;
+import org.jetbrains.annotations.Nullable;
+import org.languagetool.AnalyzedSentence;
+import org.languagetool.JLanguageTool;
+import org.languagetool.markup.AnnotatedText;
+import org.languagetool.rules.ml.MLServerGrpc;
+import org.languagetool.rules.ml.MLServerProto;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.net.ssl.SSLException;
+import java.io.File;
+import java.io.IOException;
+import java.util.*;
+import java.util.concurrent.Callable;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+/**
+ * Base class fur rules running on external servers;
+ * see gRPC service definition in languagetool-core/src/main/proto/ml_server.proto
+ *
+ * @see #create(ResourceBundle, RemoteRuleConfig, boolean, String, String, Map)  for an easy to add rules; return rule in Language::getRelevantRemoteRules
+ * add it like this:
+  &lt;pre&gt;
+   public List&amp;lt;Rule&amp;gt; getRelevantRemoteRules(ResourceBundle messageBundle, List&amp;lt;RemoteRuleConfig&amp;gt; configs, GlobalConfig globalConfig, UserConfig userConfig, Language motherTongue, List&amp;lt;Language&amp;gt; altLanguages) throws IOException {
+     List&amp;lt;Rule&amp;gt; rules = new ArrayList&amp;lt;&amp;gt;(super.getRelevantRemoteRules(
+     messageBundle, configs, globalConfig, userConfig, motherTongue, altLanguages));
+     Rule exampleRule = GRPCRule.create(messageBundle,
+       RemoteRuleConfig.getRelevantConfig(&quot;EXAMPLE_ID&quot;, configs),
+      &quot;EXAMPLE_ID&quot;, &quot;example_rule_id&quot;,
+      Collections.singletonMap(&quot;example_match_id&quot;, &quot;example_rule_message&quot;));
+     rules.add(exampleRule);
+     return rules;
+   }
+  &lt;/pre&gt;
+
+ */
+public abstract class GRPCRule extends RemoteRule {
+<span class="nc" id="L71">  private static final Logger logger = LoggerFactory.getLogger(GRPCRule.class);</span>
+
+  public static String cleanID(String id) {
+<span class="nc" id="L74">    return id.replaceAll(&quot;[^a-zA-Z_]&quot;, &quot;_&quot;).toUpperCase();</span>
+  }
+  /**
+   * Internal rule to create rule matches with IDs based on Match Sub-IDs
+   */
+  protected class GRPCSubRule extends Rule {
+    private final String subId;
+    private final String matchId;
+    private final String description;
+
+<span class="nc" id="L84">    GRPCSubRule(String subId, @Nullable String description) {</span>
+<span class="nc" id="L85">      this.subId = subId;</span>
+<span class="nc" id="L86">      this.matchId = GRPCRule.this.getId() + &quot;_&quot; + cleanID(subId);</span>
+<span class="nc bnc" id="L87" title="All 4 branches missed.">      if (description == null || description.isEmpty()) {</span>
+<span class="nc" id="L88">        this.description = GRPCRule.this.getDescription();</span>
+<span class="nc bnc" id="L89" title="All 4 branches missed.">        if (this.description == null || this.description.isEmpty()) {</span>
+<span class="nc" id="L90">          throw new RuntimeException(&quot;Missing description for rule with ID &quot; + matchId);</span>
+        }
+      } else {
+<span class="nc" id="L93">        this.description = description;</span>
+      }
+<span class="nc" id="L95">    }</span>
+
+    @Override
+    public String getId() {
+<span class="nc" id="L99">      return matchId;</span>
+    }
+
+    @Override
+    public String getDescription() {
+<span class="nc" id="L104">      return this.description;</span>
+    }
+
+    @Override
+    public RuleMatch[] match(AnalyzedSentence sentence) throws IOException {
+<span class="nc" id="L109">      throw new UnsupportedOperationException();</span>
+    }
+
+  }
+
+  static class Connection {
+    final ManagedChannel channel;
+    final MLServerGrpc.MLServerBlockingStub stub;
+
+    private ManagedChannel getChannel(String host, int port, boolean useSSL,
+                                      @Nullable String clientPrivateKey, @Nullable  String clientCertificate,
+                                      @Nullable String rootCertificate) throws SSLException {
+<span class="nc" id="L121">      NettyChannelBuilder channelBuilder = NettyChannelBuilder.forAddress(host, port);</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">      if (useSSL) {</span>
+<span class="nc" id="L123">        SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (rootCertificate != null) {</span>
+<span class="nc" id="L125">          sslContextBuilder.trustManager(new File(rootCertificate));</span>
+        }
+<span class="nc bnc" id="L127" title="All 4 branches missed.">        if (clientCertificate != null &amp;&amp; clientPrivateKey != null) {</span>
+<span class="nc" id="L128">          sslContextBuilder.keyManager(new File(clientCertificate), new File(clientPrivateKey));</span>
+        }
+<span class="nc" id="L130">        channelBuilder = channelBuilder.negotiationType(NegotiationType.TLS).sslContext(sslContextBuilder.build());</span>
+<span class="nc" id="L131">      } else {</span>
+<span class="nc" id="L132">        channelBuilder = channelBuilder.usePlaintext();</span>
+      }
+<span class="nc" id="L134">      return channelBuilder.build();</span>
+    }
+
+<span class="nc" id="L137">    Connection(RemoteRuleConfig serviceConfiguration) throws SSLException {</span>
+<span class="nc" id="L138">      String host = serviceConfiguration.getUrl();</span>
+<span class="nc" id="L139">      int port = serviceConfiguration.getPort();</span>
+<span class="nc" id="L140">      boolean ssl = Boolean.parseBoolean(serviceConfiguration.getOptions().getOrDefault(&quot;secure&quot;, &quot;false&quot;));</span>
+<span class="nc" id="L141">      String key = serviceConfiguration.getOptions().get(&quot;clientKey&quot;);</span>
+<span class="nc" id="L142">      String cert = serviceConfiguration.getOptions().get(&quot;clientCertificate&quot;);</span>
+<span class="nc" id="L143">      String ca = serviceConfiguration.getOptions().get(&quot;rootCertificate&quot;);</span>
+<span class="nc" id="L144">      this.channel = getChannel(host, port, ssl, key, cert, ca);</span>
+<span class="nc" id="L145">      this.stub = MLServerGrpc.newBlockingStub(channel);</span>
+
+<span class="nc" id="L147">    }</span>
+
+    private void shutdown() {
+<span class="nc bnc" id="L150" title="All 2 branches missed.">      if (channel != null) {</span>
+<span class="nc" id="L151">        channel.shutdownNow();</span>
+      }
+<span class="nc" id="L153">    }</span>
+  }
+
+  private static final LoadingCache&lt;RemoteRuleConfig, Connection&gt; servers =
+<span class="nc" id="L157">    CacheBuilder.newBuilder().build(CacheLoader.from(serviceConfiguration -&gt; {</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">      if (serviceConfiguration == null) {</span>
+<span class="nc" id="L159">        throw new IllegalArgumentException(&quot;No configuration for connection given&quot;);</span>
+      }
+      try {
+<span class="nc" id="L162">        return new Connection(serviceConfiguration);</span>
+<span class="nc" id="L163">      } catch (SSLException e) {</span>
+<span class="nc" id="L164">        throw new RuntimeException(e);</span>
+      }
+    }));
+
+  static {
+<span class="nc" id="L169">    shutdownRoutines.add(() -&gt; servers.asMap().values().forEach(Connection::shutdown));</span>
+<span class="nc" id="L170">  }</span>
+
+  private final Connection conn;
+
+  public GRPCRule(ResourceBundle messages, RemoteRuleConfig config, boolean inputLogging) {
+<span class="nc" id="L175">    super(messages, config, inputLogging);</span>
+
+<span class="nc" id="L177">    synchronized (servers) {</span>
+<span class="nc" id="L178">      Connection conn = null;</span>
+        try {
+<span class="nc" id="L180">          conn = servers.get(serviceConfiguration);</span>
+<span class="nc" id="L181">        } catch (Exception e) {</span>
+<span class="nc" id="L182">          logger.error(&quot;Could not connect to remote service at &quot; + serviceConfiguration, e);</span>
+<span class="nc" id="L183">        }</span>
+<span class="nc" id="L184">      this.conn = conn;</span>
+<span class="nc" id="L185">    }</span>
+<span class="nc" id="L186">  }</span>
+
+  protected class MLRuleRequest extends RemoteRule.RemoteRequest {
+    final MLServerProto.MatchRequest request;
+    final List&lt;AnalyzedSentence&gt; sentences;
+
+<span class="nc" id="L192">    public MLRuleRequest(MLServerProto.MatchRequest request, List&lt;AnalyzedSentence&gt; sentences) {</span>
+<span class="nc" id="L193">      this.request = request;</span>
+<span class="nc" id="L194">      this.sentences = sentences;</span>
+<span class="nc" id="L195">    }</span>
+  }
+
+  @Override
+  protected RemoteRule.RemoteRequest prepareRequest(List&lt;AnalyzedSentence&gt; sentences, AnnotatedText annotatedText) {
+<span class="nc" id="L200">    List&lt;String&gt; text = sentences.stream().map(AnalyzedSentence::getText).collect(Collectors.toList());</span>
+<span class="nc" id="L201">    MLServerProto.MatchRequest req = MLServerProto.MatchRequest.newBuilder()</span>
+<span class="nc" id="L202">      .addAllSentences(text)</span>
+<span class="nc" id="L203">      .setInputLogging(inputLogging)</span>
+<span class="nc" id="L204">      .build();</span>
+<span class="nc" id="L205">    return new MLRuleRequest(req, sentences);</span>
+  }
+
+  @Override
+  protected Callable&lt;RemoteRuleResult&gt; executeRequest(RemoteRule.RemoteRequest request) {
+<span class="nc" id="L210">    return () -&gt; {</span>
+<span class="nc" id="L211">      MLRuleRequest req = (MLRuleRequest) request;</span>
+
+<span class="nc" id="L213">      MLServerProto.MatchResponse response = conn.stub.match(req.request);</span>
+<span class="nc" id="L214">      List&lt;RuleMatch&gt; matches = Streams.zip(response.getSentenceMatchesList().stream(), req.sentences.stream(), (matchList, sentence) -&gt;</span>
+<span class="nc" id="L215">        matchList.getMatchesList().stream().map(match -&gt; {</span>
+<span class="nc" id="L216">            GRPCSubRule subRule = new GRPCSubRule(match.getSubId(), match.getRuleDescription());</span>
+<span class="nc" id="L217">            String message = match.getMatchDescription();</span>
+<span class="nc" id="L218">            String shortMessage = match.getMatchShortDescription();</span>
+<span class="nc bnc" id="L219" title="All 4 branches missed.">            if (message == null || message.isEmpty()) {</span>
+<span class="nc" id="L220">              message = getMessage(match, sentence);</span>
+            }
+<span class="nc bnc" id="L222" title="All 4 branches missed.">            if (message == null || message.isEmpty()) {</span>
+<span class="nc" id="L223">              throw new RuntimeException(&quot;Missing message for match with ID &quot; + subRule.getId());</span>
+            }
+<span class="nc" id="L225">            int start = match.getOffset();</span>
+<span class="nc" id="L226">            int end = start + match.getLength();</span>
+<span class="nc" id="L227">            RuleMatch m = new RuleMatch(subRule, sentence,</span>
+                                        start, end,
+                                        message, shortMessage);
+<span class="nc" id="L230">            m.setSuggestedReplacements(match.getSuggestionsList());</span>
+<span class="nc" id="L231">            return m;</span>
+          }
+        )
+<span class="nc" id="L234">      ).flatMap(Function.identity()).collect(Collectors.toList());</span>
+<span class="nc" id="L235">      RemoteRuleResult result = new RemoteRuleResult(true, true, matches);</span>
+<span class="nc" id="L236">      return result;</span>
+    };
+  }
+
+  /**
+   * messages can be provided by the ML server or the Java client
+   * fill them in here or leave this empty if the server takes care of it
+   */
+  protected abstract String getMessage(MLServerProto.Match match, AnalyzedSentence sentence);
+
+  @Override
+  protected RemoteRuleResult fallbackResults(RemoteRule.RemoteRequest request) {
+<span class="nc" id="L248">    return new RemoteRuleResult(false, false, Collections.emptyList());</span>
+  }
+
+  /**
+   * Helper method to create instances of RemoteMLRule
+   * @param messages for i18n; = JLanguageTool.getMessageBundle(lang)
+   * @param config configuration for remote rule server;
+   *               options: secure, clientKey, clientCertificate, rootCertificate
+                   use RemoteRuleConfig.getRelevantConfig(id, configs)
+                   to load this in Language::getRelevantRemoteRules
+   * @param id ID of rule
+   * @param descriptionKey key in MessageBundle.properties for rule description
+   * @param messagesByID mapping match.sub_id -&amp;gt; key in MessageBundle.properties for RuleMatch's message
+   * @return instance of RemoteMLRule
+   */
+  public static GRPCRule create(ResourceBundle messages, RemoteRuleConfig config, boolean inputLogging,
+                                String id, String descriptionKey, Map&lt;String, String&gt; messagesByID) {
+<span class="nc" id="L265">    return new GRPCRule(messages, config, inputLogging) {</span>
+
+
+      @Override
+      protected String getMessage(MLServerProto.Match match, AnalyzedSentence sentence) {
+<span class="nc" id="L270">        return messages.getString(messagesByID.get(match.getSubId()));</span>
+      }
+
+      @Override
+      public String getDescription() {
+<span class="nc" id="L275">        return messages.getString(descriptionKey);</span>
+      }
+    };
+  }
+
+  /**
+   * Helper method to create instances of RemoteMLRule
+   * @param config configuration for remote rule server;
+   *               options: secure, clientKey, clientCertificate, rootCertificate
+                   use RemoteRuleConfig.getRelevantConfig(id, configs)
+                   to load this in Language::getRelevantRemoteRules
+   * @param id ID of rule
+   * @param description rule description
+   * @param messagesByID mapping match.sub_id to RuleMatch's message
+   * @return instance of RemoteMLRule
+   */
+  public static GRPCRule create(RemoteRuleConfig config, boolean inputLogging,
+                                String id, String description, Map&lt;String, String&gt; messagesByID) {
+<span class="nc" id="L293">    return new GRPCRule(JLanguageTool.getMessageBundle(), config, inputLogging) {</span>
+
+
+      @Override
+      protected String getMessage(MLServerProto.Match match, AnalyzedSentence sentence) {
+<span class="nc" id="L298">        return messagesByID.get(match.getSubId());</span>
+      }
+
+      @Override
+      public String getDescription() {
+<span class="nc" id="L303">        return description;</span>
+      }
+    };
+  }
+
+  public static List&lt;GRPCRule&gt; createAll(List&lt;RemoteRuleConfig&gt; configs, boolean inputLogging, String defaultDescription) {
+<span class="nc" id="L309">    return configs.stream()</span>
+<span class="nc" id="L310">      .filter(cfg -&gt; cfg.getRuleId().startsWith(&quot;AI_&quot;))</span>
+<span class="nc" id="L311">      .map(cfg -&gt; create(cfg, inputLogging, cfg.getRuleId(), defaultDescription, Collections.emptyMap()))</span>
+<span class="nc" id="L312">      .collect(Collectors.toList());</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

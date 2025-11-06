@@ -1,0 +1,444 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HunspellRule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules.spelling.hunspell</a> &gt; <span class="el_source">HunspellRule.java</span></div><h1>HunspellRule.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2012 Marcin Miłkowski (http://www.languagetool.org)
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+
+package org.languagetool.rules.spelling.hunspell;
+
+import com.google.common.io.Resources;
+import org.apache.commons.lang3.StringUtils;
+import org.jetbrains.annotations.NotNull;
+import org.languagetool.*;
+import org.languagetool.languagemodel.LanguageModel;
+import org.languagetool.rules.Categories;
+import org.languagetool.rules.RuleMatch;
+import org.languagetool.rules.SuggestedReplacement;
+import org.languagetool.rules.spelling.SpellingCheckRule;
+import org.languagetool.tools.StringTools;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.*;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+/**
+ * A hunspell-based spellchecking-rule.
+ * 
+ * The default dictionary is set to the first country variant on the list - so the order
+   in the Language class declaration is important!
+ * 
+ * @author Marcin Miłkowski
+ */
+public class HunspellRule extends SpellingCheckRule {
+
+  public static final String RULE_ID = &quot;HUNSPELL_RULE&quot;;
+
+  protected static final String FILE_EXTENSION = &quot;.dic&quot;;
+
+<span class="nc" id="L60">  protected boolean needsInit = true;</span>
+<span class="nc" id="L61">  protected Hunspell hunspell = null;</span>
+
+<span class="nc" id="L63">  private static final ConcurrentLinkedQueue&lt;String&gt; activeChecks = new ConcurrentLinkedQueue&lt;&gt;();</span>
+<span class="nc" id="L64">  private static final Logger logger = LoggerFactory.getLogger(HunspellRule.class);</span>
+  private static final String NON_ALPHABETIC = &quot;[^\\p{L}]&quot;;
+
+  private final boolean monitorRules;
+
+  public static Queue&lt;String&gt; getActiveChecks() {
+<span class="nc" id="L70">    return activeChecks;</span>
+  }
+
+<span class="nc" id="L73">  private static final String[] WHITESPACE_ARRAY = new String[20];</span>
+  static {
+<span class="nc bnc" id="L75" title="All 2 branches missed.">    for (int i = 0; i &lt; 20; i++) {</span>
+<span class="nc" id="L76">      WHITESPACE_ARRAY[i] = StringUtils.repeat(' ', i);</span>
+    }
+<span class="nc" id="L78">  }</span>
+  protected Pattern nonWordPattern;
+
+  private final UserConfig userConfig;
+
+  public HunspellRule(ResourceBundle messages, Language language, UserConfig userConfig) {
+<span class="nc" id="L84">    this(messages, language, userConfig, Collections.emptyList());</span>
+<span class="nc" id="L85">  }</span>
+
+  /**
+   * @since 4.3
+   */
+  public HunspellRule(ResourceBundle messages, Language language, UserConfig userConfig, List&lt;Language&gt; altLanguages) {
+<span class="nc" id="L91">    this(messages, language, userConfig, altLanguages, null);</span>
+<span class="nc" id="L92">  }</span>
+
+  public HunspellRule(ResourceBundle messages, Language language, UserConfig userConfig, List&lt;Language&gt; altLanguages,
+                      LanguageModel languageModel) {
+<span class="nc" id="L96">    super(messages, language, userConfig, altLanguages, languageModel);</span>
+<span class="nc" id="L97">    super.setCategory(Categories.TYPOS.getCategory(messages));</span>
+<span class="nc" id="L98">    this.userConfig = userConfig;</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">    this.monitorRules = System.getProperty(&quot;monitorActiveRules&quot;) != null;</span>
+<span class="nc" id="L100">  }</span>
+
+  @Override
+  public String getId() {
+<span class="nc" id="L104">    return RULE_ID;</span>
+  }
+
+  @Override
+  public String getDescription() {
+<span class="nc" id="L109">    return messages.getString(&quot;desc_spelling&quot;);</span>
+  }
+
+  /**
+   * Is the given token part of a hyphenated compound preceded by a quoted token (e.g., „Spiegel“-Magazin) 
+   * and should be treated as an ordinary hyphenated compound (e.g., „Spiegel-Magazin“)
+   */
+  protected boolean isQuotedCompound (AnalyzedSentence analyzedSentence, int idx, String token) {
+<span class="nc" id="L117">    return false;</span>
+  }
+
+  @Override
+  public RuleMatch[] match(AnalyzedSentence sentence) throws IOException {
+<span class="nc" id="L122">    List&lt;RuleMatch&gt; ruleMatches = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">    if (needsInit) {</span>
+<span class="nc" id="L124">      init();</span>
+    }
+<span class="nc bnc" id="L126" title="All 2 branches missed.">    if (hunspell == null) {</span>
+      // some languages might not have a dictionary, be silent about it
+<span class="nc" id="L128">      return toRuleMatchArray(ruleMatches);</span>
+    }
+
+<span class="nc" id="L131">    String monitoringText = this.getClass().getName() + &quot;:&quot; + this.getId() + &quot;:&quot; + sentence.getText();</span>
+    try {
+<span class="nc bnc" id="L133" title="All 2 branches missed.">      if (monitorRules) {</span>
+<span class="nc" id="L134">        activeChecks.add(monitoringText);</span>
+      }
+<span class="nc" id="L136">      String[] tokens = tokenizeText(getSentenceTextWithoutUrlsAndImmunizedTokens(sentence));</span>
+
+      // starting with the first token to skip the zero-length START_SENT
+      int len;
+<span class="nc bnc" id="L140" title="All 2 branches missed.">      if (sentence.getTokens().length &gt; 1) { // if fixes exception in SuggestionsChangesTest</span>
+<span class="nc" id="L141">        len = sentence.getTokens()[1].getStartPos();</span>
+      } else {
+<span class="nc" id="L143">        len = sentence.getTokens()[0].getStartPos();</span>
+      }
+<span class="nc" id="L145">      int prevStartPos = -1;</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">      for (int i = 0; i &lt; tokens.length; i++) {</span>
+<span class="nc" id="L147">        String word = tokens[i];</span>
+<span class="nc bnc" id="L148" title="All 6 branches missed.">        if ((ignoreWord(Arrays.asList(tokens), i) || ignoreWord(word)) &amp;&amp; !isProhibited(cutOffDot(word))) {</span>
+<span class="nc" id="L149">          prevStartPos = len;</span>
+<span class="nc" id="L150">          len += word.length() + 1;</span>
+<span class="nc" id="L151">          continue;</span>
+        }
+<span class="nc bnc" id="L153" title="All 2 branches missed.">        if (isMisspelled(word)) {</span>
+<span class="nc" id="L154">          String cleanWord = word;</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">          if (word.endsWith(&quot;.&quot;)) {</span>
+<span class="nc" id="L156">            cleanWord = word.substring(0, word.length()-1);</span>
+          }
+<span class="nc bnc" id="L158" title="All 4 branches missed.">          if (i &gt; 0 &amp;&amp; prevStartPos != -1) {</span>
+<span class="nc" id="L159">            String prevWord = tokens[i-1];</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">            if (prevWord.length() &gt; 0) {</span>
+              // &quot;thanky ou&quot; -&gt; &quot;thank you&quot;
+<span class="nc" id="L162">              String sugg1a = prevWord.substring(0, prevWord.length()-1);</span>
+<span class="nc" id="L163">              String sugg1b = cutOffDot(prevWord.substring(prevWord.length()-1) + word);</span>
+<span class="nc bnc" id="L164" title="All 4 branches missed.">              if (!isMisspelled(sugg1a) &amp;&amp; !isMisspelled(sugg1b)) {</span>
+<span class="nc" id="L165">                RuleMatch rm = createWrongSplitMatch(sentence, ruleMatches, len, cleanWord, sugg1a, sugg1b, prevStartPos);</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">                if (rm != null) {</span>
+<span class="nc" id="L167">                  ruleMatches.add(rm);</span>
+                }
+              }
+              // &quot;than kyou&quot; -&gt; &quot;thank you&quot;
+<span class="nc" id="L171">              String sugg2a = prevWord + word.substring(0, 1);</span>
+<span class="nc" id="L172">              String sugg2b = cutOffDot(word.substring(1));</span>
+<span class="nc bnc" id="L173" title="All 4 branches missed.">              if (!isMisspelled(sugg2a) &amp;&amp; !isMisspelled(sugg2b)) {</span>
+<span class="nc" id="L174">                RuleMatch rm = createWrongSplitMatch(sentence, ruleMatches, len, cleanWord, sugg2a, sugg2b, prevStartPos);</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">                if (rm != null) {</span>
+<span class="nc" id="L176">                  ruleMatches.add(rm);</span>
+                }
+              }
+            }
+          }
+          
+<span class="nc" id="L182">          RuleMatch ruleMatch = new RuleMatch(this, sentence,</span>
+<span class="nc" id="L183">            len, len + cleanWord.length(),</span>
+<span class="nc" id="L184">            messages.getString(&quot;spelling&quot;),</span>
+<span class="nc" id="L185">            messages.getString(&quot;desc_spelling_short&quot;));</span>
+<span class="nc" id="L186">          ruleMatch.setType(RuleMatch.Type.UnknownWord);</span>
+<span class="nc bnc" id="L187" title="All 6 branches missed.">          if (userConfig == null || userConfig.getMaxSpellingSuggestions() == 0 || ruleMatches.size() &lt;= userConfig.getMaxSpellingSuggestions()) {</span>
+<span class="nc" id="L188">            List&lt;SuggestedReplacement&gt; suggestions = SuggestedReplacement.convert(getSuggestions(cleanWord));</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">            if (word.endsWith(&quot;.&quot;)) {</span>
+<span class="nc" id="L190">              int pos = 1;</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">              for (String suggestion : getSuggestions(word)) {</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">                if (!suggestions.contains(suggestion)) {</span>
+<span class="nc" id="L193">                  suggestions.add(Math.min(pos, suggestions.size()), new SuggestedReplacement(suggestion.substring(0, suggestion.length()-1)));</span>
+<span class="nc" id="L194">                  pos += 2;  // we mix the lists, as we don't know which one is the better one</span>
+                }
+<span class="nc" id="L196">              }</span>
+            }
+<span class="nc" id="L198">            List&lt;SuggestedReplacement&gt; additionalTopSuggestions = getAdditionalTopSuggestions(suggestions, cleanWord);</span>
+<span class="nc bnc" id="L199" title="All 4 branches missed.">            if (additionalTopSuggestions.isEmpty() &amp;&amp; word.endsWith(&quot;.&quot;)) {</span>
+<span class="nc" id="L200">              additionalTopSuggestions = getAdditionalTopSuggestions(suggestions, word).</span>
+<span class="nc" id="L201">                stream()</span>
+<span class="nc" id="L202">                .map(sugg -&gt; {</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">                  if (sugg.getReplacement().endsWith(&quot;.&quot;)) {</span>
+<span class="nc" id="L204">                    return sugg;</span>
+                  } else {
+<span class="nc" id="L206">                    SuggestedReplacement newSugg = new SuggestedReplacement(sugg);</span>
+<span class="nc" id="L207">                    newSugg.setReplacement(sugg.getReplacement() + &quot;.&quot;);</span>
+<span class="nc" id="L208">                    return newSugg;</span>
+                  }
+<span class="nc" id="L210">                }).collect(Collectors.toList());</span>
+            }
+<span class="nc" id="L212">            Collections.reverse(additionalTopSuggestions);</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">            for (SuggestedReplacement additionalTopSuggestion : additionalTopSuggestions) {</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">              if (!cleanWord.equals(additionalTopSuggestion.getReplacement())) {</span>
+<span class="nc" id="L215">                suggestions.add(0, additionalTopSuggestion);</span>
+              }
+<span class="nc" id="L217">            }</span>
+<span class="nc" id="L218">            List&lt;SuggestedReplacement&gt; additionalSuggestions = getAdditionalSuggestions(suggestions, cleanWord);</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">            for (SuggestedReplacement additionalSuggestion : additionalSuggestions) {</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">              if (!cleanWord.equals(additionalSuggestion.getReplacement())) {</span>
+<span class="nc" id="L221">                suggestions.addAll(additionalSuggestions);</span>
+              }
+<span class="nc" id="L223">            }</span>
+<span class="nc" id="L224">            suggestions = filterDupes(filterSuggestions(suggestions, sentence, i));</span>
+            // Find potentially missing compounds with privacy-friendly logging: we only log a single unknown word with no
+            // meta data and only if it's made up of two valid words, similar to the &quot;UNKNOWN&quot; logging in
+            // GermanSpellerRule:
+            /*if (language.getShortCode().equals(&quot;de&quot;)) {
+              String covered = sentence.getText().substring(len, len + cleanWord.length());
+              if (suggestions.stream().anyMatch(
+                    k -&gt; k.getReplacement().contains(&quot; &quot;) &amp;&amp;
+                    StringTools.uppercaseFirstChar(k.getReplacement().replaceAll(&quot; &quot;, &quot;&quot;).toLowerCase()).equals(covered) &amp;&amp;
+                    k.getReplacement().length() &gt; 6 &amp;&amp; k.getReplacement().length() &lt; 25 &amp;&amp;
+                    k.getReplacement().matches(&quot;[a-zA-ZÖÄÜöäüß -]+&quot;)
+                  )) {
+                logger.info(&quot;COMPOUND: &quot; + covered);
+              }
+            }*/
+            // TODO user suggestions
+<span class="nc" id="L240">            addSuggestionsToRuleMatch(cleanWord, Collections.emptyList(), suggestions, null, ruleMatch);</span>
+<span class="nc" id="L241">          } else {</span>
+            // limited to save CPU
+<span class="nc" id="L243">            ruleMatch.setSuggestedReplacement(messages.getString(&quot;too_many_errors&quot;));</span>
+          }
+<span class="nc" id="L245">          ruleMatches.add(ruleMatch);</span>
+        }
+<span class="nc" id="L247">        prevStartPos = len;</span>
+<span class="nc" id="L248">        len += word.length() + 1;</span>
+      }
+    } finally {
+<span class="nc bnc" id="L251" title="All 2 branches missed.">      if (monitorRules) {</span>
+<span class="nc" id="L252">        activeChecks.remove(monitoringText);</span>
+      }
+    }
+<span class="nc" id="L255">    return toRuleMatchArray(ruleMatches);</span>
+  }
+
+  private String cutOffDot(String s) {
+<span class="nc bnc" id="L259" title="All 2 branches missed.">    return s.endsWith(&quot;.&quot;) ? s.substring(0, s.length()-1) : s;</span>
+  }
+
+  /**
+   * @since public since 4.1
+   */
+  @Override
+  public boolean isMisspelled(String word) {
+    try {
+<span class="nc bnc" id="L268" title="All 2 branches missed.">      if (needsInit) {</span>
+<span class="nc" id="L269">        init();</span>
+      }
+<span class="nc" id="L271">      boolean isAlphabetic = true;</span>
+<span class="nc bnc" id="L272" title="All 2 branches missed.">      if (word.length() == 1) { // hunspell dictionaries usually do not contain punctuation</span>
+<span class="nc" id="L273">        isAlphabetic = Character.isAlphabetic(word.charAt(0));</span>
+      }
+<span class="nc bnc" id="L275" title="All 2 branches missed.">      return (</span>
+<span class="nc bnc" id="L276" title="All 4 branches missed.">              isAlphabetic &amp;&amp; !&quot;--&quot;.equals(word)</span>
+<span class="nc bnc" id="L277" title="All 2 branches missed.">              &amp;&amp; (hunspell != null &amp;&amp; !hunspell.spell(word))</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">              &amp;&amp; !ignoreWord(word)</span>
+             )
+<span class="nc bnc" id="L280" title="All 2 branches missed.">             || isProhibited(cutOffDot(word));</span>
+<span class="nc" id="L281">    } catch (IOException e) {</span>
+<span class="nc" id="L282">      throw new RuntimeException(e);</span>
+    }
+  }
+
+  public List&lt;String&gt; getSuggestions(String word) throws IOException {
+<span class="nc bnc" id="L287" title="All 2 branches missed.">    if (needsInit) {</span>
+<span class="nc" id="L288">      init();</span>
+    }
+<span class="nc" id="L290">    return hunspell.suggest(word);</span>
+  }
+
+  protected List&lt;String&gt; sortSuggestionByQuality(String misspelling, List&lt;String&gt; suggestions) {
+<span class="nc" id="L294">    return suggestions;</span>
+  }
+
+
+  protected String[] tokenizeText(String sentence) {
+<span class="nc" id="L299">    return nonWordPattern.split(sentence);</span>
+  }
+
+  protected String getSentenceTextWithoutUrlsAndImmunizedTokens(AnalyzedSentence sentence) {
+<span class="nc" id="L303">    StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L304">    AnalyzedTokenReadings[] sentenceTokens = getSentenceWithImmunization(sentence).getTokens();</span>
+<span class="nc bnc" id="L305" title="All 2 branches missed.">    for (int i = 1; i &lt; sentenceTokens.length; i++) {</span>
+<span class="nc" id="L306">      String token = sentenceTokens[i].getToken();</span>
+<span class="nc bnc" id="L307" title="All 10 branches missed.">      if (sentenceTokens[i].isImmunized() || sentenceTokens[i].isIgnoredBySpeller() || isUrl(token) || isEMail(token) || isQuotedCompound(sentence, i, token)) {</span>
+<span class="nc bnc" id="L308" title="All 2 branches missed.">        if (isQuotedCompound(sentence, i, token)) {</span>
+<span class="nc" id="L309">          sb.append(' ').append(token.substring(1));</span>
+        }
+        // replace URLs and immunized tokens with whitespace to ignore them for spell checking:
+<span class="nc bnc" id="L312" title="All 2 branches missed.">        else if (token.length() &lt; 20) {</span>
+<span class="nc" id="L313">          sb.append(WHITESPACE_ARRAY[token.length()]);</span>
+        } else {
+<span class="nc bnc" id="L315" title="All 2 branches missed.">          for (int j = 0; j &lt; token.length(); j++) {</span>
+<span class="nc" id="L316">            sb.append(' ');</span>
+          }
+        }
+<span class="nc bnc" id="L319" title="All 4 branches missed.">      } else if (token.length() &gt; 1 &amp;&amp; token.codePointCount(0, token.length()) != token.length()) {</span>
+        // some symbols such as emojis (😂) have a string length that equals 2 
+<span class="nc bnc" id="L321" title="All 2 branches missed.">        for (int charIndex = 0; charIndex &lt; token.length();) {</span>
+<span class="nc" id="L322">          int unicodeCodePoint = token.codePointAt(charIndex);</span>
+<span class="nc" id="L323">          int increment = Character.charCount(unicodeCodePoint);</span>
+<span class="nc bnc" id="L324" title="All 2 branches missed.">          if (increment == 1) {</span>
+<span class="nc" id="L325">            sb.append(token.charAt(charIndex));</span>
+          } else {
+<span class="nc" id="L327">            sb.append(&quot;  &quot;);</span>
+          }
+<span class="nc" id="L329">          charIndex += increment;</span>
+<span class="nc" id="L330">        }</span>
+      } else {
+<span class="nc" id="L332">        sb.append(token);</span>
+      }
+    }
+<span class="nc" id="L335">    return sb.toString();</span>
+  }
+
+  @Override
+  protected synchronized void init() throws IOException {
+<span class="nc" id="L340">    super.init();</span>
+<span class="nc" id="L341">    String langCountry = language.getShortCode();</span>
+<span class="nc bnc" id="L342" title="All 2 branches missed.">    if (language.getCountries().length &gt; 0) {</span>
+<span class="nc" id="L343">      langCountry += &quot;_&quot; + language.getCountries()[0];</span>
+    }
+<span class="nc" id="L345">    String shortDicPath = getDictFilenameInResources(langCountry);</span>
+<span class="nc" id="L346">    String wordChars = &quot;&quot;;</span>
+    // set dictionary only if there are dictionary files:
+<span class="nc" id="L348">    Path affPath = null;</span>
+<span class="nc bnc" id="L349" title="All 2 branches missed.">    if (JLanguageTool.getDataBroker().resourceExists(shortDicPath)) {</span>
+<span class="nc" id="L350">      String path = getDictionaryPath(langCountry, shortDicPath);</span>
+<span class="nc bnc" id="L351" title="All 2 branches missed.">      if (&quot;&quot;.equals(path)) {</span>
+<span class="nc" id="L352">        hunspell = null;</span>
+      } else {
+<span class="nc" id="L354">        affPath = Paths.get(path + &quot;.aff&quot;);</span>
+<span class="nc" id="L355">        hunspell = Hunspell.getInstance(Paths.get(path + &quot;.dic&quot;), affPath);</span>
+<span class="nc" id="L356">        addIgnoreWords();</span>
+      }
+<span class="nc bnc" id="L358" title="All 2 branches missed.">    } else if (new File(shortDicPath + &quot;.dic&quot;).exists()) {</span>
+      // for dynamic languages
+<span class="nc" id="L360">      affPath = Paths.get(shortDicPath + &quot;.aff&quot;);</span>
+<span class="nc" id="L361">      hunspell = Hunspell.getInstance(Paths.get(shortDicPath + &quot;.dic&quot;), affPath);</span>
+    }
+<span class="nc bnc" id="L363" title="All 2 branches missed.">    if (affPath != null) {</span>
+<span class="nc" id="L364">      Scanner sc = new Scanner(affPath);</span>
+<span class="nc bnc" id="L365" title="All 2 branches missed.">      while (sc.hasNextLine()) {</span>
+<span class="nc" id="L366">        String line = sc.nextLine();</span>
+<span class="nc bnc" id="L367" title="All 2 branches missed.">        if (line.startsWith(&quot;WORDCHARS &quot;)) {</span>
+<span class="nc" id="L368">          String wordCharsFromAff = line.substring(&quot;WORDCHARS &quot;.length());</span>
+          //System.out.println(&quot;#&quot; + wordCharsFromAff+ &quot;#&quot;);
+<span class="nc" id="L370">          wordChars = &quot;(?![&quot; + wordCharsFromAff.replace(&quot;-&quot;, &quot;\\-&quot;) + &quot;])&quot;;</span>
+<span class="nc" id="L371">          break;</span>
+        }
+<span class="nc" id="L373">      }</span>
+      
+    }
+<span class="nc" id="L376">    nonWordPattern = Pattern.compile(wordChars + NON_ALPHABETIC);</span>
+<span class="nc" id="L377">    needsInit = false;</span>
+<span class="nc" id="L378">  }</span>
+
+  @NotNull
+  protected String getDictFilenameInResources(String langCountry) {
+<span class="nc" id="L382">    return &quot;/&quot; + language.getShortCode() + &quot;/hunspell/&quot; + langCountry + FILE_EXTENSION;</span>
+  }
+
+  private void addIgnoreWords() throws IOException {
+<span class="nc" id="L386">    wordsToBeIgnored.add(SpellingCheckRule.LANGUAGETOOL);</span>
+<span class="nc" id="L387">    wordsToBeIgnored.add(SpellingCheckRule.LANGUAGETOOLER);</span>
+<span class="nc" id="L388">    URL ignoreUrl = JLanguageTool.getDataBroker().getFromResourceDirAsUrl(getIgnoreFileName());</span>
+<span class="nc" id="L389">    List&lt;String&gt; ignoreLines = Resources.readLines(ignoreUrl, StandardCharsets.UTF_8);</span>
+<span class="nc bnc" id="L390" title="All 2 branches missed.">    for (String ignoreLine : ignoreLines) {</span>
+<span class="nc bnc" id="L391" title="All 2 branches missed.">      if (!ignoreLine.startsWith(&quot;#&quot;)) {</span>
+<span class="nc" id="L392">        wordsToBeIgnored.add(ignoreLine);</span>
+      }
+<span class="nc" id="L394">    }</span>
+<span class="nc" id="L395">  }</span>
+
+  private String getDictionaryPath(String dicName,
+      String originalPath) throws IOException {
+
+<span class="nc" id="L400">    URL dictURL = JLanguageTool.getDataBroker().getFromResourceDirAsUrl(originalPath);</span>
+    String dictionaryPath;
+    //in the webstart, java EE or OSGi bundle version, we need to copy the files outside the jar
+    //to the local temporary directory
+<span class="nc bnc" id="L404" title="All 2 branches missed.">    if (StringUtils.equalsAny(dictURL.getProtocol(), &quot;jar&quot;, &quot;vfs&quot;, &quot;bundle&quot;, &quot;bundleresource&quot;)) {</span>
+<span class="nc" id="L405">      File tempDir = new File(System.getProperty(&quot;java.io.tmpdir&quot;));</span>
+<span class="nc" id="L406">      File tempDicFile = new File(tempDir, dicName + FILE_EXTENSION);</span>
+<span class="nc" id="L407">      JLanguageTool.addTemporaryFile(tempDicFile);</span>
+<span class="nc" id="L408">      try (InputStream dicStream = JLanguageTool.getDataBroker().getFromResourceDirAsStream(originalPath)) {</span>
+<span class="nc" id="L409">        fileCopy(dicStream, tempDicFile);</span>
+      }
+<span class="nc" id="L411">      File tempAffFile = new File(tempDir, dicName + &quot;.aff&quot;);</span>
+<span class="nc" id="L412">      JLanguageTool.addTemporaryFile(tempAffFile);</span>
+<span class="nc bnc" id="L413" title="All 2 branches missed.">      if (originalPath.endsWith(FILE_EXTENSION)) {</span>
+<span class="nc" id="L414">        originalPath = originalPath.substring(0, originalPath.length() - FILE_EXTENSION.length()) + &quot;.aff&quot;;</span>
+      }
+<span class="nc" id="L416">      try (InputStream affStream = JLanguageTool.getDataBroker().getFromResourceDirAsStream(originalPath)) {</span>
+<span class="nc" id="L417">        fileCopy(affStream, tempAffFile);</span>
+      }
+<span class="nc" id="L419">      dictionaryPath = tempDir.getAbsolutePath() + &quot;/&quot; + dicName;</span>
+<span class="nc" id="L420">    } else {</span>
+<span class="nc" id="L421">      int suffixLength = FILE_EXTENSION.length();</span>
+      try {
+<span class="nc" id="L423">        dictionaryPath = new File(dictURL.toURI()).getAbsolutePath();</span>
+<span class="nc" id="L424">        dictionaryPath = dictionaryPath.substring(0, dictionaryPath.length() - suffixLength);</span>
+<span class="nc" id="L425">      } catch (URISyntaxException e) {</span>
+<span class="nc" id="L426">        return &quot;&quot;;</span>
+<span class="nc" id="L427">      }</span>
+    }
+<span class="nc" id="L429">    return dictionaryPath;</span>
+  }
+
+  private void fileCopy(InputStream in, File targetFile) throws IOException {
+<span class="nc" id="L433">    try (OutputStream out = new FileOutputStream(targetFile)) {</span>
+<span class="nc" id="L434">      byte[] buf = new byte[1024];</span>
+      int len;
+<span class="nc bnc" id="L436" title="All 2 branches missed.">      while ((len = in.read(buf)) &gt; 0) {</span>
+<span class="nc" id="L437">        out.write(buf, 0, len);</span>
+      }
+<span class="nc" id="L439">      in.close();</span>
+    }
+<span class="nc" id="L441">  }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

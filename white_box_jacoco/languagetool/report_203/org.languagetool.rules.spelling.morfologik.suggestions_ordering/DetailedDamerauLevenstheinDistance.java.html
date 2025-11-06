@@ -1,0 +1,349 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DetailedDamerauLevenstheinDistance.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules.spelling.morfologik.suggestions_ordering</a> &gt; <span class="el_source">DetailedDamerauLevenstheinDistance.java</span></div><h1>DetailedDamerauLevenstheinDistance.java</h1><pre class="source lang-java linenums">/*
+ *  LanguageTool, a natural language style checker
+ *  * Copyright (C) 2018 Fabian Richter
+ *  *
+ *  * This library is free software; you can redistribute it and/or
+ *  * modify it under the terms of the GNU Lesser General Public
+ *  * License as published by the Free Software Foundation; either
+ *  * version 2.1 of the License, or (at your option) any later version.
+ *  *
+ *  * This library is distributed in the hope that it will be useful,
+ *  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *  * Lesser General Public License for more details.
+ *  *
+ *  * You should have received a copy of the GNU Lesser General Public
+ *  * License along with this library; if not, write to the Free Software
+ *  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ *  * USA
+ *
+ */
+
+package org.languagetool.rules.spelling.morfologik.suggestions_ordering;
+
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.ToStringBuilder;
+
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Random;
+import java.util.function.UnaryOperator;
+import java.util.stream.IntStream;
+
+public final class DetailedDamerauLevenstheinDistance {
+  private DetailedDamerauLevenstheinDistance() {
+  }
+
+  public abstract static class EditOperation implements UnaryOperator&lt;String&gt; {
+    protected final Random random;
+
+<span class="nc" id="L41">    public EditOperation() {</span>
+<span class="nc" id="L42">      this.random = new Random();</span>
+<span class="nc" id="L43">    }</span>
+
+<span class="nc" id="L45">    public EditOperation(long seed) {</span>
+<span class="nc" id="L46">      this.random = new Random(seed);</span>
+<span class="nc" id="L47">    }</span>
+  }
+
+<span class="nc" id="L50">  public static class Delete extends EditOperation {</span>
+
+    @Override
+    public String apply(String s) {
+<span class="nc bnc" id="L54" title="All 2 branches missed.">      if (s.length() &lt;= 1) {</span>
+<span class="nc" id="L55">        return null;</span>
+      }
+
+<span class="nc" id="L58">      int i = random.nextInt(s.length());</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">      if (i == 0) {</span>
+<span class="nc" id="L60">        return s.substring(1);</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">      } else if (i == s.length() - 1) {</span>
+<span class="nc" id="L62">        return s.substring(0, i);</span>
+      } else {
+<span class="nc" id="L64">        return s.substring(0, i) + s.substring(i + 1);</span>
+      }
+    }
+  }
+
+<span class="nc" id="L69">  public static class Transpose extends EditOperation {</span>
+    @Override
+    public String apply(String s) {
+<span class="nc bnc" id="L72" title="All 2 branches missed.">      if (s.length() &lt;= 1) {</span>
+<span class="nc" id="L73">        return null;</span>
+      }
+<span class="nc" id="L75">      int i = random.nextInt(s.length() - 1);</span>
+<span class="nc" id="L76">      String transposed = &quot;&quot; + s.charAt(i + 1) + s.charAt(i);</span>
+
+<span class="nc bnc" id="L78" title="All 2 branches missed.">      if (i == 0) {</span>
+<span class="nc" id="L79">        return transposed + s.substring(2);</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">      } else if (i == s.length() - 1) {</span>
+<span class="nc" id="L81">        return s.substring(0, i) + transposed;</span>
+      } else {
+<span class="nc" id="L83">        return s.substring(0, i) + transposed + s.substring(i + 2);</span>
+      }
+    }
+  }
+  private static char randomChar(Random random) {
+<span class="nc" id="L88">    return (char) ((int) 'a' + random.nextInt(26));</span>
+  }
+
+<span class="nc" id="L91">  public static class Insert extends EditOperation {</span>
+
+    @Override
+    public String apply(String s) {
+<span class="nc" id="L95">      int i = random.nextInt(s.length() + 1);</span>
+<span class="nc" id="L96">      char c = randomChar(random);</span>
+
+<span class="nc bnc" id="L98" title="All 2 branches missed.">      if (i == 0) {</span>
+<span class="nc" id="L99">        return &quot;&quot; + c + s;</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">      } else if (i == s.length()) {</span>
+<span class="nc" id="L101">        return s + c;</span>
+      } else {
+<span class="nc" id="L103">        return s.substring(0, i) + c + s.substring(i);</span>
+      }
+    }
+  }
+
+<span class="nc" id="L108">  public static class Replace extends EditOperation {</span>
+
+    @Override
+    public String apply(String s) {
+<span class="nc bnc" id="L112" title="All 2 branches missed.">      if (s.length() == 0) {</span>
+<span class="nc" id="L113">        return null;</span>
+      }
+<span class="nc" id="L115">      int i = random.nextInt(s.length());</span>
+<span class="nc" id="L116">      char c = randomChar(random);</span>
+
+<span class="nc bnc" id="L118" title="All 2 branches missed.">      if (i == 0) {</span>
+<span class="nc" id="L119">        return &quot;&quot; + c + s.substring(1);</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">      } else if (i == s.length() - 1) {</span>
+<span class="nc" id="L121">        return s.substring(0, i) + c;</span>
+      } else {
+<span class="nc" id="L123">        return s.substring(0, i) + c + s.substring(i + 1);</span>
+      }
+    }
+  }
+
+<span class="nc" id="L128">  public static final List&lt;EditOperation&gt; editOperations = Arrays.asList(</span>
+    new Insert(), new Replace(), new Transpose(), new Delete());
+<span class="nc" id="L130">  private static final Random random = new Random();</span>
+
+  public static final EditOperation randomEdit() {
+<span class="nc" id="L133">    return editOperations.get(random.nextInt(editOperations.size()));</span>
+  }
+
+  public static class Distance {
+    public final int inserts;
+    public final int deletes;
+    public final int replaces;
+    public final int transposes;
+
+    public Distance() {
+<span class="nc" id="L143">      this(0, 0, 0, 0);</span>
+<span class="nc" id="L144">    }</span>
+
+<span class="nc" id="L146">    public Distance(int inserts, int deletes, int replaces, int transposes) {</span>
+<span class="nc" id="L147">      this.inserts = inserts;</span>
+<span class="nc" id="L148">      this.deletes = deletes;</span>
+<span class="nc" id="L149">      this.replaces = replaces;</span>
+<span class="nc" id="L150">      this.transposes = transposes;</span>
+<span class="nc" id="L151">    }</span>
+
+    public Distance insert() {
+<span class="nc" id="L154">      return new Distance(inserts + 1, deletes, replaces, transposes);</span>
+    }
+
+    public Distance delete() {
+<span class="nc" id="L158">      return new Distance(inserts, deletes + 1, replaces, transposes);</span>
+    }
+
+    public Distance replace() {
+<span class="nc" id="L162">      return new Distance(inserts, deletes, replaces + 1, transposes);</span>
+    }
+
+    public Distance transpose() {
+<span class="nc" id="L166">      return new Distance(inserts, deletes, replaces, transposes + 1);</span>
+    }
+
+    public Distance track(EditOperation operation) {
+<span class="nc bnc" id="L170" title="All 2 branches missed.">      if (operation instanceof Insert) {</span>
+<span class="nc" id="L171">        return insert();</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">      } else if (operation instanceof Delete) {</span>
+<span class="nc" id="L173">        return delete();</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">      } else if (operation instanceof Replace) {</span>
+<span class="nc" id="L175">        return replace();</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">      } else if (operation instanceof Transpose) {</span>
+<span class="nc" id="L177">        return transpose();</span>
+      } else {
+<span class="nc" id="L179">        throw new IllegalArgumentException(&quot;Unknown operation: &quot; + operation);</span>
+      }
+    }
+
+    public int value() {
+<span class="nc" id="L184">      return inserts + deletes + replaces + transposes;</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="nc bnc" id="L189" title="All 2 branches missed.">      if (o == this) { return true; }</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">      if (o == null) { return false; }</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">      if (o.getClass() != getClass()) { return false; }</span>
+<span class="nc" id="L192">      Distance other = (Distance) o;</span>
+<span class="nc" id="L193">      return new EqualsBuilder()</span>
+<span class="nc" id="L194">        .append(inserts, other.inserts)</span>
+<span class="nc" id="L195">        .append(deletes, other.deletes)</span>
+<span class="nc" id="L196">        .append(replaces, other.replaces)</span>
+<span class="nc" id="L197">        .append(transposes, other.transposes)</span>
+<span class="nc" id="L198">        .build();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L203">      return new ToStringBuilder(this)</span>
+<span class="nc" id="L204">        .append(&quot;value&quot;, value())</span>
+<span class="nc" id="L205">        .append(&quot;inserts&quot;, inserts)</span>
+<span class="nc" id="L206">        .append(&quot;deletes&quot;, deletes)</span>
+<span class="nc" id="L207">        .append(&quot;replaces&quot;, replaces)</span>
+<span class="nc" id="L208">        .append(&quot;transposes&quot;, transposes)</span>
+<span class="nc" id="L209">        .build();</span>
+    }
+  }
+
+  /**
+   * Compute the distance between strings: the minimum number of operations
+   * needed to transform one string into the other (insertion, deletion,
+   * substitution of a single character, or a transposition of two adjacent
+   * characters).
+   *
+   * Code adapted from https://github.com/tdebatty/java-string-similarity/blob/3406d2cfd853ca385090d144eed117f636ebd304/src/main/java/info/debatty/java/stringsimilarity/Damerau.java, available under MIT License
+   *
+   *  The MIT License
+   *
+   *  Copyright 2015 Thibault Debatty.
+   *
+   *  Permission is hereby granted, free of charge, to any person obtaining a copy
+   *  of this software and associated documentation files (the &quot;Software&quot;), to deal
+   *  in the Software without restriction, including without limitation the rights
+   *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   *  copies of the Software, and to permit persons to whom the Software is
+   *  furnished to do so, subject to the following conditions:
+   *
+   *  The above copyright notice and this permission notice shall be included in
+   *  all copies or substantial portions of the Software.
+   *
+   *  THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+   *  THE SOFTWARE.
+   *
+   *
+   * @param s1 The first string to compare.
+   * @param s2 The second string to compare.
+   * @return The computed distance.
+   * @throws NullPointerException if s1 or s2 is null.
+   */
+  public static Distance compare(final String s1, final String s2) {
+
+<span class="nc bnc" id="L251" title="All 2 branches missed.">    if (s1 == null) {</span>
+<span class="nc" id="L252">      throw new NullPointerException(&quot;s1 must not be null&quot;);</span>
+    }
+
+<span class="nc bnc" id="L255" title="All 2 branches missed.">    if (s2 == null) {</span>
+<span class="nc" id="L256">      throw new NullPointerException(&quot;s2 must not be null&quot;);</span>
+    }
+
+<span class="nc bnc" id="L259" title="All 2 branches missed.">    if (s1.equals(s2)) {</span>
+<span class="nc" id="L260">      return new Distance();</span>
+    }
+
+    // INFinite distance is the max possible distance
+<span class="nc" id="L264">    int inf = s1.length() + s2.length();</span>
+
+    // Create and initialize the character array indices
+<span class="nc" id="L267">    HashMap&lt;Character, Integer&gt; da = new HashMap&lt;Character, Integer&gt;();</span>
+
+<span class="nc bnc" id="L269" title="All 2 branches missed.">    for (int d = 0; d &lt; s1.length(); d++) {</span>
+<span class="nc" id="L270">      da.put(s1.charAt(d), 0);</span>
+    }
+
+<span class="nc bnc" id="L273" title="All 2 branches missed.">    for (int d = 0; d &lt; s2.length(); d++) {</span>
+<span class="nc" id="L274">      da.put(s2.charAt(d), 0);</span>
+    }
+
+    // Create the distance matrix H[0 .. s1.length+1][0 .. s2.length+1]
+<span class="nc" id="L278">    Distance[][] h = new Distance[s1.length() + 2][s2.length() + 2];</span>
+
+    // fill with empty values
+<span class="nc bnc" id="L281" title="All 2 branches missed.">    for (int i = 0; i &lt; s1.length() + 2; i ++) {</span>
+<span class="nc bnc" id="L282" title="All 2 branches missed.">      for (int j = 0; j &lt; s2.length() + 2; j++) {</span>
+<span class="nc" id="L283">        h[i][j] = new Distance();</span>
+      }
+    }
+
+    // initialize the left and top edges of H
+    // TODO understand initialization
+<span class="nc bnc" id="L289" title="All 2 branches missed.">    for (int i = 0; i &lt;= s1.length(); i++) {</span>
+<span class="nc" id="L290">      h[i + 1][0] = new Distance(inf, 0, 0, 0);</span>
+<span class="nc" id="L291">      h[i + 1][1] = new Distance(i, 0, 0, 0);</span>
+    }
+
+<span class="nc bnc" id="L294" title="All 2 branches missed.">    for (int j = 0; j &lt;= s2.length(); j++) {</span>
+<span class="nc" id="L295">      h[0][j + 1] = new Distance(inf, 0, 0, 0);</span>
+<span class="nc" id="L296">      h[1][j + 1] = new Distance(j, 0, 0, 0);</span>
+    }
+
+    // fill in the distance matrix H
+    // look at each character in s1
+<span class="nc bnc" id="L301" title="All 2 branches missed.">    for (int i = 1; i &lt;= s1.length(); i++) {</span>
+<span class="nc" id="L302">      int db = 0;</span>
+
+      // look at each character in b
+<span class="nc bnc" id="L305" title="All 2 branches missed.">      for (int j = 1; j &lt;= s2.length(); j++) {</span>
+<span class="nc" id="L306">        int i1 = da.get(s2.charAt(j - 1));</span>
+<span class="nc" id="L307">        int j1 = db;</span>
+
+<span class="nc" id="L309">        int cost = 1;</span>
+<span class="nc bnc" id="L310" title="All 2 branches missed.">        if (s1.charAt(i - 1) == s2.charAt(j - 1)) {</span>
+<span class="nc" id="L311">          cost = 0;</span>
+<span class="nc" id="L312">          db = j;</span>
+        }
+
+<span class="nc" id="L315">        int substitution = h[i][j].value() + cost;</span>
+<span class="nc" id="L316">        int insertion = h[i + 1][j].value() + 1;</span>
+<span class="nc" id="L317">        int deletion = h[i][j + 1].value() + 1;</span>
+<span class="nc" id="L318">        int transpose = h[i1][j1].value() + (i - i1 - 1) + 1 + (j - j1 - 1);</span>
+<span class="nc" id="L319">        int min = IntStream.of(substitution, insertion, deletion, transpose).min().getAsInt();</span>
+
+        // TODO: think about order, multiple cases might be true, which operations should be preferred?
+<span class="nc bnc" id="L322" title="All 2 branches missed.">        if (min == substitution) {</span>
+<span class="nc bnc" id="L323" title="All 2 branches missed.">          if (cost == 1) {</span>
+<span class="nc" id="L324">            h[i + 1][j + 1] = h[i][j].replace();</span>
+          } else {
+<span class="nc" id="L326">            h[i + 1][j + 1] = h[i][j];</span>
+          }
+<span class="nc bnc" id="L328" title="All 2 branches missed.">        } else if (min == insertion) {</span>
+<span class="nc" id="L329">          h[i + 1][j + 1] = h[i + 1][j].insert();</span>
+<span class="nc bnc" id="L330" title="All 2 branches missed.">        } else if (min == deletion) {</span>
+<span class="nc" id="L331">          h[i + 1][j + 1] = h[i][j + 1].delete();</span>
+<span class="nc bnc" id="L332" title="All 2 branches missed.">        } else if (min == transpose) {</span>
+<span class="nc" id="L333">          int transposeCost = (i - i1 - 1) + 1 + (j - j1 - 1);</span>
+<span class="nc" id="L334">          Distance value = h[i1][j1];</span>
+<span class="nc bnc" id="L335" title="All 2 branches missed.">          for (int k = 0; k &lt; transposeCost; k++) {</span>
+<span class="nc" id="L336">            value = value.transpose();</span>
+          }
+<span class="nc" id="L338">          h[i + 1][j + 1] = value;</span>
+        }
+
+      }
+
+<span class="nc" id="L343">      da.put(s1.charAt(i - 1), i);</span>
+    }
+
+<span class="nc" id="L346">    return h[s1.length() + 1][s2.length() + 1];</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

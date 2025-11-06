@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RemoteRuleConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules</a> &gt; <span class="el_source">RemoteRuleConfig.java</span></div><h1>RemoteRuleConfig.java</h1><pre class="source lang-java linenums">/*
+ *  LanguageTool, a natural language style checker
+ *  * Copyright (C) 2018 Fabian Richter
+ *  *
+ *  * This library is free software; you can redistribute it and/or
+ *  * modify it under the terms of the GNU Lesser General Public
+ *  * License as published by the Free Software Foundation; either
+ *  * version 2.1 of the License, or (at your option) any later version.
+ *  *
+ *  * This library is distributed in the hope that it will be useful,
+ *  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *  * Lesser General Public License for more details.
+ *  *
+ *  * You should have received a copy of the GNU Lesser General Public
+ *  * License along with this library; if not, write to the Free Software
+ *  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ *  * USA
+ *
+ */
+
+package org.languagetool.rules;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.commons.lang3.builder.ToStringBuilder;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+
+public class RemoteRuleConfig {
+  private static final int DEFAULT_PORT = 443;
+  private static final int DEFAULT_RETRIES = 0;
+  private static final long DEFAULT_BASE_TIMEOUT = 1000;
+  private static final float DEFAULT_TIMEOUT_PER_CHAR = 0;
+  private static final int DEFAULT_FALL = 1;
+  private static final int DEFAULT_DOWN = 5000;
+
+<span class="nc" id="L55">  private static final LoadingCache&lt;File, List&lt;RemoteRuleConfig&gt;&gt; configCache = CacheBuilder.newBuilder()</span>
+<span class="nc" id="L56">    .expireAfterWrite(15, TimeUnit.MINUTES)</span>
+<span class="nc" id="L57">    .build(new CacheLoader&lt;File, List&lt;RemoteRuleConfig&gt;&gt;() {</span>
+      @Override
+      public List&lt;RemoteRuleConfig&gt; load(File path) throws Exception {
+<span class="nc" id="L60">        try (FileInputStream in = new FileInputStream(path)) {</span>
+<span class="nc" id="L61">          return parse(in);</span>
+        }
+      }
+    });
+
+  private final String ruleId;
+
+  private final String url;
+  private final Integer port;
+
+  private final Integer maxRetries;
+  private final Long baseTimeoutMilliseconds;
+  private final Float timeoutPerCharacterMilliseconds;
+
+  private final Integer fall;
+  private final Long downMilliseconds;
+
+
+  private final Map&lt;String, String&gt; options;
+
+  // TODO configure health checks, load balancing, ...?
+
+  @JsonCreator
+  public RemoteRuleConfig(@JsonProperty(&quot;ruleId&quot;) String ruleId,
+                          @JsonProperty(&quot;url&quot;) String url,
+                          @JsonProperty(&quot;port&quot;) Integer port,
+                          @JsonProperty(&quot;maxRetries&quot;) Integer maxRetries,
+                          @JsonProperty(&quot;baseTimeoutMilliseconds&quot;) Long baseTimeoutMilliseconds,
+                          @JsonProperty(&quot;timeoutPerCharacterMilliseconds&quot;) Float timeoutPerCharacterMilliseconds,
+                          @JsonProperty(&quot;fall&quot;) Integer fall,
+                          @JsonProperty(&quot;downMilliseconds&quot;) Long downMilliseconds,
+<span class="nc" id="L92">                          @JsonProperty(&quot;options&quot;) Map&lt;String, String&gt; options) {</span>
+<span class="nc" id="L93">    this.ruleId = ruleId;</span>
+<span class="nc" id="L94">    this.url = url;</span>
+<span class="nc" id="L95">    this.port = port;</span>
+<span class="nc" id="L96">    this.maxRetries = maxRetries;</span>
+<span class="nc" id="L97">    this.baseTimeoutMilliseconds = baseTimeoutMilliseconds;</span>
+<span class="nc" id="L98">    this.timeoutPerCharacterMilliseconds = timeoutPerCharacterMilliseconds;</span>
+<span class="nc" id="L99">    this.fall = fall;</span>
+<span class="nc" id="L100">    this.downMilliseconds = downMilliseconds;</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">    this.options = Collections.unmodifiableMap(options != null ? options : Collections.emptyMap());</span>
+<span class="nc" id="L102">  }</span>
+
+  public String getRuleId() {
+<span class="nc" id="L105">    return ruleId;</span>
+  }
+  public String getUrl() {
+<span class="nc" id="L108">    return url;</span>
+  }
+  public int getPort() {
+<span class="nc bnc" id="L111" title="All 2 branches missed.">    return port != null ? port : DEFAULT_PORT;</span>
+  }
+  public int getMaxRetries() {
+<span class="nc bnc" id="L114" title="All 2 branches missed.">    return maxRetries != null ? maxRetries : DEFAULT_RETRIES;</span>
+  }
+  public int getFall() {
+<span class="nc bnc" id="L117" title="All 2 branches missed.">    return fall != null ? fall : DEFAULT_FALL;</span>
+  }
+  public long getDownMilliseconds() {
+<span class="nc bnc" id="L120" title="All 2 branches missed.">    return downMilliseconds != null ? downMilliseconds : DEFAULT_DOWN;</span>
+  }
+  public long getBaseTimeoutMilliseconds() {
+<span class="nc bnc" id="L123" title="All 2 branches missed.">    return baseTimeoutMilliseconds != null ? baseTimeoutMilliseconds : DEFAULT_BASE_TIMEOUT;</span>
+  }
+
+  public float getTimeoutPerCharacterMilliseconds() {
+<span class="nc bnc" id="L127" title="All 2 branches missed.">    return timeoutPerCharacterMilliseconds != null ? timeoutPerCharacterMilliseconds : DEFAULT_TIMEOUT_PER_CHAR;</span>
+  }
+
+  public Map&lt;String, String&gt; getOptions() {
+<span class="nc" id="L131">    return options;</span>
+  }
+
+  @Override
+  public boolean equals(Object o) {
+<span class="nc bnc" id="L136" title="All 2 branches missed.">    if (this == o) {</span>
+<span class="nc" id="L137">      return true;</span>
+    }
+
+<span class="nc bnc" id="L140" title="All 4 branches missed.">    if (o == null || getClass() != o.getClass()) {</span>
+<span class="nc" id="L141">      return false;</span>
+    }
+
+<span class="nc" id="L144">    RemoteRuleConfig that = (RemoteRuleConfig) o;</span>
+
+<span class="nc" id="L146">    return new EqualsBuilder()</span>
+<span class="nc" id="L147">      .append(ruleId, that.ruleId)</span>
+<span class="nc" id="L148">      .append(url, that.url)</span>
+<span class="nc" id="L149">      .append(port, that.port)</span>
+<span class="nc" id="L150">      .append(maxRetries, that.maxRetries)</span>
+<span class="nc" id="L151">      .append(baseTimeoutMilliseconds, that.baseTimeoutMilliseconds)</span>
+<span class="nc" id="L152">      .append(timeoutPerCharacterMilliseconds, that.timeoutPerCharacterMilliseconds)</span>
+<span class="nc" id="L153">      .append(fall, that.fall)</span>
+<span class="nc" id="L154">      .append(downMilliseconds, that.downMilliseconds)</span>
+<span class="nc" id="L155">      .append(options, that.options)</span>
+<span class="nc" id="L156">      .isEquals();</span>
+  }
+
+  @Override
+  public int hashCode() {
+<span class="nc" id="L161">    return new HashCodeBuilder(17, 37)</span>
+<span class="nc" id="L162">      .append(ruleId)</span>
+<span class="nc" id="L163">      .append(url)</span>
+<span class="nc" id="L164">      .append(port)</span>
+<span class="nc" id="L165">      .append(maxRetries)</span>
+<span class="nc" id="L166">      .append(baseTimeoutMilliseconds)</span>
+<span class="nc" id="L167">      .append(timeoutPerCharacterMilliseconds)</span>
+<span class="nc" id="L168">      .append(fall)</span>
+<span class="nc" id="L169">      .append(downMilliseconds)</span>
+<span class="nc" id="L170">      .append(options)</span>
+<span class="nc" id="L171">      .toHashCode();</span>
+  }
+
+  @Override
+  public String toString() {
+<span class="nc" id="L176">    return new ToStringBuilder(this)</span>
+<span class="nc" id="L177">      .append(&quot;ruleId&quot;, ruleId)</span>
+<span class="nc" id="L178">      .append(&quot;url&quot;, url)</span>
+<span class="nc" id="L179">      .append(&quot;port&quot;, port)</span>
+<span class="nc" id="L180">      .append(&quot;maxRetries&quot;, maxRetries)</span>
+<span class="nc" id="L181">      .append(&quot;baseTimeout&quot;, baseTimeoutMilliseconds)</span>
+<span class="nc" id="L182">      .append(&quot;timeoutPerCharacter&quot;, timeoutPerCharacterMilliseconds)</span>
+<span class="nc" id="L183">      .append(&quot;fall&quot;, fall)</span>
+<span class="nc" id="L184">      .append(&quot;down&quot;, downMilliseconds)</span>
+<span class="nc" id="L185">      .append(&quot;options&quot;, options)</span>
+<span class="nc" id="L186">      .build();</span>
+  }
+
+  public static RemoteRuleConfig getRelevantConfig(String rule, List&lt;RemoteRuleConfig&gt; configs) {
+<span class="nc" id="L190">    return configs.stream().filter(config -&gt; config.getRuleId().equals(rule)).findFirst().orElse(null);</span>
+  }
+
+  public static List&lt;RemoteRuleConfig&gt; parse(InputStream json) throws IOException {
+<span class="nc" id="L194">    ObjectMapper mapper = new ObjectMapper(new JsonFactory().enable(JsonParser.Feature.ALLOW_COMMENTS));</span>
+<span class="nc" id="L195">    return mapper.readValue(json, new TypeReference&lt;List&lt;RemoteRuleConfig&gt;&gt;() {});</span>
+  }
+
+  public static List&lt;RemoteRuleConfig&gt; load(File configFile) throws ExecutionException {
+<span class="nc" id="L199">    return configCache.get(configFile);</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

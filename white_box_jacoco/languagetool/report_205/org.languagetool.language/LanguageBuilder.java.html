@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LanguageBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.language</a> &gt; <span class="el_source">LanguageBuilder.java</span></div><h1>LanguageBuilder.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker 
+ * Copyright (C) 2007 Daniel Naber (http://www.danielnaber.de)
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.language;
+
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.languagetool.*;
+import org.languagetool.chunking.Chunker;
+import org.languagetool.languagemodel.LanguageModel;
+import org.languagetool.rules.Rule;
+import org.languagetool.rules.neuralnetwork.Word2VecModel;
+import org.languagetool.synthesis.Synthesizer;
+import org.languagetool.tagging.Tagger;
+import org.languagetool.tagging.disambiguation.Disambiguator;
+import org.languagetool.tokenizers.SentenceTokenizer;
+import org.languagetool.tokenizers.Tokenizer;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.*;
+
+/**
+ * Create a language by specifying the language's XML rule file.
+ */
+public final class LanguageBuilder {
+
+  private LanguageBuilder() {
+  }
+
+  public static Language makeAdditionalLanguage(File file) throws InstantiationException, IllegalAccessException {
+<span class="nc" id="L47">    return makeLanguage(file, true);</span>
+  }
+
+  /**
+   * Takes an XML file named &lt;tt&gt;rules-xx-language.xml&lt;/tt&gt;,
+   * e.g. &lt;tt&gt;rules-de-German.xml&lt;/tt&gt; and builds
+   * a Language object for that language.
+   */
+  private static Language makeLanguage(File file, boolean isAdditional) throws IllegalAccessException, InstantiationException {
+<span class="nc" id="L56">    Objects.requireNonNull(file, &quot;file cannot be null&quot;);</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">    if (!file.getName().endsWith(&quot;.xml&quot;)) {</span>
+<span class="nc" id="L58">      throw new RuleFilenameException(file);</span>
+    }
+<span class="nc" id="L60">    String[] parts = file.getName().split(&quot;-&quot;);</span>
+<span class="nc" id="L61">    boolean startsWithRules = parts[0].equals(&quot;rules&quot;);</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">    boolean secondPartHasCorrectLength = parts.length == 3 &amp;&amp;</span>
+<span class="nc bnc" id="L63" title="All 6 branches missed.">            (parts[1].length() == &quot;en&quot;.length() || parts[1].length() == &quot;ast&quot;.length() || parts[1].length() == &quot;en_US&quot;.length());</span>
+<span class="nc bnc" id="L64" title="All 4 branches missed.">    if (!startsWithRules || !secondPartHasCorrectLength) {</span>
+<span class="nc" id="L65">      throw new RuleFilenameException(file);</span>
+    }
+    //TODO: when the XML file is mergeable with
+    // other rules (check this in the XML Rule Loader by using rules[@integrate='add']?),
+    // subclass the existing language,
+    //and adjust the settings if any are set in the rule file default configuration set
+
+    Language newLanguage;
+<span class="nc bnc" id="L73" title="All 2 branches missed.">    if (Languages.isLanguageSupported(parts[1])) {</span>
+<span class="nc" id="L74">      Language baseLanguage = Languages.getLanguageForShortCode(parts[1]).getClass().newInstance();</span>
+<span class="nc" id="L75">      newLanguage = new ExtendedLanguage(baseLanguage, parts[2].replace(&quot;.xml&quot;, &quot;&quot;), file);</span>
+<span class="nc" id="L76">    } else {</span>
+<span class="nc" id="L77">      newLanguage = new Language() {</span>
+        @Override
+        public Locale getLocale() {
+<span class="nc" id="L80">          return new Locale(getShortCode());</span>
+        }
+
+        @Override
+        public Contributor[] getMaintainers() {
+<span class="nc" id="L85">          return null;</span>
+        }
+
+        @Override
+        public String getShortCode() {
+<span class="nc bnc" id="L90" title="All 2 branches missed.">          if (parts[1].length() == 2) {</span>
+<span class="nc" id="L91">            return parts[1];</span>
+          }
+<span class="nc" id="L93">          return parts[1].split(&quot;_&quot;)[0]; //en as in en_US</span>
+        }
+
+        @Override
+        public String[] getCountries() {
+<span class="nc bnc" id="L98" title="All 2 branches missed.">          if (parts[1].length() == 2) {</span>
+<span class="nc" id="L99">            return new String[]{&quot;&quot;};</span>
+          }
+<span class="nc" id="L101">          return new String[]{parts[1].split(&quot;_&quot;)[1]}; //US as in en_US</span>
+        }
+
+        @Override
+        public String getName() {
+<span class="nc" id="L106">          return parts[2].replace(&quot;.xml&quot;, &quot;&quot;);</span>
+        }
+
+        @Override
+        public List&lt;Rule&gt; getRelevantRules(ResourceBundle messages, UserConfig userConfig, Language motherTongue, List&lt;Language&gt; altLanguages) {
+<span class="nc" id="L111">          return Collections.emptyList();</span>
+        }
+
+        @Override
+        public List&lt;String&gt; getRuleFileNames() {
+<span class="nc" id="L116">          List&lt;String&gt; ruleFiles = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L117">          ruleFiles.add(file.getAbsolutePath());</span>
+<span class="nc" id="L118">          return ruleFiles;</span>
+        }
+
+        @Override
+        public boolean isExternal() {
+<span class="nc" id="L123">          return isAdditional;</span>
+        }
+      };
+    }
+<span class="nc" id="L127">    return newLanguage;</span>
+  }
+
+  static class ExtendedLanguage extends Language {
+
+    private final Language baseLanguage;
+    private final String name;
+    private final File ruleFile;
+
+<span class="nc" id="L136">    ExtendedLanguage(Language baseLanguage, String name, File ruleFile) {</span>
+<span class="nc" id="L137">      this.baseLanguage = baseLanguage;</span>
+<span class="nc" id="L138">      this.name = name;</span>
+<span class="nc" id="L139">      this.ruleFile = ruleFile;</span>
+<span class="nc" id="L140">    }</span>
+
+    @Override
+    public String getName() {
+<span class="nc" id="L144">      return name;</span>
+    }
+
+    @Override
+    public List&lt;String&gt; getRuleFileNames() {
+<span class="nc" id="L149">      List&lt;String&gt; ruleFiles = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L150">      ruleFiles.addAll(baseLanguage.getRuleFileNames());</span>
+<span class="nc" id="L151">      ruleFiles.add(ruleFile.getAbsolutePath());</span>
+<span class="nc" id="L152">      return ruleFiles;</span>
+    }
+
+    @Override
+    public boolean isExternal() {
+<span class="nc" id="L157">      return true;</span>
+    }
+
+    @Override
+    public Locale getLocale() {
+<span class="nc" id="L162">      return baseLanguage.getLocale();</span>
+    }
+
+    @Override
+    public Contributor[] getMaintainers() {
+<span class="nc" id="L167">      return baseLanguage.getMaintainers();</span>
+    }
+
+    @Override
+    public String getShortCode() {
+<span class="nc" id="L172">      return baseLanguage.getShortCode();</span>
+    }
+
+    @Override
+    public String[] getCountries() {
+<span class="nc" id="L177">      return baseLanguage.getCountries();</span>
+    }
+
+    @Override
+    public List&lt;Rule&gt; getRelevantRules(ResourceBundle messages, UserConfig userConfig, Language motherTongue, List&lt;Language&gt; altLanguages) throws IOException {
+<span class="nc" id="L182">      return baseLanguage.getRelevantRules(messages, null, motherTongue, altLanguages);</span>
+    }
+
+    @Nullable @Override
+    public String getVariant() {
+<span class="nc" id="L187">      return baseLanguage.getVariant();</span>
+    }
+
+    @Override
+    public List&lt;String&gt; getDefaultEnabledRulesForVariant() {
+<span class="nc" id="L192">      return baseLanguage.getDefaultEnabledRulesForVariant();</span>
+    }
+
+    @Override
+    public List&lt;String&gt; getDefaultDisabledRulesForVariant() {
+<span class="nc" id="L197">      return baseLanguage.getDefaultDisabledRulesForVariant();</span>
+    }
+
+    @Nullable
+    @Override
+    public LanguageModel getLanguageModel(File indexDir) throws IOException {
+<span class="nc" id="L203">      return baseLanguage.getLanguageModel(indexDir);</span>
+    }
+
+    @Override
+    public List&lt;Rule&gt; getRelevantLanguageModelRules(ResourceBundle messages, LanguageModel languageModel, UserConfig userConfig) throws IOException {
+<span class="nc" id="L208">      return baseLanguage.getRelevantLanguageModelRules(messages, languageModel, userConfig);</span>
+    }
+
+    @Override
+    public List&lt;Rule&gt; getRelevantWord2VecModelRules(ResourceBundle messages, Word2VecModel word2vecModel) throws IOException {
+<span class="nc" id="L213">      return baseLanguage.getRelevantWord2VecModelRules(messages, word2vecModel);</span>
+    }
+
+    @Override
+    public Locale getLocaleWithCountryAndVariant() {
+<span class="nc" id="L218">      return baseLanguage.getLocaleWithCountryAndVariant();</span>
+    }
+
+    @Nullable
+    @Override
+    public Language getDefaultLanguageVariant() {
+<span class="nc" id="L224">      return baseLanguage.getDefaultLanguageVariant();</span>
+    }
+
+    @Override
+    public Disambiguator createDefaultDisambiguator() {
+<span class="nc" id="L229">      return baseLanguage.createDefaultDisambiguator();</span>
+    }
+
+    @NotNull
+    @Override
+    public Tagger createDefaultTagger() {
+<span class="nc" id="L235">      return baseLanguage.createDefaultTagger();</span>
+    }
+
+    @Override
+    public SentenceTokenizer createDefaultSentenceTokenizer() {
+<span class="nc" id="L240">      return baseLanguage.createDefaultSentenceTokenizer();</span>
+    }
+
+    @Override
+    public Tokenizer createDefaultWordTokenizer() {
+<span class="nc" id="L245">      return baseLanguage.createDefaultWordTokenizer();</span>
+    }
+
+    @Nullable
+    @Override
+    public Chunker createDefaultChunker() {
+<span class="nc" id="L251">      return baseLanguage.createDefaultChunker();</span>
+    }
+
+    @Nullable
+    @Override
+    public Chunker createDefaultPostDisambiguationChunker() {
+<span class="nc" id="L257">      return baseLanguage.createDefaultPostDisambiguationChunker();</span>
+    }
+
+    @Nullable
+    @Override
+    public Synthesizer createDefaultSynthesizer() {
+<span class="nc" id="L263">      return baseLanguage.createDefaultSynthesizer();</span>
+    }
+
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

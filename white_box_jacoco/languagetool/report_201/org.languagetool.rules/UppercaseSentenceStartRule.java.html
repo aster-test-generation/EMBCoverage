@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UppercaseSentenceStartRule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules</a> &gt; <span class="el_source">UppercaseSentenceStartRule.java</span></div><h1>UppercaseSentenceStartRule.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker 
+ * Copyright (C) 2005 Daniel Naber (http://www.danielnaber.de)
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules;
+
+import java.io.IOException;
+import java.util.*;
+import java.util.regex.Pattern;
+
+import org.apache.commons.lang3.StringUtils;
+import org.jetbrains.annotations.Nullable;
+import org.languagetool.AnalyzedSentence;
+import org.languagetool.AnalyzedTokenReadings;
+import org.languagetool.Language;
+import org.languagetool.tokenizers.WordTokenizer;
+import org.languagetool.tools.StringTools;
+
+/**
+ * Checks that a sentence starts with an uppercase letter.
+ * 
+ * @author Daniel Naber
+ */
+public class UppercaseSentenceStartRule extends TextLevelRule {
+
+<span class="fc" id="L40">  private static final Pattern NUMERALS_EN =</span>
+<span class="fc" id="L41">          Pattern.compile(&quot;[a-z]|(m{0,4}(c[md]|d?c{0,3})(x[cl]|l?x{0,3})(i[xv]|v?i{0,3}))$&quot;);</span>
+<span class="fc" id="L42">  private static final Pattern WHITESPACE_OR_QUOTE = Pattern.compile(&quot;[ \&quot;'„«»‘’“”\\n]&quot;); //only ending quote is necessary?</span>
+<span class="fc" id="L43">  private static final Pattern SENTENCE_END1 = Pattern.compile(&quot;[.?!…]|&quot;);</span>
+<span class="fc" id="L44">  private static final Set&lt;String&gt; EXCEPTIONS = new HashSet&lt;&gt;(Arrays.asList(</span>
+          &quot;iPhone&quot;,
+          &quot;iPhones&quot;,
+          &quot;iOS&quot;,
+          &quot;iBook&quot;,
+          &quot;iDEAL&quot;,
+          &quot;iDeal&quot;,
+          &quot;iMovie&quot;,
+          &quot;iLife&quot;,
+          &quot;iWork&quot;,
+          &quot;iMac&quot;,
+          &quot;iMacs&quot;,
+          &quot;eBay&quot;,
+          &quot;fMRI&quot;,
+          &quot;iPad&quot;,
+          &quot;iPadOS&quot;,
+          &quot;iPads&quot;,
+          &quot;iPod&quot;,
+          &quot;iPods&quot;,
+          &quot;iCloud&quot;,
+          &quot;iRobot&quot;,
+          &quot;iRobots&quot;,
+          &quot;iTunes&quot;,
+          &quot;macOS&quot;,
+          &quot;watchOS&quot;,
+          &quot;tvOS&quot;,
+          &quot;mRNA&quot;,
+          &quot;iHeartRadio&quot;,
+          &quot;iMessage&quot;,
+          &quot;iFood&quot;,
+          &quot;x86&quot;
+  ));
+
+  private final Language language;
+
+  /** @since 3.3 */
+  public UppercaseSentenceStartRule(ResourceBundle messages, Language language, IncorrectExample incorrectExample, CorrectExample correctExample) {
+<span class="fc" id="L81">    super(messages);</span>
+<span class="fc" id="L82">    super.setCategory(Categories.CASING.getCategory(messages));</span>
+<span class="fc" id="L83">    this.language = language;</span>
+<span class="fc" id="L84">    setLocQualityIssueType(ITSIssueType.Typographical);</span>
+<span class="pc bpc" id="L85" title="1 of 4 branches missed.">    if (incorrectExample != null &amp;&amp; correctExample != null) {</span>
+<span class="fc" id="L86">      addExamplePair(incorrectExample, correctExample);</span>
+    }
+<span class="fc" id="L88">  }</span>
+
+  /**
+   * @deprecated use {@link #UppercaseSentenceStartRule(ResourceBundle, Language, IncorrectExample, CorrectExample)} instead (deprecated since 3.3)
+   */
+  public UppercaseSentenceStartRule(ResourceBundle messages, Language language) {
+<span class="fc" id="L94">    this(messages, language, null, null);</span>
+<span class="fc" id="L95">  }</span>
+
+  @Override
+  public final String getId() {
+<span class="fc" id="L99">    return &quot;UPPERCASE_SENTENCE_START&quot;;</span>
+  }
+
+  @Override
+  public final String getDescription() {
+<span class="fc" id="L104">    return messages.getString(&quot;desc_uppercase_sentence&quot;);</span>
+  }
+
+  @Override
+  public RuleMatch[] match(List&lt;AnalyzedSentence&gt; sentences) throws IOException {
+<span class="fc" id="L109">    String lastParagraphString = &quot;&quot;;</span>
+<span class="fc" id="L110">    List&lt;RuleMatch&gt; ruleMatches = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L111" title="All 4 branches covered.">    if (sentences.size() == 1 &amp;&amp; sentences.get(0).getTokens().length == 2) {</span>
+      // Special case for a single &quot;sentence&quot; with a single word - it's not useful
+      // to complain about this (and might hide a typo error):
+<span class="fc" id="L114">      return toRuleMatchArray(ruleMatches);</span>
+    }
+<span class="fc" id="L116">    int pos = 0;</span>
+<span class="fc" id="L117">    boolean isPrevSentenceNumberedList = false;</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">    for (AnalyzedSentence sentence : sentences) {</span>
+<span class="fc" id="L119">      AnalyzedTokenReadings[] tokens = getSentenceWithImmunization(sentence).getTokensWithoutWhitespace();</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">      if (tokens.length &lt; 2) {</span>
+<span class="nc" id="L121">        return toRuleMatchArray(ruleMatches);</span>
+      }
+<span class="fc" id="L123">      int matchTokenPos = 1; // 0 = SENT_START</span>
+<span class="fc" id="L124">      AnalyzedTokenReadings firstTokenObj = tokens[matchTokenPos];</span>
+<span class="fc" id="L125">      String firstToken = firstTokenObj.getToken();</span>
+<span class="fc" id="L126">      String secondToken = null;</span>
+<span class="fc" id="L127">      String thirdToken = null;</span>
+      // ignore quote characters:
+<span class="pc bpc" id="L129" title="1 of 4 branches missed.">      if (tokens.length &gt;= 3 &amp;&amp; isQuoteStart(firstToken)) {</span>
+<span class="nc" id="L130">        matchTokenPos = 2;</span>
+<span class="nc" id="L131">        secondToken = tokens[matchTokenPos].getToken();</span>
+      }
+<span class="fc" id="L133">      String firstDutchToken = dutchSpecialCase(firstToken, secondToken, tokens);</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">      if (firstDutchToken != null) {</span>
+<span class="nc" id="L135">        thirdToken = firstDutchToken;</span>
+<span class="nc" id="L136">        matchTokenPos = 3;</span>
+      }
+
+<span class="fc" id="L139">      String checkToken = firstToken;</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">      if (thirdToken != null) {</span>
+<span class="nc" id="L141">        checkToken = thirdToken;</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">      } else if (secondToken != null) {</span>
+<span class="nc" id="L143">        checkToken = secondToken;</span>
+      }
+
+<span class="fc" id="L146">      String lastToken = tokens[tokens.length - 1].getToken();</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">      if (WHITESPACE_OR_QUOTE.matcher(lastToken).matches()) {</span>
+        // ignore trailing whitespace or quote
+<span class="nc" id="L149">        lastToken = tokens[tokens.length - 2].getToken();</span>
+      }
+
+<span class="fc" id="L152">      boolean preventError = false;</span>
+<span class="pc bpc" id="L153" title="2 of 4 branches missed.">      if (lastParagraphString.equals(&quot;,&quot;) || lastParagraphString.equals(&quot;;&quot;)) {</span>
+<span class="nc" id="L154">        preventError = true;</span>
+      }
+<span class="pc bpc" id="L156" title="3 of 4 branches missed.">      if (!SENTENCE_END1.matcher(lastParagraphString).matches() &amp;&amp; !isSentenceEnd(lastToken)) {</span>
+<span class="nc" id="L157">        preventError = true;</span>
+      }
+
+<span class="fc" id="L160">      lastParagraphString = lastToken;</span>
+
+      //allows enumeration with lowercase letters: a), iv., etc.
+<span class="fc bfc" id="L163" title="All 2 branches covered.">      if (matchTokenPos+1 &lt; tokens.length</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">              &amp;&amp; NUMERALS_EN.matcher(tokens[matchTokenPos].getToken()).matches()</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">              &amp;&amp; (tokens[matchTokenPos+1].getToken().equals(&quot;.&quot;)</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">              || tokens[matchTokenPos+1].getToken().equals(&quot;)&quot;))) {</span>
+<span class="nc" id="L167">        preventError = true;</span>
+      }
+
+<span class="pc bpc" id="L170" title="3 of 8 branches missed.">      if (isPrevSentenceNumberedList || isUrl(checkToken) || isEMail(checkToken) || firstTokenObj.isImmunized()) {</span>
+<span class="fc" id="L171">        preventError = true;</span>
+      }
+
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">      if (checkToken.length() &gt; 0) {</span>
+<span class="fc" id="L175">        char firstChar = checkToken.charAt(0);</span>
+<span class="pc bpc" id="L176" title="1 of 6 branches missed.">        if (!preventError &amp;&amp; Character.isLowerCase(firstChar) &amp;&amp; !EXCEPTIONS.contains(checkToken)) {</span>
+<span class="fc" id="L177">          RuleMatch ruleMatch = new RuleMatch(this, sentence,</span>
+<span class="fc" id="L178">                  pos+tokens[matchTokenPos].getStartPos(),</span>
+<span class="fc" id="L179">                  pos+tokens[matchTokenPos].getEndPos(),</span>
+<span class="fc" id="L180">                  messages.getString(&quot;incorrect_case&quot;));</span>
+<span class="fc" id="L181">          ruleMatch.setSuggestedReplacement(StringTools.uppercaseFirstChar(checkToken));</span>
+<span class="fc" id="L182">          ruleMatches.add(ruleMatch);</span>
+        }
+      }
+<span class="fc" id="L185">      pos += sentence.getCorrectedTextLength();</span>
+      // Plain text lists like this are not properly split into sentences, we
+      // work around that here so the items don't create an error when starting lowercase:
+      // 1. item one
+      // 2. item two
+<span class="pc bpc" id="L190" title="1 of 4 branches missed.">      isPrevSentenceNumberedList = sentence.getText().matches(&quot;\\d+\\. .*&quot;) || sentence.getText().matches(&quot;.*\n\\d+\\. &quot;);</span>
+<span class="fc" id="L191">    }</span>
+<span class="fc" id="L192">    return toRuleMatchArray(ruleMatches);</span>
+  }
+
+  @Nullable
+  private String dutchSpecialCase(String firstToken,
+      String secondToken, AnalyzedTokenReadings[] tokens) {
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">    if (!language.getShortCode().equals(&quot;nl&quot;)) {</span>
+<span class="fc" id="L199">      return null;</span>
+    }
+<span class="nc bnc" id="L201" title="All 4 branches missed.">    if (tokens.length &gt; 3 &amp;&amp; firstToken.equals(&quot;'&quot;)</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">        &amp;&amp; isDutchSpecialCase(secondToken)) {</span>
+<span class="nc" id="L203">      return tokens[3].getToken();</span>
+    }
+<span class="nc" id="L205">    return null;</span>
+  }
+
+  protected boolean isUrl(String token) {
+<span class="fc" id="L209">    return WordTokenizer.isUrl(token);</span>
+  }
+
+  protected boolean isEMail(String token) {
+<span class="fc" id="L213">    return WordTokenizer.isEMail(token);</span>
+  }
+
+  private boolean isDutchSpecialCase(String word) {
+<span class="nc" id="L217">    return StringUtils.equalsAny(word, &quot;k&quot;, &quot;m&quot;, &quot;n&quot;, &quot;r&quot;, &quot;s&quot;, &quot;t&quot;);</span>
+  }
+
+  private boolean isSentenceEnd(String word) {
+<span class="nc" id="L221">    return StringUtils.equalsAny(word, &quot;.&quot;, &quot;?&quot;, &quot;!&quot;, &quot;…&quot;);</span>
+  }
+
+  private boolean isQuoteStart(String word) {
+<span class="fc" id="L225">    return StringUtils.equalsAny(word, &quot;\&quot;&quot;, &quot;'&quot;, &quot;„&quot;, &quot;»&quot;, &quot;«&quot;, &quot;“&quot;, &quot;‘&quot;);</span>
+  }
+
+  @Override
+  public int minToCheckParagraph() {
+<span class="nc" id="L230">    return 0;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

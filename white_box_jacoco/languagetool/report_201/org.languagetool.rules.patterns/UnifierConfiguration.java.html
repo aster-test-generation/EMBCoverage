@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnifierConfiguration.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules.patterns</a> &gt; <span class="el_source">UnifierConfiguration.java</span></div><h1>UnifierConfiguration.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2006 Daniel Naber (http://www.danielnaber.de)
+ * Copyright (C) 2013 Stefan Lotties
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules.patterns;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+/**
+ * @author Stefan Lotties
+ * @since 2.3
+ */
+public class UnifierConfiguration {
+  /**
+   * A Map for storing the equivalence types for features. Features are
+   * specified as Strings, and map into types defined as maps from Strings to
+   * Elements.
+   */
+  private final Map&lt;EquivalenceTypeLocator, PatternToken&gt; equivalenceTypes;
+
+  /**
+   * A Map that stores all possible equivalence types listed for features.
+   */
+  private final Map&lt;String, List&lt;String&gt;&gt; equivalenceFeatures;
+
+<span class="fc" id="L45">  public UnifierConfiguration() {</span>
+    // workaround for issue #13
+<span class="fc" id="L47">    equivalenceTypes = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="fc" id="L48">    equivalenceFeatures = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="fc" id="L49">  }</span>
+
+  /**
+   * Prepares equivalence types for features to be tested. All equivalence
+   * types are given as {@link PatternToken}s. They create an equivalence set (with
+   * abstraction).
+   *
+   * @param feature Feature to be tested, like gender, grammatical case or number.
+   * @param type Type of equivalence for the feature, for example plural, first person, genitive.
+   * @param elem Element specifying the equivalence.
+   */
+  public final void setEquivalence(String feature, String type,
+                                   PatternToken elem) {
+
+<span class="fc" id="L63">    EquivalenceTypeLocator typeKey = new EquivalenceTypeLocator(feature, type);</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">    if (equivalenceTypes.containsKey(typeKey)) {</span>
+<span class="fc" id="L65">      return;</span>
+    }
+<span class="fc" id="L67">    equivalenceTypes.put(typeKey, elem);</span>
+    
+    List&lt;String&gt; lTypes;
+<span class="fc bfc" id="L70" title="All 2 branches covered.">    if (equivalenceFeatures.containsKey(feature)) {</span>
+<span class="fc" id="L71">      lTypes = equivalenceFeatures.get(feature);</span>
+    } else {
+      // workaround for issue #13
+<span class="fc" id="L74">      lTypes = new CopyOnWriteArrayList&lt;&gt;();</span>
+<span class="fc" id="L75">      equivalenceFeatures.put(feature, lTypes);</span>
+    }
+<span class="fc" id="L77">    lTypes.add(type);</span>
+<span class="fc" id="L78">  }</span>
+
+  public Map&lt;EquivalenceTypeLocator, PatternToken&gt; getEquivalenceTypes() {
+<span class="fc" id="L81">    return Collections.unmodifiableMap(equivalenceTypes);</span>
+  }
+
+  public Map&lt;String, List&lt;String&gt;&gt; getEquivalenceFeatures() {
+<span class="fc" id="L85">    return Collections.unmodifiableMap(equivalenceFeatures);</span>
+  }
+
+  public Unifier createUnifier() {
+<span class="fc" id="L89">    return new Unifier(getEquivalenceTypes(), getEquivalenceFeatures());</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

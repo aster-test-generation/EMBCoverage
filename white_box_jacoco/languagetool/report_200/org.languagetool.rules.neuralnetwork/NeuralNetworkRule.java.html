@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NeuralNetworkRule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules.neuralnetwork</a> &gt; <span class="el_source">NeuralNetworkRule.java</span></div><h1>NeuralNetworkRule.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2017 Markus Brenneis
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules.neuralnetwork;
+
+import org.jetbrains.annotations.NotNull;
+import org.languagetool.AnalyzedSentence;
+import org.languagetool.AnalyzedTokenReadings;
+import org.languagetool.Language;
+import org.languagetool.rules.Categories;
+import org.languagetool.rules.Rule;
+import org.languagetool.rules.RuleMatch;
+import org.languagetool.rules.ScoredConfusionSet;
+import org.languagetool.tools.Tools;
+
+import java.io.*;
+import java.util.*;
+
+public class NeuralNetworkRule extends Rule {
+  
+  private static final int CONTEXT_LENGTH = 5;
+  private static final boolean DEBUG = false;
+
+  private final List&lt;String&gt; subjects;
+  private final List&lt;Optional&lt;String&gt;&gt; descriptions;
+  private final String id;
+  private final Classifier classifier;
+
+  private double minScore;
+
+  public NeuralNetworkRule(ResourceBundle messages, Language language, ScoredConfusionSet confusionSet, Word2VecModel word2VecModel) throws IOException {
+<span class="nc" id="L47">    super(messages);</span>
+<span class="nc" id="L48">    super.setCategory(Categories.TYPOS.getCategory(messages));</span>
+
+<span class="nc" id="L50">    this.subjects = confusionSet.getConfusionTokens();</span>
+<span class="nc" id="L51">    this.descriptions = confusionSet.getTokenDescriptions();</span>
+<span class="nc" id="L52">    this.minScore = confusionSet.getScore();</span>
+
+    try {
+<span class="nc" id="L55">      InputStream W1Stream = streamFor(word2VecModel.getPath(), &quot;W_fc1.txt&quot;);</span>
+<span class="nc" id="L56">      InputStream b1Stream = streamFor(word2VecModel.getPath(), &quot;b_fc1.txt&quot;);</span>
+      Classifier tmpClassifier;
+      try {
+<span class="nc" id="L59">        InputStream W2Stream = streamFor(word2VecModel.getPath(), &quot;W_fc2.txt&quot;);</span>
+<span class="nc" id="L60">        InputStream b2Stream = streamFor(word2VecModel.getPath(), &quot;b_fc2.txt&quot;);</span>
+        //System.out.println(&quot;deep rule for &quot; + confusionSet.toString());
+<span class="nc" id="L62">        tmpClassifier = new TwoLayerClassifier(word2VecModel.getEmbedding(), W1Stream, b1Stream, W2Stream, b2Stream);</span>
+<span class="nc" id="L63">      } catch (FileNotFoundException e) {</span>
+<span class="nc" id="L64">        tmpClassifier = new SingleLayerClassifier(word2VecModel.getEmbedding(), W1Stream, b1Stream);</span>
+<span class="nc" id="L65">      }</span>
+<span class="nc" id="L66">      classifier = tmpClassifier;</span>
+<span class="nc" id="L67">    } catch (FileNotFoundException e) {</span>
+<span class="nc" id="L68">      throw new IOException(&quot;Weights for confusion set &quot; + confusionSet + &quot; are missing&quot;, e);</span>
+<span class="nc" id="L69">    }</span>
+
+<span class="nc" id="L71">    this.id = createId(language);</span>
+<span class="nc" id="L72">  }</span>
+
+  public NeuralNetworkRule(ResourceBundle messages, Language language, ScoredConfusionSet confusionSet, Classifier classifier) {
+<span class="nc" id="L75">    super(messages);</span>
+<span class="nc" id="L76">    super.setCategory(Categories.TYPOS.getCategory(messages));</span>
+<span class="nc" id="L77">    this.subjects = confusionSet.getConfusionTokens();</span>
+<span class="nc" id="L78">    this.descriptions = confusionSet.getTokenDescriptions();</span>
+<span class="nc" id="L79">    this.minScore = confusionSet.getScore();</span>
+<span class="nc" id="L80">    this.classifier = classifier;</span>
+<span class="nc" id="L81">    this.id = createId(language);</span>
+<span class="nc" id="L82">  }</span>
+
+  @NotNull
+  private String createId(Language language) {
+<span class="nc" id="L86">    return language.getShortCode().toUpperCase() + &quot;_&quot; + subjects.get(0) + &quot;_VS_&quot; + subjects.get(1) + &quot;_NEURALNETWORK&quot;;</span>
+  }
+
+  private InputStream streamFor(File path, String filename) throws FileNotFoundException {
+<span class="nc" id="L90">    String folderName = String.join(&quot;_&quot;, subjects);</span>
+<span class="nc" id="L91">    return new FileInputStream(path.getPath() + File.separator + &quot;neuralnetwork&quot; + File.separator + folderName + File.separator + filename);</span>
+  }
+
+  public List&lt;String&gt; getSubjects() {
+<span class="nc" id="L95">    return subjects;</span>
+  }
+
+  protected double getMinScore() {
+<span class="nc" id="L99">    return minScore;</span>
+  }
+
+  public void setMinScore(double minScore) {
+<span class="nc" id="L103">    this.minScore = minScore;</span>
+<span class="nc" id="L104">  }</span>
+
+  @Override
+  public String getId() {
+<span class="nc" id="L108">    return id;</span>
+  }
+
+  @Override
+  public String getDescription() {
+    // TODO use resource
+<span class="nc" id="L114">    return &quot;Possible Typo '&quot; + getSubjects().get(0) + &quot;'/'&quot; + getSubjects().get(1) + &quot;'&quot;;</span>
+  }
+
+  private Suggestion getSuggestion(float[] y) {
+    String suggestion;
+    boolean unsure;
+<span class="nc bnc" id="L120" title="All 2 branches missed.">    if (y[0] &gt; y[1]) {</span>
+<span class="nc" id="L121">      suggestion = getSubjects().get(0);</span>
+<span class="nc bnc" id="L122" title="All 4 branches missed.">      unsure = !(y[0] &gt; getMinScore() &amp;&amp; y[1] &lt; -getMinScore());</span>
+    } else {
+<span class="nc" id="L124">      suggestion = getSubjects().get(1);</span>
+<span class="nc bnc" id="L125" title="All 4 branches missed.">      unsure = !(y[1] &gt; getMinScore() &amp;&amp; y[0] &lt; -getMinScore());</span>
+    }
+<span class="nc" id="L127">    return new Suggestion(suggestion, unsure);</span>
+  }
+
+  @Override
+  public RuleMatch[] match(AnalyzedSentence sentence) throws IOException {
+<span class="nc" id="L132">    List&lt;RuleMatch&gt; ruleMatches = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L133">    AnalyzedTokenReadings[] tokens = sentence.getTokensWithoutWhitespace();</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">    for (int i = 1; i &lt; tokens.length; i++) {</span>
+<span class="nc" id="L135">      String token = tokens[i].getToken();</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">      if (getSubjects().contains(token)) {</span>
+<span class="nc" id="L137">        String[] context = getContext(tokens, i);</span>
+<span class="nc" id="L138">        float[] y = classifier.getScores(context);</span>
+<span class="nc" id="L139">        Suggestion suggestion = getSuggestion(y);</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">        if (!suggestion.matches(token)) {</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">          if (!suggestion.isUnsure()) {</span>
+<span class="nc" id="L142">            ruleMatches.add(createRuleMatch(tokens[i], suggestion, y, sentence));</span>
+          } else {
+            if (DEBUG) {
+              System.out.println(&quot;unsure: &quot; + getMessage(suggestion, y) + Arrays.toString(context));
+            }
+          }
+        }
+      }
+    }
+<span class="nc" id="L151">    return toRuleMatchArray(ruleMatches);</span>
+  }
+
+  @NotNull
+  private String[] getContext(AnalyzedTokenReadings[] tokens, int center) {
+<span class="nc" id="L156">    String[] context = new String[CONTEXT_LENGTH - 1];</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">    for (int i = 0; i &lt; CONTEXT_LENGTH/2; i++) {</span>
+<span class="nc" id="L158">      context[i] = safeGetToken(tokens, center - CONTEXT_LENGTH/2 + i);</span>
+    }
+<span class="nc bnc" id="L160" title="All 2 branches missed.">    for (int i = 0; i &lt; CONTEXT_LENGTH/2; i++) {</span>
+<span class="nc" id="L161">      context[CONTEXT_LENGTH/2 + i] = safeGetToken(tokens, center + 1 + i);</span>
+    }
+<span class="nc" id="L163">    return context;</span>
+  }
+
+  private static String safeGetToken(AnalyzedTokenReadings[] arr, int i) {
+<span class="nc bnc" id="L167" title="All 4 branches missed.">    if (i &lt;= 0 || i &gt;= arr.length) {</span>
+<span class="nc" id="L168">      return &quot;.&quot;;</span>
+    }
+<span class="nc" id="L170">    return arr[i].getToken();</span>
+  }
+
+  @NotNull
+  private RuleMatch createRuleMatch(AnalyzedTokenReadings token, Suggestion suggestion, float[] y, AnalyzedSentence sentence) {
+<span class="nc" id="L175">    String msg = getMessage(suggestion, y);</span>
+<span class="nc" id="L176">    int pos = token.getStartPos();</span>
+<span class="nc" id="L177">    RuleMatch ruleMatch = new RuleMatch(this, sentence, pos, pos + token.getToken().length(), msg);</span>
+<span class="nc" id="L178">    ruleMatch.setSuggestedReplacement(suggestion.toString());</span>
+<span class="nc" id="L179">    return ruleMatch;</span>
+  }
+
+  @NotNull
+  private String getMessage(Suggestion suggestion, float[] y) {
+    String msg;
+<span class="nc bnc" id="L185" title="All 2 branches missed.">    int suggestionIndex = suggestion.matches(subjects.get(0)) ? 0 : 1;</span>
+<span class="nc" id="L186">    int wrongWordIndex = (suggestionIndex + 1) % 2;</span>
+<span class="nc bnc" id="L187" title="All 4 branches missed.">    if (descriptions.get(suggestionIndex).isPresent() &amp;&amp; descriptions.get(wrongWordIndex).isPresent()) {</span>
+<span class="nc" id="L188">      msg = Tools.i18n(messages, &quot;neural_network_suggest_with_description&quot;,</span>
+<span class="nc" id="L189">              subjects.get(suggestionIndex), descriptions.get(suggestionIndex).get(),</span>
+<span class="nc" id="L190">              subjects.get(wrongWordIndex), descriptions.get(wrongWordIndex).get());</span>
+    } else {
+<span class="nc" id="L192">      msg = Tools.i18n(messages, &quot;neural_network_suggest&quot;, subjects.get(suggestionIndex), subjects.get(wrongWordIndex));</span>
+    }
+<span class="nc bnc" id="L194" title="All 2 branches missed.">    if (suggestion.isUnsure()) {</span>
+<span class="nc" id="L195">      msg = &quot;(low certainty) &quot; + msg;</span>
+    }
+<span class="nc" id="L197">    return msg;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

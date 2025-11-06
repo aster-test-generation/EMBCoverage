@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DisambiguationPatternRule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.tagging.disambiguation.rules</a> &gt; <span class="el_source">DisambiguationPatternRule.java</span></div><h1>DisambiguationPatternRule.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2005 Daniel Naber (http://www.danielnaber.de)
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.tagging.disambiguation.rules;
+
+import org.jetbrains.annotations.Nullable;
+import org.languagetool.*;
+import org.languagetool.rules.patterns.*;
+
+import java.io.IOException;
+import java.util.*;
+
+/**
+ * A Rule that describes a pattern of words or part-of-speech tags used for
+ * disambiguation.
+ * 
+ * @author Marcin Miłkowski
+ */
+public class DisambiguationPatternRule extends AbstractPatternRule {
+
+  /** Possible disambiguator actions. **/
+<span class="nc" id="L37">  public enum DisambiguatorAction {</span>
+<span class="nc" id="L38">    ADD, FILTER, REMOVE, REPLACE, UNIFY, IMMUNIZE, IGNORE_SPELLING, FILTERALL</span>
+  }
+
+  private final String disambiguatedPOS;
+  private final Match matchElement;
+  private final DisambiguatorAction disAction;
+
+  private AnalyzedToken[] newTokenReadings;
+<span class="nc" id="L46">  private List&lt;DisambiguatedExample&gt; examples = Collections.emptyList();</span>
+<span class="nc" id="L47">  private List&lt;String&gt; untouchedExamples = Collections.emptyList();</span>
+
+  /**
+   * @param id Id of the Rule
+   * @param language Language of the Rule
+   * @param description Description to be shown (name)
+   * @param disambAction the action to be executed on found token(s)
+   * @since public since 2.5
+   */
+  public DisambiguationPatternRule(String id, String description,
+                                   Language language, List&lt;PatternToken&gt; patternTokens,
+                                   String disambiguatedPOS, Match posSelect,
+                                   DisambiguatorAction disambAction) {
+<span class="nc" id="L60">    super(id, description, language, patternTokens, true);</span>
+<span class="nc bnc" id="L61" title="All 18 branches missed.">    if (disambiguatedPOS == null &amp;&amp; posSelect == null</span>
+        &amp;&amp; disambAction != DisambiguatorAction.UNIFY
+        &amp;&amp; disambAction != DisambiguatorAction.ADD
+        &amp;&amp; disambAction != DisambiguatorAction.REMOVE
+        &amp;&amp; disambAction != DisambiguatorAction.IMMUNIZE
+        &amp;&amp; disambAction != DisambiguatorAction.REPLACE
+        &amp;&amp; disambAction != DisambiguatorAction.FILTERALL
+        &amp;&amp; disambAction != DisambiguatorAction.IGNORE_SPELLING) {
+<span class="nc" id="L69">      throw new NullPointerException(&quot;disambiguated POS cannot be null with posSelect == null and &quot; + disambAction);</span>
+    }
+<span class="nc" id="L71">    this.disambiguatedPOS = disambiguatedPOS;</span>
+<span class="nc" id="L72">    this.matchElement = posSelect;</span>
+<span class="nc" id="L73">    this.disAction = Objects.requireNonNull(disambAction);</span>
+<span class="nc" id="L74">  }</span>
+
+  /**
+   * Used to add new interpretations.
+   * @param newReadings
+   *          An array of AnalyzedTokens. The length of the array should be the
+   *          same as the number of the tokens matched and selected by
+   *          {@code &lt;marker&gt;...&lt;/marker&gt;} elements.
+   */
+  public final void setNewInterpretations(AnalyzedToken[] newReadings) {
+<span class="nc" id="L84">    newTokenReadings = newReadings.clone();</span>
+<span class="nc" id="L85">  }</span>
+
+  /**
+   * Performs disambiguation on the source sentence.
+   * @param sentence {@link AnalyzedSentence} Sentence to be disambiguated.
+   * @return {@link AnalyzedSentence} Disambiguated sentence (might be unchanged).
+   */
+  public final AnalyzedSentence replace(AnalyzedSentence sentence) throws IOException {
+<span class="nc" id="L93">    DisambiguationPatternRuleReplacer replacer = new DisambiguationPatternRuleReplacer(this);</span>
+<span class="nc" id="L94">    return replacer.replace(sentence);</span>
+  }
+
+  public void setExamples(List&lt;DisambiguatedExample&gt; examples) {
+<span class="nc" id="L98">    this.examples = Objects.requireNonNull(examples);</span>
+<span class="nc" id="L99">  }</span>
+
+  public List&lt;DisambiguatedExample&gt; getExamples() {
+<span class="nc" id="L102">    return Collections.unmodifiableList(examples);</span>
+  }
+
+  public void setUntouchedExamples(List&lt;String&gt; untouchedExamples) {
+<span class="nc" id="L106">    this.untouchedExamples = Objects.requireNonNull(untouchedExamples);</span>
+<span class="nc" id="L107">  }</span>
+
+  public List&lt;String&gt; getUntouchedExamples() {
+<span class="nc" id="L110">    return Collections.unmodifiableList(untouchedExamples);</span>
+  }
+
+  /**
+   * @since 2.3
+   */
+  public DisambiguatorAction getAction() {
+<span class="nc" id="L117">    return disAction;</span>
+  }
+
+  /**
+   * @since 2.3
+   */
+  public AnalyzedToken[] getNewTokenReadings() {
+<span class="nc" id="L124">    return newTokenReadings;</span>
+  }
+
+  /**
+   * @since 2.3
+   */
+  @Nullable
+  public Match getMatchElement() {
+<span class="nc" id="L132">    return matchElement;</span>
+  }
+
+  /**
+   * @since 2.3
+   */
+  @Nullable
+  public String getDisambiguatedPOS() {
+<span class="nc" id="L140">    return disambiguatedPOS;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

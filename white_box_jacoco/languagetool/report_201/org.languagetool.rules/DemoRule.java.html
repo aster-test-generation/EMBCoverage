@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DemoRule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules</a> &gt; <span class="el_source">DemoRule.java</span></div><h1>DemoRule.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker 
+ * Copyright (C) 2015 Daniel Naber (http://www.danielnaber.de)
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules;
+
+import org.languagetool.AnalyzedSentence;
+import org.languagetool.AnalyzedToken;
+import org.languagetool.AnalyzedTokenReadings;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * A simple demo rule as an example for how to implement your own Java-based
+ * rule in LanguageTool. Simple walks over the text and prints the words
+ * and their analysis.
+ * 
+ * &lt;p&gt;To activate this rule, add it to {@code getRelevantRules()} in e.g. {@code English.java}.
+ * 
+ * &lt;p&gt;This rule works on sentences, extend {@link TextLevelRule} instead to work 
+ * on the complete text.
+ */
+<span class="nc" id="L39">public class DemoRule extends Rule {</span>
+  
+  @Override
+  public String getId() {
+<span class="nc" id="L43">    return &quot;DEMO_RULE&quot;;  // a unique id that doesn't change over time</span>
+  }
+
+  @Override
+  public String getDescription() {
+<span class="nc" id="L48">    return &quot;A demo rule that just prints the text analysis&quot;;  // shown in the configuration dialog</span>
+  }
+
+  // This is the method with the error detection logic that you need to implement:
+  @Override
+  public RuleMatch[] match(AnalyzedSentence sentence) throws IOException {
+<span class="nc" id="L54">    List&lt;RuleMatch&gt; ruleMatches = new ArrayList&lt;&gt;();</span>
+
+    // Let's get all the tokens (i.e. words) of this sentence, but not the spaces:
+<span class="nc" id="L57">    AnalyzedTokenReadings[] tokens = sentence.getTokensWithoutWhitespace();</span>
+    
+    // No let's iterate over those - note that the first token will
+    // be a special token that indicates the start of a sentence:
+<span class="nc bnc" id="L61" title="All 2 branches missed.">    for (AnalyzedTokenReadings token : tokens) {</span>
+      
+<span class="nc" id="L63">      System.out.println(&quot;Token: &quot; + token.getToken());  // the original word from the input text</span>
+      
+      // A word can have more than one reading, e.g. 'dance' can be a verb or a noun,
+      // so we iterate over the readings:
+<span class="nc bnc" id="L67" title="All 2 branches missed.">      for (AnalyzedToken analyzedToken : token.getReadings()) {</span>
+<span class="nc" id="L68">        System.out.println(&quot;  Lemma: &quot; + analyzedToken.getLemma());</span>
+<span class="nc" id="L69">        System.out.println(&quot;  POS: &quot; + analyzedToken.getPOSTag());</span>
+<span class="nc" id="L70">      }</span>
+      
+      // You can add your own logic here to find errors. Here, we just consider
+      // the word &quot;demo&quot; an error and create a rule match that LanguageTool will
+      // then show to the user:
+<span class="nc bnc" id="L75" title="All 2 branches missed.">      if (token.getToken().equals(&quot;demo&quot;)) {</span>
+<span class="nc" id="L76">        RuleMatch ruleMatch = new RuleMatch(this, sentence, token.getStartPos(), token.getEndPos(), &quot;The demo rule thinks this looks wrong&quot;);</span>
+<span class="nc" id="L77">        ruleMatch.setSuggestedReplacement(&quot;blablah&quot;);  // the user will see this as a suggested correction</span>
+<span class="nc" id="L78">        ruleMatches.add(ruleMatch);</span>
+      }
+    }
+
+<span class="nc" id="L82">    return toRuleMatchArray(ruleMatches);</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

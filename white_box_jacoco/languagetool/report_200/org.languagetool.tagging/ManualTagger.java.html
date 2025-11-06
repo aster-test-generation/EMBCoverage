@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ManualTagger.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.tagging</a> &gt; <span class="el_source">ManualTagger.java</span></div><h1>ManualTagger.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker 
+ * Copyright (C) 2007 Daniel Naber (http://www.danielnaber.de)
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.tagging;
+
+import gnu.trove.THashMap;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.*;
+
+import org.languagetool.synthesis.ManualSynthesizer;
+import org.languagetool.tools.StringTools;
+
+import java.io.*;
+import java.util.*;
+
+/**
+ * A tagger that reads the POS information from a plain (UTF-8) text file. This
+ * makes it possible for the user to edit the text file to let the system know
+ * about new words or missing readings in the *.dict file.
+ * 
+ * &lt;p&gt;File Format: &lt;tt&gt;fullform baseform postags&lt;/tt&gt; (tab separated)
+ * 
+ * @author Daniel Naber
+ * @see ManualSynthesizer
+ */
+public class ManualTagger implements WordTagger {
+
+  private final Map&lt;String, List&lt;TaggedWord&gt;&gt; mapping;
+
+  public ManualTagger(InputStream inputStream) throws IOException {
+<span class="nc" id="L49">    this(inputStream, false);</span>
+<span class="nc" id="L50">  }</span>
+
+<span class="nc" id="L52">  public ManualTagger(InputStream inputStream, boolean internTags) throws IOException {</span>
+<span class="nc" id="L53">    mapping = loadMapping(inputStream, &quot;utf8&quot;, internTags);</span>
+<span class="nc" id="L54">  }</span>
+
+  private Map&lt;String, List&lt;TaggedWord&gt;&gt; loadMapping(InputStream inputStream, String encoding, boolean internTags) throws IOException {
+<span class="nc" id="L57">    Map&lt;String, List&lt;TaggedWord&gt;&gt; map = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L58">    try (</span>
+<span class="nc" id="L59">      InputStreamReader reader = new InputStreamReader(inputStream, encoding);</span>
+<span class="nc" id="L60">      BufferedReader br = new BufferedReader(reader)</span>
+    ) {
+      String line;
+<span class="nc bnc" id="L63" title="All 2 branches missed.">      while ((line = br.readLine()) != null) {</span>
+<span class="nc bnc" id="L64" title="All 4 branches missed.">        if (StringTools.isEmpty(line) || line.charAt(0) == '#') {</span>
+<span class="nc" id="L65">          continue;</span>
+        }
+<span class="nc" id="L67">        line = line.replaceFirst(&quot;#.*&quot;, &quot;&quot;).trim();</span>
+<span class="nc" id="L68">        String[] parts = line.split(&quot;\t&quot;);</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        if (parts.length != 3) {</span>
+<span class="nc" id="L70">          throw new IOException(&quot;Unknown line format when loading manual tagger dictionary, expected three tab-separated fields: '&quot; + line + &quot;'&quot;);</span>
+        }
+<span class="nc" id="L72">        List&lt;TaggedWord&gt; terms = map.get(parts[0]);</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        if (terms == null) {</span>
+<span class="nc" id="L74">          terms = new ArrayList&lt;&gt;();</span>
+        }
+<span class="nc bnc" id="L76" title="All 2 branches missed.">        terms.add(new TaggedWord(parts[1], internTags ? parts[2].trim().intern() : parts[2].trim()));</span>
+<span class="nc" id="L77">        map.put(parts[0], terms);</span>
+<span class="nc" id="L78">      }</span>
+    }
+<span class="nc" id="L80">    return map;</span>
+  }
+
+  /**
+   * Look up a word's baseform (lemma) and POS information.
+   */
+  @Override
+  public List&lt;TaggedWord&gt; tag(String word) {
+<span class="nc" id="L88">    List&lt;TaggedWord&gt; lookedUpTerms = mapping.get(word);</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">    if (lookedUpTerms != null) {</span>
+<span class="nc" id="L90">      return Collections.unmodifiableList(lookedUpTerms);</span>
+    } else {
+<span class="nc" id="L92">      return Collections.emptyList();</span>
+    }
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UserConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool</a> &gt; <span class="el_source">UserConfig.java</span></div><h1>UserConfig.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2018 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool;
+
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * User-specific configuration. So far, this contains a list of words and a settings map.
+ * @since 4.2
+ */
+public class UserConfig {
+
+  // don't do A/B tests in command line / GUI mode / tests, etc.; true when running as a server
+<span class="fc" id="L38">  private static boolean abTestEnabled = false;</span>
+  public static void enableABTests() {
+<span class="nc" id="L40">    abTestEnabled = true;</span>
+<span class="nc" id="L41">  }</span>
+  public static boolean hasABTestsEnabled() {
+<span class="nc" id="L43">    return abTestEnabled;</span>
+  }
+
+  private final List&lt;String&gt; userSpecificSpellerWords;
+  private final int maxSpellingSuggestions;
+  private final String userDictName;
+<span class="fc" id="L49">  private final Map&lt;String, Integer&gt; configurableRuleValues = new HashMap&lt;&gt;();</span>
+  private final LinguServices linguServices;
+  // needs to be in UserConfig so it is considered both in ResultCache and in PipelinePool
+  private final boolean filterDictionaryMatches;
+
+  // partially indifferent for comparing UserConfigs (e.g. in PipelinePool)
+  // provided to rules only for A/B tests
+  private final Long textSessionId;
+  private final String abTest;
+
+  public UserConfig() {
+<span class="nc" id="L60">    this(new ArrayList&lt;&gt;(), new HashMap&lt;&gt;());</span>
+<span class="nc" id="L61">  }</span>
+
+  public UserConfig(List&lt;String&gt; userSpecificSpellerWords) {
+<span class="nc" id="L64">    this(userSpecificSpellerWords, new HashMap&lt;&gt;());</span>
+<span class="nc" id="L65">  }</span>
+
+  public UserConfig(Map&lt;String, Integer&gt; ruleValues) {
+<span class="nc" id="L68">    this(new ArrayList&lt;&gt;(), Objects.requireNonNull(ruleValues));</span>
+<span class="nc" id="L69">  }</span>
+
+  public UserConfig(Map&lt;String, Integer&gt; ruleValues, LinguServices linguServices) {
+<span class="nc" id="L72">    this(new ArrayList&lt;&gt;(), Objects.requireNonNull(ruleValues), 0, null, linguServices);</span>
+<span class="nc" id="L73">  }</span>
+
+  public UserConfig(List&lt;String&gt; userSpecificSpellerWords, Map&lt;String, Integer&gt; ruleValues) {
+<span class="nc" id="L76">    this(userSpecificSpellerWords, ruleValues, 0);</span>
+<span class="nc" id="L77">  }</span>
+
+  public UserConfig(List&lt;String&gt; userSpecificSpellerWords, Map&lt;String, Integer&gt; ruleValues, int maxSpellingSuggestions) {
+<span class="nc" id="L80">    this(userSpecificSpellerWords, ruleValues, maxSpellingSuggestions, null, null);</span>
+<span class="nc" id="L81">  }</span>
+  
+  public UserConfig(List&lt;String&gt; userSpecificSpellerWords, Map&lt;String, Integer&gt; ruleValues,
+                    int maxSpellingSuggestions, String userDictName,
+                    LinguServices linguServices) {
+<span class="nc" id="L86">    this(userSpecificSpellerWords, ruleValues, maxSpellingSuggestions, userDictName, linguServices, false);</span>
+<span class="nc" id="L87">  }</span>
+
+  public UserConfig(List&lt;String&gt; userSpecificSpellerWords, Map&lt;String, Integer&gt; ruleValues,
+                    int maxSpellingSuggestions, String userDictName,
+                    LinguServices linguServices, boolean filterDictionaryMatches) {
+<span class="nc" id="L92">    this(userSpecificSpellerWords, ruleValues, maxSpellingSuggestions, userDictName, linguServices,</span>
+      filterDictionaryMatches, null, null);
+<span class="nc" id="L94">  }</span>
+
+  public UserConfig(List&lt;String&gt; userSpecificSpellerWords, Map&lt;String, Integer&gt; ruleValues,
+                    int maxSpellingSuggestions, String userDictName,
+                    LinguServices linguServices, boolean filterDictionaryMatches,
+<span class="fc" id="L99">                    @Nullable String abTest, @Nullable Long textSessionId) {</span>
+<span class="fc" id="L100">    this.userSpecificSpellerWords = Objects.requireNonNull(userSpecificSpellerWords);</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">    for (Map.Entry&lt;String, Integer&gt; entry : ruleValues.entrySet()) {</span>
+<span class="nc" id="L102">      this.configurableRuleValues.put(entry.getKey(), entry.getValue());</span>
+<span class="nc" id="L103">    }</span>
+<span class="fc" id="L104">    this.maxSpellingSuggestions = maxSpellingSuggestions;</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">    this.userDictName = userDictName == null ? &quot;default&quot; : userDictName;</span>
+<span class="fc" id="L106">    this.linguServices = linguServices;</span>
+<span class="fc" id="L107">    this.filterDictionaryMatches = filterDictionaryMatches;</span>
+<span class="fc" id="L108">    this.abTest = abTest;</span>
+<span class="fc" id="L109">    this.textSessionId = textSessionId;</span>
+<span class="fc" id="L110">  }</span>
+
+  public List&lt;String&gt; getAcceptedWords() {
+<span class="fc" id="L113">    return userSpecificSpellerWords;</span>
+  }
+
+  public int getMaxSpellingSuggestions() {
+<span class="fc" id="L117">    return maxSpellingSuggestions;</span>
+  }
+
+  public Map&lt;String, Integer&gt; getConfigValues() {
+<span class="nc" id="L121">    return configurableRuleValues;</span>
+  }
+  
+  public void insertConfigValues(Map&lt;String, Integer&gt;  ruleValues) {
+<span class="nc bnc" id="L125" title="All 2 branches missed.">    for (Map.Entry&lt;String, Integer&gt; entry : ruleValues.entrySet()) {</span>
+<span class="nc" id="L126">      this.configurableRuleValues.put(entry.getKey(), entry.getValue());</span>
+<span class="nc" id="L127">    }</span>
+<span class="nc" id="L128">  }</span>
+  
+  public int getConfigValueByID(String ruleID) {
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">    if (configurableRuleValues.containsKey(ruleID)) {</span>
+<span class="nc" id="L132">      return configurableRuleValues.get(ruleID);</span>
+    }
+<span class="fc" id="L134">    return -1;</span>
+  }
+  
+  public boolean hasLinguServices() {
+<span class="nc bnc" id="L138" title="All 2 branches missed.">    return linguServices != null;</span>
+  }
+  
+  public LinguServices getLinguServices() {
+<span class="nc" id="L142">    return linguServices;</span>
+  }
+
+  /**
+   * @since 4.4
+   */
+  public String getUserDictName() {
+<span class="nc" id="L149">    return userDictName;</span>
+  }
+
+  @Override
+  public boolean equals(Object o) {
+<span class="nc bnc" id="L154" title="All 2 branches missed.">    if (this == o) return true;</span>
+<span class="nc bnc" id="L155" title="All 4 branches missed.">    if (o == null || getClass() != o.getClass()) return false;</span>
+<span class="nc" id="L156">    UserConfig other = (UserConfig) o;</span>
+    // optimization: equals on userSpecificSpellerWords can be expensive with huge dictionaries
+    // -&gt; we use user id &amp; dictionary names
+<span class="nc" id="L159">    return new EqualsBuilder()</span>
+<span class="nc" id="L160">      .append(maxSpellingSuggestions, other.maxSpellingSuggestions)</span>
+<span class="nc" id="L161">      .append(configurableRuleValues, other.configurableRuleValues)</span>
+<span class="nc" id="L162">      .append(userDictName, other.userDictName)</span>
+<span class="nc" id="L163">      .append(userSpecificSpellerWords, other.userSpecificSpellerWords)</span>
+<span class="nc" id="L164">      .append(filterDictionaryMatches, other.filterDictionaryMatches)</span>
+      // omitting these distorts A/B tests, as UserConfig is cached by the pipeline pool
+      // -&gt; (cached) textSessionId on server may say group A, but ID on client (relevant for saved correction) says B
+      // only group must match; keeps hit rate of pipeline cache up
+<span class="nc" id="L168">      .append(abTest, other.abTest)</span>
+<span class="nc" id="L169">      .isEquals();</span>
+  }
+
+  @Override
+  public int hashCode() {
+    // not calculating userSpecificSpellerWords.hashCode(), can be expensive; premiumId + userDictName is close enough
+<span class="nc" id="L175">    return new HashCodeBuilder(3, 11)</span>
+<span class="nc" id="L176">      .append(maxSpellingSuggestions)</span>
+<span class="nc" id="L177">      .append(userDictName)</span>
+<span class="nc" id="L178">      .append(configurableRuleValues)</span>
+<span class="nc" id="L179">      .append(abTest)</span>
+<span class="nc" id="L180">      .append(filterDictionaryMatches)</span>
+<span class="nc" id="L181">      .toHashCode();</span>
+  }
+
+  @Override
+  public String toString() {
+<span class="nc" id="L186">    return &quot;UserConfig{&quot; +</span>
+      &quot;userSpecificSpellerWords=&quot; + userSpecificSpellerWords +
+      &quot;, maxSpellingSuggestions=&quot; + maxSpellingSuggestions +
+      &quot;, userDictName='&quot; + userDictName + '\'' +
+      &quot;, configurableRuleValues=&quot; + configurableRuleValues +
+      &quot;, linguServices=&quot; + linguServices +
+      &quot;, filterDictionaryMatches=&quot; + filterDictionaryMatches +
+      &quot;, textSessionId=&quot; + textSessionId +
+      &quot;, abTest='&quot; + abTest + '\'' +
+      '}';
+  }
+
+  public Long getTextSessionId() {
+<span class="nc" id="L199">    return textSessionId;</span>
+  }
+
+  public String getAbTest() {
+<span class="nc" id="L203">    return abTest;</span>
+  }
+
+  public boolean filterDictionaryMatches() {
+<span class="fc" id="L207">    return filterDictionaryMatches;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TabBitextReader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.bitext</a> &gt; <span class="el_source">TabBitextReader.java</span></div><h1>TabBitextReader.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker 
+ * Copyright (C) 2010 Marcin Miłkowski (http://www.languagetool.org)
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+
+package org.languagetool.bitext;
+
+import org.jetbrains.annotations.Nullable;
+
+import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.Iterator;
+
+/**
+ * Reader of simple tab-delimited bilingual files.
+ * 
+ * @author Marcin Miłkowski
+ */
+public class TabBitextReader implements BitextReader {
+
+  protected BufferedReader in;
+  protected StringPair nextPair; 
+  protected String nextLine;
+  protected int sentencePos;
+
+  private String prevLine;
+<span class="nc" id="L43">  private int lineCount = -1;</span>
+
+  /**
+   * @param encoding input encoding or {@code null} to use the platform default
+   */
+<span class="nc" id="L48">  public TabBitextReader(String filename, String encoding) {</span>
+    try {     
+<span class="nc bnc" id="L50" title="All 2 branches missed.">      if (encoding == null) {</span>
+<span class="nc" id="L51">        in = new BufferedReader(new InputStreamReader(new FileInputStream(filename)));</span>
+      } else {
+<span class="nc" id="L53">        in = new BufferedReader(new InputStreamReader(new FileInputStream(filename), encoding));</span>
+      }
+<span class="nc" id="L55">      nextLine = in.readLine();</span>
+<span class="nc" id="L56">      prevLine = &quot;&quot;;</span>
+<span class="nc" id="L57">      nextPair = tab2StringPair(nextLine);</span>
+<span class="nc" id="L58">    } catch (IOException e) { </span>
+<span class="nc" id="L59">      throw new RuntimeException(e); </span>
+<span class="nc" id="L60">    }</span>
+<span class="nc" id="L61">  }</span>
+
+  @Nullable
+  protected StringPair tab2StringPair(String line) {
+<span class="nc bnc" id="L65" title="All 2 branches missed.">    if (line == null) {</span>
+<span class="nc" id="L66">      return null;</span>
+    }
+<span class="nc" id="L68">    String[] fields = line.split(&quot;\t&quot;);</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">    if (fields.length &lt; 2) {</span>
+<span class="nc" id="L70">      throw new RuntimeException(&quot;Unexpected format, expected two tab-separated columns: &quot; + line);</span>
+    }
+<span class="nc" id="L72">    return new StringPair(fields[0], fields[1]);</span>
+  }
+
+  @Override
+  public Iterator&lt;StringPair&gt; iterator() {
+<span class="nc" id="L77">    return new TabReader();</span>
+  }
+
+<span class="nc" id="L80">  class TabReader implements Iterator&lt;StringPair&gt; {</span>
+
+    @Override
+    public boolean hasNext() { 
+<span class="nc bnc" id="L84" title="All 2 branches missed.">      return nextLine != null;</span>
+    }
+
+    @Override
+    public StringPair next() {
+      try {
+<span class="nc" id="L90">        StringPair result = nextPair;</span>
+<span class="nc" id="L91">        sentencePos = nextPair.getSource().length() + 1;</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        if (nextLine != null) {</span>
+<span class="nc" id="L93">          prevLine = nextLine;</span>
+<span class="nc" id="L94">          nextLine = in.readLine();</span>
+<span class="nc" id="L95">          nextPair = tab2StringPair(nextLine);</span>
+<span class="nc" id="L96">          lineCount++;</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">          if (nextLine == null) {</span>
+<span class="nc" id="L98">            in.close();</span>
+          }
+        }
+<span class="nc" id="L101">        return result;</span>
+<span class="nc" id="L102">      } catch (IOException e) { </span>
+<span class="nc" id="L103">        throw new RuntimeException(e); </span>
+      }
+    }
+
+    // The file is read-only.
+    @Override
+    public void remove() { 
+<span class="nc" id="L110">      throw new UnsupportedOperationException(); </span>
+    }
+  }
+
+  @Override
+  public int getColumnCount() {
+<span class="nc" id="L116">    return sentencePos;</span>
+  }
+
+  @Override
+  public int getTargetColumnCount() {
+<span class="nc" id="L121">    return 1;</span>
+  }
+  
+  @Override
+  public int getLineCount() {    
+<span class="nc" id="L126">    return lineCount;</span>
+  }
+
+  @Override
+  public int getSentencePosition() {
+<span class="nc" id="L131">    return sentencePos;</span>
+  }
+
+  @Override
+  public String getCurrentLine() {
+<span class="nc" id="L136">    return prevLine;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

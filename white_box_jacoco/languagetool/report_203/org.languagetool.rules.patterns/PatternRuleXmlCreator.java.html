@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PatternRuleXmlCreator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules.patterns</a> &gt; <span class="el_source">PatternRuleXmlCreator.java</span></div><h1>PatternRuleXmlCreator.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2012 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules.patterns;
+
+import org.languagetool.JLanguageTool;
+import org.languagetool.Language;
+import org.w3c.dom.*;
+import org.w3c.dom.bootstrap.DOMImplementationRegistry;
+import org.w3c.dom.ls.*;
+
+import javax.xml.transform.*;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+import javax.xml.xpath.*;
+import java.io.InputStream;
+import java.io.StringWriter;
+import java.util.List;
+
+/**
+ * Makes XML definition of rules accessible as strings.
+ *
+ * @since 1.8, public since 2.3
+ */
+<span class="nc" id="L40">public class PatternRuleXmlCreator {</span>
+
+  /**
+   * Return the given pattern rule as an indented XML string.
+   * @since 2.3
+   */
+  public final String toXML(PatternRuleId ruleId, Language language) {
+<span class="nc" id="L47">    List&lt;String&gt; filenames = language.getRuleFileNames();</span>
+<span class="nc" id="L48">    XPath xpath = XPathFactory.newInstance().newXPath();</span>
+<span class="nc bnc" id="L49" title="All 2 branches missed.">    for (String filename : filenames) {</span>
+<span class="nc" id="L50">      try (InputStream is = JLanguageTool.getDataBroker().getAsStream(filename)) {</span>
+<span class="nc" id="L51">        Document doc = getDocument(is);</span>
+<span class="nc" id="L52">        Node ruleNode = (Node) xpath.evaluate(&quot;/rules/category/rule[@id='&quot; + ruleId.getId() + &quot;']&quot;, doc, XPathConstants.NODE);</span>
+<span class="nc bnc" id="L53" title="All 2 branches missed.">        if (ruleNode != null) {</span>
+<span class="nc" id="L54">          return nodeToString(ruleNode);</span>
+        }
+<span class="nc" id="L56">        Node ruleNodeInGroup = (Node) xpath.evaluate(&quot;/rules/category/rulegroup/rule[@id='&quot; + ruleId.getId() + &quot;']&quot;, doc, XPathConstants.NODE);</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        if (ruleNodeInGroup != null) {</span>
+<span class="nc" id="L58">          return nodeToString(ruleNodeInGroup);</span>
+        }
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        if (ruleId.getSubId() != null) {</span>
+<span class="nc" id="L61">          NodeList ruleGroupNodes = (NodeList) xpath.evaluate(&quot;/rules/category/rulegroup[@id='&quot; + ruleId.getId() + &quot;']/rule&quot;, doc, XPathConstants.NODESET);</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">          if (ruleGroupNodes != null) {</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">            for (int i = 0; i &lt; ruleGroupNodes.getLength(); i++) {</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">              if (Integer.toString(i+1).equals(ruleId.getSubId())) {</span>
+<span class="nc" id="L65">                return nodeToString(ruleGroupNodes.item(i));</span>
+              }
+            }
+          }
+<span class="nc" id="L69">        } else {</span>
+<span class="nc" id="L70">          Node ruleGroupNode = (Node) xpath.evaluate(&quot;/rules/category/rulegroup[@id='&quot; + ruleId.getId() + &quot;']&quot;, doc, XPathConstants.NODE);</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">          if (ruleGroupNode != null) {</span>
+<span class="nc" id="L72">            return nodeToString(ruleGroupNode);</span>
+          }
+        }
+<span class="nc" id="L75">      } catch (Exception e) {</span>
+<span class="nc" id="L76">        throw new RuntimeException(&quot;Could not turn rule '&quot; + ruleId + &quot;' for language &quot; + language + &quot; into a string&quot;, e);</span>
+<span class="nc" id="L77">      }</span>
+<span class="nc" id="L78">    }</span>
+<span class="nc" id="L79">    throw new RuntimeException(&quot;Could not find rule '&quot; + ruleId + &quot;' for language &quot; + language + &quot; in files: &quot; + filenames);</span>
+  }
+
+  private Document getDocument(InputStream is) throws InstantiationException, IllegalAccessException, ClassNotFoundException {
+<span class="nc" id="L83">    DOMImplementationRegistry registry = DOMImplementationRegistry.newInstance();</span>
+<span class="nc" id="L84">    DOMImplementationLS impl = (DOMImplementationLS)registry.getDOMImplementation(&quot;LS&quot;);</span>
+<span class="nc" id="L85">    LSParser parser = impl.createLSParser(DOMImplementationLS.MODE_SYNCHRONOUS, null);</span>
+    // we need to ignore whitespace here so the nodeToString() method will be able to indent it properly:
+<span class="nc" id="L87">    parser.setFilter(new IgnoreWhitespaceFilter());</span>
+<span class="nc" id="L88">    LSInput domInput = impl.createLSInput();</span>
+<span class="nc" id="L89">    domInput.setByteStream(is);</span>
+<span class="nc" id="L90">    return parser.parse(domInput);</span>
+  }
+
+  private String nodeToString(Node node) {
+<span class="nc" id="L94">    StringWriter sw = new StringWriter();</span>
+    try {
+<span class="nc" id="L96">      Transformer t = TransformerFactory.newInstance().newTransformer();</span>
+<span class="nc" id="L97">      t.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, &quot;yes&quot;);</span>
+<span class="nc" id="L98">      t.transform(new DOMSource(node), new StreamResult(sw));</span>
+<span class="nc" id="L99">    } catch (TransformerException e) {</span>
+<span class="nc" id="L100">      throw new RuntimeException(e);</span>
+<span class="nc" id="L101">    }</span>
+    // We have to use our own simple indentation. as the Java transformer indentation
+    // introduces whitespace e.g. in the &lt;suggestion&gt; elements, breaking rules:
+<span class="nc" id="L104">    String xml = sw.toString()</span>
+<span class="nc" id="L105">      .replace(&quot;&lt;token&quot;, &quot;\n    &lt;token&quot;)</span>
+<span class="nc" id="L106">      .replace(&quot;&lt;and&quot;, &quot;\n    &lt;and&quot;)</span>
+<span class="nc" id="L107">      .replace(&quot;&lt;/and&gt;&quot;, &quot;\n    &lt;/and&gt;&quot;)</span>
+<span class="nc" id="L108">      .replace(&quot;&lt;phraseref&quot;, &quot;\n    &lt;phraseref&quot;)</span>
+<span class="nc" id="L109">      .replace(&quot;&lt;antipattern&quot;, &quot;\n  &lt;antipattern&quot;)</span>
+<span class="nc" id="L110">      .replace(&quot;&lt;pattern&quot;, &quot;\n  &lt;pattern&quot;)</span>
+<span class="nc" id="L111">      .replace(&quot;&lt;/pattern&quot;, &quot;\n  &lt;/pattern&quot;)</span>
+<span class="nc" id="L112">      .replace(&quot;&lt;/antipattern&quot;, &quot;\n  &lt;/antipattern&quot;)</span>
+<span class="nc" id="L113">      .replace(&quot;&lt;/rule&gt;&quot;, &quot;\n&lt;/rule&gt;&quot;)</span>
+<span class="nc" id="L114">      .replace(&quot;&lt;filter&quot;, &quot;\n  &lt;filter&quot;)</span>
+<span class="nc" id="L115">      .replace(&quot;&lt;message&quot;, &quot;\n  &lt;message&quot;)</span>
+<span class="nc" id="L116">      .replace(&quot;&lt;short&quot;, &quot;\n  &lt;short&quot;)</span>
+<span class="nc" id="L117">      .replace(&quot;&lt;url&quot;, &quot;\n  &lt;url&quot;)</span>
+<span class="nc" id="L118">      .replace(&quot;&lt;example&quot;, &quot;\n  &lt;example&quot;)</span>
+<span class="nc" id="L119">      .replace(&quot;&lt;/suggestion&gt;&lt;suggestion&gt;&quot;, &quot;&lt;/suggestion&gt;\n  &lt;suggestion&gt;&quot;)</span>
+<span class="nc" id="L120">      .replace(&quot;&lt;/message&gt;&lt;suggestion&gt;&quot;, &quot;&lt;/message&gt;\n  &lt;suggestion&gt;&quot;);</span>
+<span class="nc" id="L121">    return xml;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

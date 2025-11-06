@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Categories.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules</a> &gt; <span class="el_source">Categories.java</span></div><h1>Categories.java</h1><pre class="source lang-java linenums">package org.languagetool.rules;
+
+import java.util.Objects;
+import java.util.ResourceBundle;
+
+/**
+ * Pre-defined rule categories.
+ * @since 3.3
+ */
+public final class Categories {
+
+  /** Rules about detecting uppercase words where lowercase is required and vice versa. */
+<span class="nc" id="L13">  public static final Categories CASING = make(&quot;CASING&quot;, &quot;category_case&quot;);</span>
+
+  /** Rules about spelling terms as one word or as as separate words. */
+<span class="nc" id="L16">  public static final Categories COMPOUNDING = make(&quot;COMPOUNDING&quot;, &quot;category_compounding&quot;);</span>
+
+<span class="nc" id="L18">  public static final Categories GRAMMAR = make(&quot;GRAMMAR&quot;, &quot;category_grammar&quot;);</span>
+
+  /** Spelling issues. */
+<span class="nc" id="L21">  public static final Categories TYPOS = make(&quot;TYPOS&quot;, &quot;category_typo&quot;);</span>
+
+<span class="nc" id="L23">  public static final Categories PUNCTUATION = make(&quot;PUNCTUATION&quot;, &quot;category_punctuation&quot;);</span>
+
+  /** Problems like incorrectly used dash or quote characters. */
+<span class="nc" id="L26">  public static final Categories TYPOGRAPHY = make(&quot;TYPOGRAPHY&quot;, &quot;category_typography&quot;);</span>
+
+  /** Words that are easily confused, like 'there' and 'their' in English. */
+<span class="nc" id="L29">  public static final Categories CONFUSED_WORDS = make(&quot;CONFUSED_WORDS&quot;, &quot;category_confused_words&quot;);</span>
+
+<span class="nc" id="L31">  public static final Categories REPETITIONS = make(&quot;REPETITIONS&quot;, &quot;category_repetitions&quot;);</span>
+
+<span class="nc" id="L33">  public static final Categories REDUNDANCY = make(&quot;REDUNDANCY&quot;, &quot;category_redundancy&quot;);</span>
+
+  /** General style issues not covered by other categories, like overly verbose wording. */
+<span class="nc" id="L36">  public static final Categories STYLE = make(&quot;STYLE&quot;, &quot;category_style&quot;);</span>
+
+
+  /** Created to match PLAIN_ENGLISH XML category. */
+<span class="nc" id="L40">  public static final Categories PLAIN_ENGLISH = make(&quot;PLAIN_ENGLISH&quot;, &quot;category_plain_english&quot;);</span>
+
+<span class="nc" id="L42">  public static final Categories GENDER_NEUTRALITY = make(&quot;GENDER_NEUTRALITY&quot;, &quot;category_gender_neutrality&quot;);</span>
+
+  /** Logic, content, and consistency problems. */
+<span class="nc" id="L45">  public static final Categories SEMANTICS = make(&quot;SEMANTICS&quot;, &quot;category_semantics&quot;);</span>
+
+  /** Colloquial style. */
+<span class="nc" id="L48">  public static final Categories COLLOQUIALISMS = make(&quot;COLLOQUIALISMS&quot;, &quot;category_colloquialism&quot;);</span>
+
+  /** Regionalisms: words used only in another language variant or used with different meanings. */
+<span class="nc" id="L51">  public static final Categories REGIONALISMS = make(&quot;REGIONALISMS&quot;, &quot;category_regionalisms&quot;);</span>
+
+  /** False friends: words easily confused by language learners because a similar word exists in their native language. */
+<span class="nc" id="L54">  public static final Categories FALSE_FRIENDS = make(&quot;FALSE_FRIENDS&quot;, &quot;category_false_friend&quot;);</span>
+
+  /** Rules that only make sense when editing Wikipedia (typically turned off by default in LanguageTool). */
+<span class="nc" id="L57">  public static final Categories WIKIPEDIA = make(&quot;WIKIPEDIA&quot;, &quot;category_wikipedia&quot;);</span>
+
+  /** Miscellaneous rules that don't fit elsewhere. */
+<span class="nc" id="L60">  public static final Categories MISC = make(&quot;MISC&quot;, &quot;category_misc&quot;);</span>
+
+  private static Categories make(String id, String message) {
+<span class="nc" id="L63">    return new Categories(id, message);</span>
+  }
+
+  private final String id;
+  private final String messageKey;
+  
+<span class="nc" id="L69">  private Categories(String id, String messageKey) {</span>
+<span class="nc" id="L70">    this.id = Objects.requireNonNull(id);</span>
+<span class="nc" id="L71">    this.messageKey = Objects.requireNonNull(messageKey);</span>
+<span class="nc" id="L72">  }</span>
+
+  public CategoryId getId() {
+<span class="nc" id="L75">    return new CategoryId(id);</span>
+  }
+
+  public Category getCategory(ResourceBundle messages) {
+<span class="nc" id="L79">    return new Category(new CategoryId(id), messages.getString(messageKey));</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,390 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MatchState.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules.patterns</a> &gt; <span class="el_source">MatchState.java</span></div><h1>MatchState.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2005 Daniel Naber (http://www.danielnaber.de)
+ * Copyright (C) 2013 Stefan Lotties
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules.patterns;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.TreeSet;
+import java.util.regex.Pattern;
+
+import org.apache.commons.lang3.StringUtils;
+import org.languagetool.AnalyzedToken;
+import org.languagetool.AnalyzedTokenReadings;
+import org.languagetool.Language;
+import org.languagetool.rules.patterns.Match.IncludeRange;
+import org.languagetool.synthesis.Synthesizer;
+import org.languagetool.tools.StringTools;
+
+import static org.languagetool.JLanguageTool.PARAGRAPH_END_TAGNAME;
+import static org.languagetool.JLanguageTool.SENTENCE_END_TAGNAME;
+import static org.languagetool.JLanguageTool.SENTENCE_START_TAGNAME;
+
+/**
+ * The state of a matching process. This state is &lt;strong&gt;NOT&lt;/strong&gt; thread-safe.
+ *
+ * @author Stefan Lotties
+ * @since 2.3
+ */
+public class MatchState {
+
+  private final Match match;
+  private final Synthesizer synthesizer;
+
+  private AnalyzedTokenReadings formattedToken;
+  private AnalyzedTokenReadings matchedToken;
+  private String skippedTokens;
+
+<span class="fc" id="L56">  public MatchState(Match match, Synthesizer synthesizer) {</span>
+<span class="fc" id="L57">    this.match = match;</span>
+<span class="fc" id="L58">    this.synthesizer = synthesizer;</span>
+<span class="fc" id="L59">    String lemma = match.getLemma();</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">    if (!StringUtils.isEmpty(lemma)) {</span>
+<span class="nc" id="L61">      formattedToken = new AnalyzedTokenReadings(new AnalyzedToken(lemma, match.getPosTag(), lemma), 0);</span>
+    }
+<span class="fc" id="L63">  }</span>
+
+  public void setToken(AnalyzedTokenReadings token) {
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">    if (match.isStaticLemma()) {</span>
+<span class="nc" id="L67">      this.matchedToken = token;</span>
+    } else {
+<span class="fc" id="L69">      this.formattedToken = token;</span>
+    }
+<span class="fc" id="L71">  }</span>
+
+  /**
+   * Sets the token to be formatted etc. and includes the support for
+   * including the skipped tokens.
+   *
+   * @param tokens Array of tokens
+   * @param index Index of the token to be formatted
+   * @param next Position of the next token (the skipped tokens are the ones between the tokens[index] and tokens[next]
+   */
+  public final void setToken(AnalyzedTokenReadings[] tokens, int index, int next) {
+<span class="nc" id="L82">    int idx = index;</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">    if (index &gt;= tokens.length) {</span>
+      // TODO: hacky workaround, find a proper solution. See EnglishPatternRuleTest.testBug()
+<span class="nc" id="L85">      idx = tokens.length - 1;</span>
+    }
+<span class="nc" id="L87">    setToken(tokens[idx]);</span>
+<span class="nc" id="L88">    IncludeRange includeSkipped = match.getIncludeSkipped();</span>
+<span class="nc bnc" id="L89" title="All 4 branches missed.">    if (next &gt; 1 &amp;&amp; includeSkipped != IncludeRange.NONE) {</span>
+<span class="nc" id="L90">      StringBuilder sb = new StringBuilder();</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">      if (includeSkipped == IncludeRange.FOLLOWING) {</span>
+<span class="nc" id="L92">        formattedToken = null;</span>
+      }
+<span class="nc bnc" id="L94" title="All 2 branches missed.">      for (int k = index + 1; k &lt; index + next; k++) {</span>
+<span class="nc bnc" id="L95" title="All 6 branches missed.">        if (tokens[k].isWhitespaceBefore()</span>
+            &amp;&amp; !(k == index + 1 &amp;&amp; includeSkipped == IncludeRange.FOLLOWING)) {
+<span class="nc" id="L97">          sb.append(' ');</span>
+        }
+<span class="nc" id="L99">        sb.append(tokens[k].getToken());</span>
+      }
+<span class="nc" id="L101">      skippedTokens = sb.toString();</span>
+<span class="nc" id="L102">    } else {</span>
+<span class="nc" id="L103">      skippedTokens = &quot;&quot;;</span>
+    }
+<span class="nc" id="L105">  }</span>
+
+  public final AnalyzedTokenReadings filterReadings() {
+<span class="nc" id="L108">    List&lt;AnalyzedToken&gt; l = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">    if (formattedToken != null) {</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">      if (match.isStaticLemma()) {</span>
+        // Note: we want the token without ignored characters so we can't use matchedToken.getToken()
+<span class="nc" id="L112">        matchedToken.leaveReading(new AnalyzedToken(matchedToken.getReadings().get(0).getToken(),</span>
+<span class="nc" id="L113">                match.getPosTag(), formattedToken.getToken()));</span>
+<span class="nc" id="L114">        formattedToken = matchedToken;</span>
+      }
+      // Note: we want the token without ignored characters so we can't use formattedToken.getToken()
+<span class="nc" id="L117">      String token = formattedToken.getAnalyzedToken(0).getToken();</span>
+<span class="nc" id="L118">      Pattern regexMatch = match.getRegexMatch();</span>
+<span class="nc" id="L119">      String regexReplace = match.getRegexReplace();</span>
+<span class="nc bnc" id="L120" title="All 4 branches missed.">      if (regexMatch != null &amp;&amp; regexReplace != null) {</span>
+        /* only replace if it is something to replace */
+<span class="nc" id="L122">        token = regexMatch.matcher(token).replaceAll(regexReplace);</span>
+      }
+<span class="nc" id="L124">      token = convertCase(token, token, null);</span>
+
+<span class="nc" id="L126">      String posTag = match.getPosTag();</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">      if (posTag != null) {</span>
+<span class="nc" id="L128">        int numRead = formattedToken.getReadingsLength();</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        if (match.isPostagRegexp()) {</span>
+<span class="nc" id="L130">          Pattern pPosRegexMatch = match.getPosRegexMatch();</span>
+<span class="nc" id="L131">          String posTagReplace = match.getPosTagReplace();</span>
+          String targetPosTag;
+<span class="nc bnc" id="L133" title="All 2 branches missed.">          for (int i = 0; i &lt; numRead; i++) {</span>
+<span class="nc" id="L134">            String testTag = formattedToken.getAnalyzedToken(i).getPOSTag();</span>
+<span class="nc bnc" id="L135" title="All 4 branches missed.">            if (testTag != null &amp;&amp; pPosRegexMatch.matcher(testTag).matches()) {</span>
+<span class="nc" id="L136">              targetPosTag = testTag;</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">              if (posTagReplace != null) {</span>
+<span class="nc" id="L138">                targetPosTag = pPosRegexMatch.matcher(targetPosTag).replaceAll(posTagReplace);</span>
+              }
+<span class="nc" id="L140">              l.add(new AnalyzedToken(token, targetPosTag,</span>
+<span class="nc" id="L141">                  formattedToken.getAnalyzedToken(i).getLemma()));</span>
+<span class="nc" id="L142">              l.get(l.size() - 1).setWhitespaceBefore(formattedToken.isWhitespaceBefore());</span>
+            }
+          }
+<span class="nc bnc" id="L145" title="All 2 branches missed.">          if (l.isEmpty()) {</span>
+<span class="nc" id="L146">            l.addAll(getNewToken(numRead, token));</span>
+          }
+<span class="nc" id="L148">        } else {</span>
+<span class="nc" id="L149">          l.addAll(getNewToken(numRead, token));</span>
+        }
+<span class="nc" id="L151">        String lemma = formattedToken.getAnalyzedToken(0).getLemma();</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">        if (formattedToken.isSentenceEnd()) {</span>
+<span class="nc" id="L153">          l.add(new AnalyzedToken(formattedToken.getToken(), SENTENCE_END_TAGNAME, lemma));</span>
+        }
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        if (formattedToken.isParagraphEnd()) {</span>
+<span class="nc" id="L156">          l.add(new AnalyzedToken(formattedToken.getToken(), PARAGRAPH_END_TAGNAME, lemma));</span>
+        }
+
+      }
+    }
+<span class="nc bnc" id="L161" title="All 2 branches missed.">    if (l.isEmpty()) {</span>
+<span class="nc" id="L162">      return formattedToken;</span>
+    }
+<span class="nc" id="L164">    final AnalyzedTokenReadings anTkRead = new AnalyzedTokenReadings(</span>
+<span class="nc" id="L165">        l.toArray(new AnalyzedToken[0]),</span>
+<span class="nc" id="L166">        formattedToken.getStartPos());</span>
+    // TODO: in case original had ignored characters we want to restore readings.token
+    // but there's no setToken() available :(
+//    anTkRead.setToken(formattedToken.getToken());
+    
+<span class="nc" id="L171">    anTkRead.setWhitespaceBefore(formattedToken.getWhitespaceBefore());</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">    if (!formattedToken.getChunkTags().isEmpty()) {</span>
+<span class="nc" id="L173">      anTkRead.setChunkTags(formattedToken.getChunkTags());</span>
+    }
+<span class="nc bnc" id="L175" title="All 2 branches missed.">    if (formattedToken.isImmunized()) {</span>
+<span class="nc" id="L176">      anTkRead.immunize();</span>
+    }
+<span class="nc" id="L178">    return anTkRead;</span>
+  }
+
+  /**
+   * Converts case of the string token according to match element attributes.
+   * @param s Token to be converted.
+   * @param sample the sample string used to determine how the original string looks like (used only on case preservation)
+   * @return Converted string.
+   */
+  String convertCase(String s, String sample, Language lang) {
+<span class="fc" id="L188">    return CaseConversionHelper.convertCase(match.getCaseConversionType(), s, sample, lang);</span>
+  }
+
+  private List&lt;AnalyzedToken&gt; getNewToken(int numRead, String token) {
+<span class="nc" id="L192">    String posTag = match.getPosTag();</span>
+<span class="nc" id="L193">    List&lt;AnalyzedToken&gt; list = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L194">    String lemma = &quot;&quot;;</span>
+<span class="nc bnc" id="L195" title="All 2 branches missed.">    for (int j = 0; j &lt; numRead; j++) {</span>
+<span class="nc" id="L196">      String tempPosTag = formattedToken.getAnalyzedToken(j).getPOSTag();</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">      if (tempPosTag != null) {</span>
+<span class="nc bnc" id="L198" title="All 4 branches missed.">        if (tempPosTag.equals(posTag) &amp;&amp; formattedToken.getAnalyzedToken(j).getLemma() != null) {</span>
+<span class="nc" id="L199">          lemma = formattedToken.getAnalyzedToken(j).getLemma();</span>
+        }
+<span class="nc bnc" id="L201" title="All 2 branches missed.">        if (StringTools.isEmpty(lemma)) {</span>
+<span class="nc" id="L202">          lemma = formattedToken.getAnalyzedToken(0).getLemma();</span>
+        }
+<span class="nc" id="L204">        list.add(new AnalyzedToken(token, posTag, lemma));</span>
+<span class="nc" id="L205">        list.get(list.size() - 1).setWhitespaceBefore(</span>
+<span class="nc" id="L206">            formattedToken.isWhitespaceBefore());</span>
+      }
+    }
+<span class="nc" id="L209">    return list;</span>
+  }
+
+  /**
+   * Gets all strings formatted using the match element.
+   */
+  public final String[] toFinalString(Language lang) throws IOException {
+<span class="fc" id="L216">    String[] formattedString = new String[1];</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">    if (formattedToken != null) {</span>
+<span class="fc" id="L218">      int readingCount = formattedToken.getReadingsLength();</span>
+<span class="fc" id="L219">      formattedString[0] = formattedToken.getToken();</span>
+
+<span class="fc" id="L221">      Pattern pRegexMatch = match.getRegexMatch();</span>
+<span class="fc" id="L222">      String regexReplace = match.getRegexReplace();</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">      if (pRegexMatch != null) {</span>
+<span class="nc" id="L224">        formattedString[0] = pRegexMatch.matcher(formattedString[0]).replaceAll(regexReplace);</span>
+      }
+
+<span class="fc" id="L227">      String posTag = match.getPosTag();</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">      if (posTag != null) {</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">        if (synthesizer == null) {</span>
+<span class="nc" id="L230">          formattedString[0] = formattedToken.getToken();</span>
+<span class="nc bnc" id="L231" title="All 2 branches missed.">        } else if (match.isPostagRegexp()) {</span>
+<span class="nc" id="L232">          TreeSet&lt;String&gt; wordForms = new TreeSet&lt;&gt;();</span>
+<span class="nc" id="L233">          boolean oneForm = false;</span>
+<span class="nc bnc" id="L234" title="All 2 branches missed.">          for (int k = 0; k &lt; readingCount; k++) {</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">            if (formattedToken.getAnalyzedToken(k).getLemma() == null) {</span>
+<span class="nc" id="L236">              String posUnique = formattedToken.getAnalyzedToken(k).getPOSTag();</span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">              if (posUnique == null) {</span>
+<span class="nc" id="L238">                wordForms.add(formattedToken.getToken());</span>
+<span class="nc" id="L239">                oneForm = true;</span>
+              } else {
+<span class="nc bnc" id="L241" title="All 2 branches missed.">                if (SENTENCE_START_TAGNAME.equals(posUnique)</span>
+<span class="nc bnc" id="L242" title="All 2 branches missed.">                    || SENTENCE_END_TAGNAME.equals(posUnique)</span>
+<span class="nc bnc" id="L243" title="All 2 branches missed.">                    || PARAGRAPH_END_TAGNAME.equals(posUnique)) {</span>
+<span class="nc bnc" id="L244" title="All 2 branches missed.">                  if (!oneForm) {</span>
+<span class="nc" id="L245">                    wordForms.add(formattedToken.getToken());</span>
+                  }
+<span class="nc" id="L247">                  oneForm = true;</span>
+                } else {
+<span class="nc" id="L249">                  oneForm = false;</span>
+                }
+              }
+            }
+          }
+<span class="nc" id="L254">          String targetPosTag = getTargetPosTag();</span>
+<span class="nc bnc" id="L255" title="All 2 branches missed.">          if (!oneForm) {</span>
+<span class="nc bnc" id="L256" title="All 2 branches missed.">            for (int i = 0; i &lt; readingCount; i++) {</span>
+<span class="nc" id="L257">              String[] possibleWordForms = synthesizer.synthesize(</span>
+<span class="nc" id="L258">                  formattedToken.getAnalyzedToken(i), targetPosTag, true);</span>
+<span class="nc bnc" id="L259" title="All 4 branches missed.">              if (possibleWordForms != null &amp;&amp; possibleWordForms.length &gt; 0) {</span>
+<span class="nc" id="L260">                wordForms.addAll(Arrays.asList(possibleWordForms));</span>
+              }
+            }
+          }
+<span class="nc bnc" id="L264" title="All 2 branches missed.">          if (wordForms.isEmpty()) {</span>
+<span class="nc" id="L265">            formattedString[0] = &quot;(&quot; + formattedToken.getToken() + &quot;)&quot;;</span>
+          } else {
+<span class="nc" id="L267">            formattedString = wordForms.toArray(new String[0]);</span>
+          }
+<span class="nc" id="L269">        } else {</span>
+<span class="nc" id="L270">          TreeSet&lt;String&gt; wordForms = new TreeSet&lt;&gt;();</span>
+<span class="nc bnc" id="L271" title="All 2 branches missed.">          for (int i = 0; i &lt; readingCount; i++) {</span>
+<span class="nc" id="L272">            String[] possibleWordForms = synthesizer.synthesize(formattedToken.getAnalyzedToken(i), posTag);</span>
+<span class="nc bnc" id="L273" title="All 2 branches missed.">            if (possibleWordForms != null) {</span>
+<span class="nc" id="L274">              wordForms.addAll(Arrays.asList(possibleWordForms));</span>
+            }
+          }
+<span class="nc" id="L277">          formattedString = wordForms.toArray(new String[0]);</span>
+        }
+      }
+    }
+    String original;
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">    if (match.isStaticLemma()) {</span>
+<span class="nc bnc" id="L283" title="All 2 branches missed.">      original = matchedToken != null ? matchedToken.getToken() : &quot;&quot;;</span>
+    } else {
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">      original = formattedToken != null ? formattedToken.getToken() : &quot;&quot;;</span>
+    }
+<span class="fc bfc" id="L287" title="All 2 branches covered.">    for (int i = 0; i &lt; formattedString.length; i++) {</span>
+<span class="fc" id="L288">      formattedString[i] = convertCase(formattedString[i], original, lang);</span>
+    }
+    // TODO should case conversion happen before or after including skipped tokens?
+<span class="fc" id="L291">    IncludeRange includeSkipped = match.getIncludeSkipped();</span>
+<span class="pc bpc" id="L292" title="3 of 4 branches missed.">    if (includeSkipped != IncludeRange.NONE &amp;&amp; skippedTokens != null</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">        &amp;&amp; !skippedTokens.isEmpty()) {</span>
+<span class="nc" id="L294">      String[] helper = new String[formattedString.length];</span>
+<span class="nc bnc" id="L295" title="All 2 branches missed.">      for (int i = 0; i &lt; formattedString.length; i++) {</span>
+<span class="nc bnc" id="L296" title="All 2 branches missed.">        if (formattedString[i] == null) {</span>
+<span class="nc" id="L297">          formattedString[i] = &quot;&quot;;</span>
+        }
+<span class="nc" id="L299">        helper[i] = formattedString[i] + skippedTokens;</span>
+      }
+<span class="nc" id="L301">      formattedString = helper;</span>
+    }
+<span class="pc bpc" id="L303" title="3 of 4 branches missed.">    if (match.checksSpelling() &amp;&amp; lang != null) {</span>
+<span class="nc" id="L304">      List&lt;String&gt; formattedStringElements = Arrays.asList(formattedString);</span>
+      // tagger-based speller
+<span class="nc" id="L306">      List&lt;AnalyzedTokenReadings&gt; analyzed = lang.getTagger().tag(</span>
+          formattedStringElements);
+<span class="nc bnc" id="L308" title="All 2 branches missed.">      for (int i = 0; i &lt; formattedString.length; i++) {</span>
+<span class="nc" id="L309">        AnalyzedToken analyzedToken = analyzed.get(i).getAnalyzedToken(0);</span>
+<span class="nc bnc" id="L310" title="All 4 branches missed.">        if (analyzedToken.getLemma() == null &amp;&amp; analyzedToken.hasNoTag()) {</span>
+<span class="nc" id="L311">          formattedString[i] = PatternRuleMatcher.MISTAKE;</span>
+        }
+      }
+    }
+<span class="fc" id="L315">    return formattedString;</span>
+  }
+
+  /**
+   * Format POS tag using parameters already defined in the class.
+   *
+   * @return Formatted POS tag as String.
+   */
+  // FIXME: gets only the first POS tag that matches, this can be wrong
+  // on the other hand, many POS tags = too many suggestions?
+  public final String getTargetPosTag() {
+<span class="nc" id="L326">    String targetPosTag = match.getPosTag();</span>
+<span class="nc" id="L327">    List&lt;String&gt; posTags = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L328">    Pattern pPosRegexMatch = match.getPosRegexMatch();</span>
+<span class="nc" id="L329">    String posTagReplace = match.getPosTagReplace();</span>
+
+<span class="nc bnc" id="L331" title="All 2 branches missed.">    if (match.isStaticLemma()) {</span>
+<span class="nc bnc" id="L332" title="All 2 branches missed.">      for (AnalyzedToken analyzedToken : matchedToken) {</span>
+<span class="nc" id="L333">        String tst = analyzedToken.getPOSTag();</span>
+<span class="nc bnc" id="L334" title="All 4 branches missed.">        if (tst != null &amp;&amp; pPosRegexMatch.matcher(tst).matches()) {</span>
+<span class="nc" id="L335">          targetPosTag = analyzedToken.getPOSTag();</span>
+<span class="nc" id="L336">          posTags.add(targetPosTag);</span>
+        }
+<span class="nc" id="L338">      }</span>
+      
+<span class="nc bnc" id="L340" title="All 6 branches missed.">      if (pPosRegexMatch != null &amp;&amp; posTagReplace != null &amp;&amp; !posTags.isEmpty()) {</span>
+<span class="nc" id="L341">        targetPosTag = pPosRegexMatch.matcher(targetPosTag).replaceAll(</span>
+            posTagReplace);
+      }
+    } else {
+<span class="nc bnc" id="L345" title="All 2 branches missed.">      for (AnalyzedToken analyzedToken : formattedToken) {</span>
+<span class="nc" id="L346">        String tst = analyzedToken.getPOSTag();</span>
+<span class="nc bnc" id="L347" title="All 4 branches missed.">        if (tst != null &amp;&amp; pPosRegexMatch.matcher(tst).matches()) {</span>
+<span class="nc" id="L348">          targetPosTag = analyzedToken.getPOSTag();</span>
+<span class="nc" id="L349">          posTags.add(targetPosTag);</span>
+        }
+<span class="nc" id="L351">      }</span>
+<span class="nc bnc" id="L352" title="All 4 branches missed.">      if (pPosRegexMatch != null &amp;&amp; posTagReplace != null) {</span>
+<span class="nc bnc" id="L353" title="All 2 branches missed.">        if (posTags.isEmpty()) {</span>
+<span class="nc" id="L354">          posTags.add(targetPosTag);</span>
+        }
+<span class="nc" id="L356">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L357">        int posTagLen = posTags.size();</span>
+<span class="nc" id="L358">        int l = 0;</span>
+<span class="nc bnc" id="L359" title="All 2 branches missed.">        for (String lPosTag : posTags) {</span>
+<span class="nc" id="L360">          l++;</span>
+<span class="nc" id="L361">          lPosTag = pPosRegexMatch.matcher(lPosTag).replaceAll(posTagReplace);</span>
+<span class="nc bnc" id="L362" title="All 2 branches missed.">          if (match.setsPos()) {</span>
+<span class="nc" id="L363">            lPosTag = synthesizer.getPosTagCorrection(lPosTag);</span>
+          }
+<span class="nc" id="L365">          sb.append(lPosTag);</span>
+<span class="nc bnc" id="L366" title="All 2 branches missed.">          if (l &lt; posTagLen) {</span>
+<span class="nc" id="L367">            sb.append('|');</span>
+          }
+<span class="nc" id="L369">        }</span>
+<span class="nc" id="L370">        targetPosTag = sb.toString();</span>
+      }
+    }
+<span class="nc" id="L373">    return targetPosTag;</span>
+  }
+
+  /**
+   * Method for getting the formatted match as a single string. In case of
+   * multiple matches, it joins them using a regular expression operator &quot;|&quot;.
+   * @return Formatted string of the matched token.
+   */
+  final String toTokenString() throws IOException {
+<span class="fc" id="L382">    String[] stringToFormat = toFinalString(null);</span>
+<span class="fc" id="L383">    return String.join(&quot;|&quot;, Arrays.asList(stringToFormat));</span>
+  }
+
+  public Match getMatch() {
+<span class="nc" id="L387">    return match;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

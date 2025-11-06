@@ -1,0 +1,324 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LanguageIdentifier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.language</a> &gt; <span class="el_source">LanguageIdentifier.java</span></div><h1>LanguageIdentifier.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2014 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.language;
+
+import com.optimaize.langdetect.LanguageDetector;
+import com.optimaize.langdetect.LanguageDetectorBuilder;
+import com.optimaize.langdetect.ngram.NgramExtractors;
+import com.optimaize.langdetect.profiles.LanguageProfile;
+import com.optimaize.langdetect.profiles.LanguageProfileReader;
+import com.optimaize.langdetect.text.*;
+import org.jetbrains.annotations.Nullable;
+import org.languagetool.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.*;
+import java.util.*;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+/**
+ * Identify the language of a text. Note that some languages might never be
+ * detected because they are close to another language. Language variants like
+ * en-US or en-GB are not detected, the result will be {@code en} for those.
+ * By default, only the first 1000 characters of a text are considered.
+ * Email signatures that use {@code \n-- \n} as a delimiter are ignored.
+ *
+ * @since 2.9
+ */
+public class LanguageIdentifier {
+
+<span class="fc" id="L48">  private static final Logger logger = LoggerFactory.getLogger(LanguageIdentifier.class);</span>
+  private static final double MINIMAL_CONFIDENCE = 0.9;
+  private static final int SHORT_ALGO_THRESHOLD = 50;
+  // texts shorter than this will *only* consider preferred languages (if set):
+  private static final int CONSIDER_ONLY_PREFERRED_THRESHOLD = 50;
+<span class="fc" id="L53">  private static final Pattern SIGNATURE = Pattern.compile(&quot;\n-- \n.*&quot;, Pattern.DOTALL);</span>
+
+  // ast and gl often prevent the correct detection of Spanish (as the are quite similar
+  // to Spanish, I assume) so we disable them for now. See LanguageDetectionEval.java:
+<span class="fc" id="L57">  private static final List&lt;String&gt; ignoreLangCodes = Arrays.asList(&quot;ast&quot;, &quot;gl&quot;);</span>
+
+  // languages that we offer profiles for as they are not yet supported by language-detector:
+<span class="fc" id="L60">  private static final List&lt;String&gt; externalLangCodes = Arrays.asList(&quot;eo&quot;);</span>
+  // fall back to checking against list of common words if fasttext probability is lower than this:
+  private static final float THRESHOLD = 0.9f;      // 7.656
+  //private static final float THRESHOLD = 0.95f;   // 7.39
+  //private static final float THRESHOLD = 0.975f;  // 7.228 
+  //private static final float THRESHOLD = 1.0f;    // 7.0
+
+  private final LanguageDetector languageDetector;
+  private final TextObjectFactory textObjectFactory;
+  private final int maxLength;
+<span class="fc" id="L70">  private final UnicodeBasedLangIdentifier unicodeIdentifier = new UnicodeBasedLangIdentifier();</span>
+
+  private FastText fastText;
+
+  public LanguageIdentifier() {
+<span class="fc" id="L75">    this(1000);</span>
+<span class="fc" id="L76">  }</span>
+
+  /**
+   * @param maxLength the maximum number of characters that will be considered - can help
+   *                  with performance. Don't use values below 100, as this would decrease
+   *                  accuracy.
+   * @throws IllegalArgumentException if {@code maxLength} is less than 10
+   * @since 4.2
+   */
+<span class="fc" id="L85">  public LanguageIdentifier(int maxLength) {</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">    if (maxLength &lt; 10) {</span>
+<span class="nc" id="L87">      throw new IllegalArgumentException(&quot;maxLength must be &gt;= 10 (but values &gt; 100 are recommended): &quot; + maxLength);</span>
+    }
+<span class="fc" id="L89">    this.maxLength = maxLength;</span>
+    try {
+<span class="fc" id="L91">      List&lt;LanguageProfile&gt; profiles = loadProfiles(getLanguageCodes());</span>
+<span class="fc" id="L92">      languageDetector = LanguageDetectorBuilder.create(NgramExtractors.standard())</span>
+<span class="fc" id="L93">        .minimalConfidence(MINIMAL_CONFIDENCE)</span>
+<span class="fc" id="L94">        .shortTextAlgorithm(SHORT_ALGO_THRESHOLD)</span>
+<span class="fc" id="L95">        .withProfiles(profiles)</span>
+<span class="fc" id="L96">        .build();</span>
+<span class="fc" id="L97">      textObjectFactory = new TextObjectFactoryBuilder()</span>
+<span class="fc" id="L98">        .maxTextLength(10000)</span>
+        // note: keep these in sync with if(fasttextEnabled) in detectLanguage:
+<span class="fc" id="L100">        .withTextFilter(ImprovedUrlTextFilter.getInstance())</span>
+<span class="fc" id="L101">        .withTextFilter(RemoveMinorityScriptsTextFilter.forThreshold(0.3))</span>
+<span class="fc" id="L102">        .withTextFilter(new RemoveEMailSignatureFilter())</span>
+<span class="fc" id="L103">        .withTextFilter(new RemoveNonBreakingSpaces())</span>
+<span class="fc" id="L104">        .build();</span>
+<span class="nc" id="L105">    } catch (IOException e) {</span>
+<span class="nc" id="L106">      throw new RuntimeException(&quot;Could not set up language identifier&quot;, e);</span>
+<span class="fc" id="L107">    }</span>
+<span class="fc" id="L108">  }</span>
+
+  public void enableFasttext(File fasttextBinary, File fasttextModel) {
+<span class="pc bpc" id="L111" title="3 of 4 branches missed.">    if (fasttextBinary != null &amp;&amp; fasttextModel != null) {</span>
+      try {
+<span class="nc" id="L113">        fastText = new FastText(fasttextModel, fasttextBinary);</span>
+<span class="nc" id="L114">        logger.info(&quot;Started fasttext process for language identification: Binary &quot; + fasttextBinary + &quot; with model @ &quot; + fasttextModel);</span>
+<span class="nc" id="L115">      } catch (IOException e) {</span>
+<span class="nc" id="L116">        logger.error(&quot;Error while starting fasttext (binary: &quot; + fasttextBinary + &quot;, model: &quot; + fasttextModel + &quot;)&quot;, e);</span>
+<span class="nc" id="L117">        throw new RuntimeException(&quot;Could not start fasttext process for language identification @ &quot; + fasttextBinary + &quot; with model @ &quot; + fasttextModel, e);</span>
+<span class="nc" id="L118">      }</span>
+    }
+<span class="fc" id="L120">  }</span>
+
+  private static List&lt;String&gt; getLanguageCodes() {
+<span class="fc" id="L123">    List&lt;String&gt; langCodes = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">    for (Language lang : Languages.get()) {</span>
+<span class="fc" id="L125">      String langCode = lang.getShortCode();</span>
+<span class="fc bfc" id="L126" title="All 6 branches covered.">      boolean ignore = lang.isVariant() || ignoreLangCodes.contains(langCode) || externalLangCodes.contains(langCode);</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">      if (ignore) {</span>
+<span class="fc" id="L128">        continue;</span>
+      }
+<span class="fc bfc" id="L130" title="All 2 branches covered.">      if (&quot;zh&quot;.equals(langCode)) {</span>
+<span class="fc" id="L131">        langCodes.add(&quot;zh-CN&quot;);</span>
+<span class="fc" id="L132">        langCodes.add(&quot;zh-TW&quot;);</span>
+      } else {
+<span class="fc" id="L134">        langCodes.add(langCode);</span>
+      }
+<span class="fc" id="L136">    }</span>
+<span class="fc" id="L137">    return langCodes;</span>
+  }
+
+  private List&lt;LanguageProfile&gt; loadProfiles(List&lt;String&gt; langCodes) throws IOException {
+<span class="fc" id="L141">    LanguageProfileReader profileReader = new LanguageProfileReader();</span>
+<span class="fc" id="L142">    List&lt;LanguageProfile&gt; profiles = profileReader.read(langCodes);</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">    for (String externalLangCode : externalLangCodes) {</span>
+<span class="fc" id="L144">      String profilePath = &quot;/&quot; + externalLangCode + &quot;/&quot; + externalLangCode + &quot;.profile&quot;;</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">      if (JLanguageTool.getDataBroker().resourceExists(profilePath)) {  // not all languages are always available</span>
+<span class="fc" id="L146">        try (InputStream profile = JLanguageTool.getDataBroker().getFromResourceDirAsStream(profilePath)) {</span>
+<span class="fc" id="L147">          profiles.add(new LanguageProfileReader().read(profile));</span>
+        }
+      }
+<span class="fc" id="L150">    }</span>
+<span class="fc" id="L151">    return profiles;</span>
+  }
+
+  /**
+   * @return language or {@code null} if language could not be identified
+   */
+  @Nullable
+  public Language detectLanguage(String text) {
+<span class="nc" id="L159">    DetectedLanguage detectedLanguage = detectLanguage(text, Collections.emptyList(), Collections.emptyList());</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">    if (detectedLanguage == null) {</span>
+<span class="nc" id="L161">      return null;</span>
+    }
+<span class="nc" id="L163">    return detectedLanguage.getDetectedLanguage();</span>
+  }
+  
+  /**
+   * @return language or {@code null} if language could not be identified
+   */
+  @Nullable
+  @Experimental
+  DetectedLanguage detectLanguageWithDetails(String text) {
+<span class="nc" id="L172">    return detectLanguage(text, Collections.emptyList(), Collections.emptyList());</span>
+  }
+  
+  /**
+   * @return language or {@code null} if language could not be identified
+   * @param noopLangsTmp list of codes that are detected but will lead to the NoopLanguage that has no rules
+   * @since 4.4 (new parameter noopLangs, changed return type to DetectedLanguage)
+   */
+  @Nullable
+  public DetectedLanguage detectLanguage(String text, List&lt;String&gt; noopLangsTmp, List&lt;String&gt; preferredLangsTmp) {
+<span class="fc" id="L182">    Objects.requireNonNull(noopLangsTmp);</span>
+<span class="fc" id="L183">    Objects.requireNonNull(preferredLangsTmp);</span>
+    // Chrome sends 'nn' (Nynorsk) or 'nb' (Bokmal), but fasttext detects 'no', so we have to map, and 
+    // Bokmal seems to be the standard variant:
+<span class="pc bnc" id="L186" title="All 2 branches missed.">    List&lt;String&gt; additionalLangs = noopLangsTmp.stream().map(k -&gt; k.equals(&quot;nb&quot;) ? &quot;no&quot; : k).collect(Collectors.toList());</span>
+<span class="pc bnc" id="L187" title="All 2 branches missed.">    List&lt;String&gt; preferredLangs = preferredLangsTmp.stream().map(k -&gt; k.equals(&quot;nb&quot;) ? &quot;no&quot; : k).collect(Collectors.toCollection(ArrayList::new));</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">    if (preferredLangs.stream().anyMatch(k -&gt; k.contains(&quot;-&quot;))) {</span>
+<span class="nc" id="L189">      throw new IllegalArgumentException(&quot;preferredLanguages may only contain language codes without variants (e.g. 'en', but not 'en-US'): &quot; +</span>
+        preferredLangs + &quot;. Use 'preferredVariants' to specify variants.&quot;);
+    }
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">    String shortText = text.length() &gt; maxLength ? text.substring(0, maxLength) : text;</span>
+<span class="fc" id="L193">    shortText = shortText.replaceAll(&quot;\uFEFF+&quot;, &quot; &quot;);  // used by the browser add-on to filter HTML etc. (_ignoreText() in validator.js)</span>
+<span class="pc bpc" id="L194" title="4 of 8 branches missed.">    if (!preferredLangs.contains(&quot;ru&quot;) &amp;&amp; !preferredLangs.contains(&quot;uk&quot;) &amp;&amp; !preferredLangs.contains(&quot;be&quot;) &amp;&amp; !preferredLangs.contains(&quot;zh&quot;) &amp;&amp;</span>
+<span class="pc bpc" id="L195" title="2 of 4 branches missed.">        !preferredLangs.contains(&quot;hi&quot;) &amp;&amp; !preferredLangs.contains(&quot;mr&quot;)) {</span>
+      // Cyrillic and Chinese are so different from Latin characters that we try to detect it even with preferredLangs not properly set:
+<span class="fc" id="L197">      preferredLangs.addAll(unicodeIdentifier.getAdditionalLangCodes(text));</span>
+<span class="fc" id="L198">      additionalLangs.addAll(unicodeIdentifier.getAdditionalLangCodes(text));</span>
+    }
+<span class="fc" id="L200">    Map.Entry&lt;String,Double&gt; result = null;</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">    if (fastText != null) {</span>
+      try {
+        // do *not* use TextObjectFactory because of https://github.com/languagetool-org/languagetool/issues/1278
+        // (using it for optimaize is okay, assuming the same strong normalization was applied during training):
+<span class="nc" id="L205">        shortText = ImprovedUrlTextFilter.getInstance().filter(shortText);</span>
+<span class="nc" id="L206">        shortText = new RemoveEMailSignatureFilter().filter(shortText);</span>
+<span class="nc" id="L207">        shortText = new RemoveNonBreakingSpaces().filter(shortText);</span>
+<span class="nc" id="L208">        shortText = shortText.replaceAll(&quot;\uFEFF+&quot;, &quot; &quot;);  // used by the browser add-on to filter HTML etc. (_ignoreText() in validator.js)</span>
+<span class="nc" id="L209">        Map&lt;String, Double&gt; scores = fastText.runFasttext(shortText, additionalLangs);</span>
+<span class="nc" id="L210">        result = getHighestScoringResult(scores);</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">        if (result.getValue().floatValue() &lt; THRESHOLD) {</span>
+          //System.out.println(text + &quot; -&gt;&quot; + result.getValue().floatValue() + &quot; &quot; + result.getKey());
+<span class="nc" id="L213">          CommonWords commonWords = new CommonWords();</span>
+<span class="nc" id="L214">          Map&lt;Language, Integer&gt; lang2Count = commonWords.getKnownWordsPerLanguage(shortText);</span>
+          //System.out.println(&quot;-&gt; &quot;+ lang2Count);
+<span class="nc bnc" id="L216" title="All 2 branches missed.">          for (Map.Entry&lt;Language, Integer&gt; entry : lang2Count.entrySet()) {</span>
+<span class="nc" id="L217">            String langCode = entry.getKey().getShortCode();</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">            if (scores.containsKey(langCode)) {</span>
+              // this looks arbitrary, but gave best results with evaluation (LanguageDetectionMinLengthEval):
+<span class="nc" id="L220">              scores.put(langCode, scores.get(langCode) + Double.valueOf(entry.getValue()));</span>
+            } else {
+<span class="nc" id="L222">              scores.put(langCode, Double.valueOf(entry.getValue()));</span>
+            }
+<span class="nc" id="L224">          }</span>
+<span class="nc" id="L225">          result = getHighestScoringResult(scores);</span>
+        }
+<span class="nc bnc" id="L227" title="All 4 branches missed.">        if (text.length() &lt; CONSIDER_ONLY_PREFERRED_THRESHOLD &amp;&amp; preferredLangs.size() &gt; 0) {</span>
+          //System.out.println(&quot;remove? &quot; + preferredLangs + &quot; &lt;-&gt; &quot; + scores);
+<span class="nc bnc" id="L229" title="All 2 branches missed.">          scores.keySet().removeIf(k -&gt; !preferredLangs.contains(k));</span>
+          //System.out.println(&quot;-&gt; &quot; + b + &quot; ==&gt; &quot; + scores);
+<span class="nc" id="L231">          result = getHighestScoringResult(scores);</span>
+        }
+        // Calculate a trivial confidence value because fasttext's confidence is often
+        // wrong for short text (e.g. 0.99 for a test that's misclassified). Don't
+        // use 1.0 because we can never be totally sure...
+<span class="nc" id="L236">        double newScore = 0.99 / (30.0 / Math.min(text.length(), 30));</span>
+        //System.out.println(&quot;fasttext  : &quot; + result);
+        //System.out.println(&quot;newScore  : &quot; + newScore);
+<span class="nc" id="L239">        result = new AbstractMap.SimpleImmutableEntry&lt;&gt;(result.getKey(), newScore);</span>
+<span class="nc" id="L240">      } catch (Exception e) {</span>
+<span class="nc" id="L241">        fastText.destroy();</span>
+<span class="nc" id="L242">        fastText = null;</span>
+<span class="nc" id="L243">        logger.error(&quot;Fasttext disabled&quot;, e);</span>
+<span class="nc" id="L244">      }</span>
+    }
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">    if (fastText == null) { // no else, value can change in if clause</span>
+<span class="fc" id="L247">      shortText = textObjectFactory.forText(shortText).toString();</span>
+<span class="fc" id="L248">      result = detectLanguageCode(shortText);</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">      if (additionalLangs.size() &gt; 0) {</span>
+<span class="nc" id="L250">        logger.warn(&quot;Cannot consider noopLanguages because not in fastText mode: &quot; + additionalLangs);</span>
+      }
+    }
+<span class="pc bpc" id="L253" title="2 of 6 branches missed.">    if (result != null &amp;&amp; result.getKey() != null &amp;&amp; canLanguageBeDetected(result.getKey(), additionalLangs)) {</span>
+<span class="fc" id="L254">      return new DetectedLanguage(null,</span>
+<span class="fc" id="L255">        Languages.getLanguageForShortCode(result.getKey(), additionalLangs),</span>
+<span class="fc" id="L256">        result.getValue().floatValue());</span>
+    } else {
+<span class="fc" id="L258">      return null;</span>
+    }
+  }
+  
+  static boolean canLanguageBeDetected(String langCode, List&lt;String&gt; additionalLanguageCodes) {
+<span class="pc bpc" id="L263" title="3 of 4 branches missed.">    return Languages.isLanguageSupported(langCode) || additionalLanguageCodes.contains(langCode);</span>
+  }
+
+  private Map.Entry&lt;String, Double&gt; getHighestScoringResult(Map&lt;String, Double&gt; probs) {
+<span class="nc" id="L267">    String result = null;</span>
+<span class="nc" id="L268">    double max = -1;</span>
+<span class="nc bnc" id="L269" title="All 2 branches missed.">    for (Map.Entry&lt;String, Double&gt; entry : probs.entrySet()) {</span>
+<span class="nc bnc" id="L270" title="All 2 branches missed.">      if (entry.getValue() &gt; max) {</span>
+<span class="nc" id="L271">        max = entry.getValue();</span>
+<span class="nc" id="L272">        result = entry.getKey();</span>
+      }
+<span class="nc" id="L274">    }</span>
+<span class="nc" id="L275">    return new AbstractMap.SimpleImmutableEntry&lt;&gt;(result, max);</span>
+  }
+
+  /**
+   * @return language or {@code null} if language could not be identified
+   */
+  @Nullable
+  private Map.Entry&lt;String, Double&gt; detectLanguageCode(String text) {
+<span class="fc" id="L283">    List&lt;com.optimaize.langdetect.DetectedLanguage&gt; lang = languageDetector.getProbabilities(text);</span>
+    // comment in for debugging:
+    //System.out.println(languageDetector.getProbabilities(textObject));
+<span class="fc bfc" id="L286" title="All 2 branches covered.">    if (lang.size() &gt; 0) {</span>
+<span class="fc" id="L287">      String code = lang.get(0).getLocale().getLanguage();</span>
+<span class="fc" id="L288">      double prob = lang.get(0).getProbability();</span>
+<span class="fc" id="L289">      return new AbstractMap.SimpleImmutableEntry&lt;&gt;(code, prob);</span>
+    } else {
+<span class="fc" id="L291">      return null;</span>
+    }
+  }
+
+<span class="fc" id="L295">  static class RemoveEMailSignatureFilter implements TextFilter {</span>
+    @Override
+    public String filter(CharSequence text) {
+<span class="fc" id="L298">      return SIGNATURE.matcher(text.toString()).replaceFirst(&quot;&quot;);</span>
+    }
+  }
+
+<span class="fc" id="L302">  static class RemoveNonBreakingSpaces implements TextFilter {</span>
+    @Override
+    public String filter(CharSequence text) {
+<span class="fc" id="L305">      return text.toString().replace('\u00A0', ' ');</span>
+    }
+  }
+
+<span class="fc" id="L309">  static class ImprovedUrlTextFilter implements TextFilter {</span>
+<span class="fc" id="L310">    private static final Pattern URL_REGEX = Pattern.compile(&quot;https?://[-_.?&amp;~;+=/#%0-9A-Za-z]+&quot;);   // '%' has been added</span>
+<span class="fc" id="L311">    private static final Pattern MAIL_REGEX = Pattern.compile(&quot;[-_.0-9A-Za-z]+@[-_0-9A-Za-z]+[-_.0-9A-Za-z]+&quot;);</span>
+<span class="fc" id="L312">    private static final ImprovedUrlTextFilter INSTANCE = new ImprovedUrlTextFilter();</span>
+    static ImprovedUrlTextFilter getInstance() {
+<span class="fc" id="L314">      return INSTANCE;</span>
+    }
+    @Override
+    public String filter(CharSequence text) {
+<span class="fc" id="L318">      String modified = URL_REGEX.matcher(text).replaceAll(&quot; &quot;);</span>
+<span class="fc" id="L319">      return MAIL_REGEX.matcher(modified).replaceAll(&quot; &quot;);</span>
+    }
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

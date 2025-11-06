@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SuggestionSorter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules.spelling</a> &gt; <span class="el_source">SuggestionSorter.java</span></div><h1>SuggestionSorter.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker 
+ * Copyright (C) 2017 Daniel Naber (http://www.danielnaber.de)
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules.spelling;
+
+import org.jetbrains.annotations.NotNull;
+import org.languagetool.languagemodel.LanguageModel;
+import org.languagetool.rules.ngrams.Probability;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+
+import static java.util.stream.Collectors.toList;
+
+/**
+ * Sort spell checking suggestions by their probability.
+ * @deprecated still work in progress
+ * @since 3.9
+ */
+public class SuggestionSorter {
+
+  private LanguageModel lm;
+
+<span class="nc" id="L41">  public SuggestionSorter(LanguageModel lm) {</span>
+<span class="nc" id="L42">    this.lm = Objects.requireNonNull(lm);</span>
+<span class="nc" id="L43">  }</span>
+
+  public List&lt;String&gt; sortSuggestions(List&lt;String&gt; suggestions) {
+<span class="nc" id="L46">    List&lt;RankedSuggestion&gt; ranked = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">    for (String suggestion : suggestions) {</span>
+      // TODO: consider context
+      // TODO: consider phrases
+<span class="nc" id="L50">      Probability p = lm.getPseudoProbability(Collections.singletonList(suggestion));</span>
+<span class="nc" id="L51">      ranked.add(new RankedSuggestion(p.getProb(), suggestion));</span>
+<span class="nc" id="L52">    }</span>
+<span class="nc" id="L53">    Collections.sort(ranked);</span>
+    /*for (RankedSuggestion rankedSuggestion : ranked) {
+      System.out.println(rankedSuggestion.prob + &quot; &quot; + rankedSuggestion.suggestion);
+    }*/
+<span class="nc" id="L57">    return ranked.stream().map(k -&gt; k.suggestion).collect(toList());</span>
+  }
+  
+  class RankedSuggestion implements Comparable&lt;RankedSuggestion&gt; {
+    private final double prob;
+    private final String suggestion;
+    
+<span class="nc" id="L64">    RankedSuggestion(double prob, String suggestion) {</span>
+<span class="nc" id="L65">      this.prob = prob;</span>
+<span class="nc" id="L66">      this.suggestion = suggestion;</span>
+<span class="nc" id="L67">    }</span>
+
+    @Override
+    public int compareTo(@NotNull RankedSuggestion o) {
+<span class="nc" id="L71">      return Double.compare(o.prob, prob);</span>
+    }
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

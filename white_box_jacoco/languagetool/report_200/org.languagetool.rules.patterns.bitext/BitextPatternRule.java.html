@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BitextPatternRule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules.patterns.bitext</a> &gt; <span class="el_source">BitextPatternRule.java</span></div><h1>BitextPatternRule.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker 
+ * Copyright (C) 2010 Marcin Miłkowski (www.languagetool.org)
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+
+package org.languagetool.rules.patterns.bitext;
+
+import java.io.IOException;
+
+import org.languagetool.AnalyzedSentence;
+import org.languagetool.rules.Rule;
+import org.languagetool.rules.RuleMatch;
+import org.languagetool.rules.bitext.BitextRule;
+import org.languagetool.rules.patterns.AbstractPatternRule;
+
+/**
+ * A bitext pattern rule class. A BitextPatternRule describes a language error and 
+ * can test whether a given pre-analyzed pair of source and target text 
+ * contains that error using the {@link Rule#match} method. It uses the syntax
+ * of XML files similar to normal PatternRules.
+ * 
+ * @author Marcin Miłkowski
+ */
+public class BitextPatternRule extends BitextRule {
+
+  private final AbstractPatternRule srcRule;
+  private final AbstractPatternRule trgRule;
+  
+<span class="nc" id="L43">  BitextPatternRule(AbstractPatternRule src, AbstractPatternRule trg) {    </span>
+<span class="nc" id="L44">    srcRule = src;</span>
+<span class="nc" id="L45">    trgRule = trg;</span>
+<span class="nc" id="L46">  }</span>
+  
+  public AbstractPatternRule getSrcRule() {
+<span class="nc" id="L49">    return srcRule;        </span>
+  }
+  
+  public AbstractPatternRule getTrgRule() {
+<span class="nc" id="L53">    return trgRule;</span>
+  }
+  
+  @Override
+  public String getDescription() {
+<span class="nc" id="L58">    return srcRule.getDescription();</span>
+  }
+
+  @Override
+  public String getMessage() {
+<span class="nc" id="L63">    return trgRule.getMessage();</span>
+  }
+  
+  @Override
+  public String getId() {
+<span class="nc" id="L68">    return srcRule.getId();</span>
+  }
+
+  /**
+   * This method always returns an empty array.
+   * Use {@link #match(org.languagetool.AnalyzedSentence, org.languagetool.AnalyzedSentence)} instead.
+   */
+  @Override
+  public RuleMatch[] match(AnalyzedSentence sentence) throws IOException {
+<span class="nc" id="L77">    return new RuleMatch[0];</span>
+  }
+
+  @Override
+  public RuleMatch[] match(AnalyzedSentence sourceSentence,
+      AnalyzedSentence targetSentence) throws IOException {
+<span class="nc bnc" id="L83" title="All 2 branches missed.">    if (srcRule.match(sourceSentence).length &gt; 0)  {</span>
+<span class="nc" id="L84">      return trgRule.match(targetSentence);</span>
+    }
+<span class="nc" id="L86">    return new RuleMatch[0];</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

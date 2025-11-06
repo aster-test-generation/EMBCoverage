@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BitextPatternRuleHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules.patterns.bitext</a> &gt; <span class="el_source">BitextPatternRuleHandler.java</span></div><h1>BitextPatternRuleHandler.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2015 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules.patterns.bitext;
+
+import org.languagetool.Language;
+import org.languagetool.Languages;
+import org.languagetool.bitext.StringPair;
+import org.languagetool.rules.IncorrectExample;
+import org.languagetool.rules.bitext.IncorrectBitextExample;
+import org.languagetool.rules.patterns.PatternToken;
+import org.languagetool.rules.patterns.Match;
+import org.languagetool.rules.patterns.PatternRule;
+import org.languagetool.rules.patterns.PatternRuleHandler;
+import org.xml.sax.Attributes;
+import org.xml.sax.SAXException;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+<span class="nc" id="L37">class BitextPatternRuleHandler extends PatternRuleHandler {</span>
+
+  private static final String SOURCE = &quot;source&quot;;
+  private static final String TARGET = &quot;target&quot;;
+  private static final String SRC_EXAMPLE = &quot;srcExample&quot;;
+  private static final String TRG_EXAMPLE = &quot;trgExample&quot;;
+
+<span class="nc" id="L44">  private final List&lt;BitextPatternRule&gt; rules = new ArrayList&lt;&gt;();</span>
+
+  private PatternRule srcRule;
+  private PatternRule trgRule;
+
+  private IncorrectExample trgExample;
+  private IncorrectExample srcExample;
+
+  private Language srcLang;
+
+<span class="nc" id="L54">  private List&lt;StringPair&gt; correctExamples = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L55">  private List&lt;IncorrectBitextExample&gt; incorrectExamples = new ArrayList&lt;&gt;();</span>
+
+  List&lt;BitextPatternRule&gt; getBitextRules() {
+<span class="nc" id="L58">    return rules;</span>
+  }
+
+  // ===========================================================
+  // SAX DocumentHandler methods
+  // ===========================================================
+
+  @Override
+  public void startElement(String namespaceURI, String lName,
+      String qName, Attributes attrs) throws SAXException {
+<span class="nc bnc" id="L68" title="All 5 branches missed.">    switch (qName) {</span>
+      case RULES:
+<span class="nc" id="L70">        String languageStr = attrs.getValue(&quot;targetLang&quot;);</span>
+<span class="nc" id="L71">        language = Languages.getLanguageForShortCode(languageStr);</span>
+<span class="nc" id="L72">        break;</span>
+      case RULE:
+<span class="nc" id="L74">        super.startElement(namespaceURI, lName, qName, attrs);</span>
+<span class="nc" id="L75">        correctExamples = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L76">        incorrectExamples = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L77">        break;</span>
+      case TARGET:
+<span class="nc" id="L79">        startPattern(attrs);</span>
+<span class="nc" id="L80">        break;</span>
+      case SOURCE:
+<span class="nc" id="L82">        srcLang = Languages.getLanguageForShortCode(attrs.getValue(&quot;lang&quot;));</span>
+<span class="nc" id="L83">        break;</span>
+      default:
+<span class="nc" id="L85">        super.startElement(namespaceURI, lName, qName, attrs);</span>
+        break;
+    }
+<span class="nc" id="L88">  }</span>
+
+  @Override
+  public void endElement(String namespaceURI, String sName,
+      String qName) throws SAXException {
+<span class="nc bnc" id="L93" title="All 7 branches missed.">    switch (qName) {</span>
+      case RULE:
+<span class="nc" id="L95">        trgRule.setMessage(message.toString());</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        for (Match m : suggestionMatches) {</span>
+<span class="nc" id="L97">          trgRule.addSuggestionMatch(m);</span>
+<span class="nc" id="L98">        }</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        if (phrasePatternTokens.size() &lt;= 1) {</span>
+<span class="nc" id="L100">          suggestionMatches.clear();</span>
+        }
+<span class="nc" id="L102">        BitextPatternRule bRule = new BitextPatternRule(srcRule, trgRule);</span>
+<span class="nc" id="L103">        bRule.setCorrectBitextExamples(correctExamples);</span>
+<span class="nc" id="L104">        bRule.setIncorrectBitextExamples(incorrectExamples);</span>
+<span class="nc" id="L105">        bRule.setSourceLanguage(srcLang);</span>
+<span class="nc" id="L106">        rules.add(bRule);</span>
+<span class="nc" id="L107">        break;</span>
+      case SRC_EXAMPLE:
+<span class="nc" id="L109">        srcExample = setExample();</span>
+<span class="nc" id="L110">        break;</span>
+      case TRG_EXAMPLE:
+<span class="nc" id="L112">        trgExample = setExample();</span>
+<span class="nc" id="L113">        break;</span>
+      case SOURCE:
+<span class="nc" id="L115">        srcRule = finalizeRule();</span>
+<span class="nc" id="L116">        break;</span>
+      case TARGET:
+<span class="nc" id="L118">        trgRule = finalizeRule();</span>
+<span class="nc" id="L119">        break;</span>
+      case EXAMPLE:
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        if (inCorrectExample) {</span>
+<span class="nc" id="L122">          correctExamples.add(new StringPair(srcExample.getExample(), trgExample.getExample()));</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        } else if (inIncorrectExample) {</span>
+<span class="nc" id="L124">          StringPair examplePair = new StringPair(srcExample.getExample(), trgExample.getExample());</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">          if (trgExample.getCorrections().isEmpty()) {</span>
+<span class="nc" id="L126">            incorrectExamples.add(new IncorrectBitextExample(examplePair));</span>
+          } else {
+<span class="nc" id="L128">            List&lt;String&gt; corrections = trgExample.getCorrections();</span>
+<span class="nc" id="L129">            incorrectExamples.add(new IncorrectBitextExample(examplePair, corrections));</span>
+          }
+        }
+<span class="nc" id="L132">        inCorrectExample = false;</span>
+<span class="nc" id="L133">        inIncorrectExample = false;</span>
+<span class="nc" id="L134">        inErrorTriggerExample = false;</span>
+<span class="nc" id="L135">        break;</span>
+      default:
+<span class="nc" id="L137">        super.endElement(namespaceURI, sName, qName);</span>
+        break;
+    }
+
+<span class="nc" id="L141">  }</span>
+
+  private IncorrectExample setExample() {
+<span class="nc" id="L144">    IncorrectExample example = null;</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">    if (inCorrectExample) {</span>
+<span class="nc" id="L146">      example = new IncorrectExample(correctExample.toString());</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">    } else if (inIncorrectExample) {</span>
+<span class="nc" id="L148">      String[] corrections = exampleCorrection.toString().split(&quot;\\|&quot;);</span>
+<span class="nc bnc" id="L149" title="All 4 branches missed.">      if (corrections.length &gt; 0 &amp;&amp; corrections[0].length() &gt; 0) {</span>
+<span class="nc" id="L150">        example = new IncorrectExample(incorrectExample.toString(), Arrays.asList(corrections));</span>
+      } else {
+<span class="nc" id="L152">        example = new IncorrectExample(incorrectExample.toString());</span>
+      }
+<span class="nc bnc" id="L154" title="All 2 branches missed.">    } else if (inErrorTriggerExample) {</span>
+<span class="nc" id="L155">      throw new RuntimeException(&quot;'triggers_error' is not supported for bitext XML&quot;);</span>
+    }
+<span class="nc" id="L157">    correctExample = new StringBuilder();</span>
+<span class="nc" id="L158">    incorrectExample = new StringBuilder();</span>
+<span class="nc" id="L159">    exampleCorrection = new StringBuilder();</span>
+<span class="nc" id="L160">    return example;</span>
+  }
+
+  private PatternRule finalizeRule() {
+<span class="nc" id="L164">    PatternRule rule = null;</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">    if (phrasePatternTokens.isEmpty()) {</span>
+<span class="nc" id="L166">      rule = new PatternRule(id, language, patternTokens,</span>
+<span class="nc" id="L167">          name, &quot;&quot;, shortMessage.toString());</span>
+<span class="nc" id="L168">      prepareRule(rule);</span>
+    } else {
+<span class="nc bnc" id="L170" title="All 2 branches missed.">      if (!patternTokens.isEmpty()) {</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">        for (List&lt;PatternToken&gt; ph : phrasePatternTokens) {</span>
+<span class="nc" id="L172">          ph.addAll(new ArrayList&lt;&gt;(patternTokens));</span>
+<span class="nc" id="L173">        }</span>
+      }
+<span class="nc bnc" id="L175" title="All 2 branches missed.">      for (List&lt;PatternToken&gt; phrasePatternToken : phrasePatternTokens) {</span>
+<span class="nc" id="L176">        processElement(phrasePatternToken);</span>
+<span class="nc" id="L177">        rule = new PatternRule(id, language, phrasePatternToken,</span>
+<span class="nc" id="L178">            name, message.toString(), shortMessage.toString(), &quot;&quot;,</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">            phrasePatternTokens.size() &gt; 1);</span>
+<span class="nc" id="L180">        prepareRule(rule);</span>
+<span class="nc" id="L181">      }</span>
+    }
+<span class="nc" id="L183">    patternTokens.clear();</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">    if (phrasePatternTokens != null) {</span>
+<span class="nc" id="L185">      phrasePatternTokens.clear();</span>
+    }
+<span class="nc" id="L187">    startPositionCorrection = 0;</span>
+<span class="nc" id="L188">    endPositionCorrection = 0;</span>
+<span class="nc" id="L189">    return rule;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

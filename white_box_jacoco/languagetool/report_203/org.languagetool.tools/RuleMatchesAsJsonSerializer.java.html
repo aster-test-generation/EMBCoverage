@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuleMatchesAsJsonSerializer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.tools</a> &gt; <span class="el_source">RuleMatchesAsJsonSerializer.java</span></div><h1>RuleMatchesAsJsonSerializer.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2016 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.tools;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonGenerator;
+import org.languagetool.DetectedLanguage;
+import org.languagetool.JLanguageTool;
+import org.languagetool.Language;
+import org.languagetool.Tag;
+import org.languagetool.markup.AnnotatedText;
+import org.languagetool.markup.AnnotatedTextBuilder;
+import org.languagetool.rules.*;
+import org.languagetool.rules.patterns.AbstractPatternRule;
+
+import java.io.IOException;
+import java.io.StringWriter;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Write rule matches and some meta information as JSON.
+ * @since 3.4, public since 3.6
+ */
+public class RuleMatchesAsJsonSerializer {
+
+  private static final int API_VERSION = 1;
+  private static final String STATUS = &quot;&quot;;
+  private static final String PREMIUM_HINT = &quot;You might be missing errors only the Premium version can find. Contact us at support&lt;at&gt;languagetoolplus.com.&quot;;
+  private static final String START_MARKER = &quot;__languagetool_start_marker&quot;;
+<span class="fc" id="L47">  private static final JsonFactory factory = new JsonFactory();</span>
+  
+  private final int compactMode;
+  private final Language lang;
+
+  public RuleMatchesAsJsonSerializer() {
+<span class="nc" id="L53">    this(0, null);</span>
+<span class="nc" id="L54">  }</span>
+
+  /**
+   * @since 4.7
+   */
+  public RuleMatchesAsJsonSerializer(int compactMode) {
+<span class="nc" id="L60">    this(compactMode, null);</span>
+<span class="nc" id="L61">  }</span>
+
+  /**
+   * @since 5.1
+   */
+<span class="fc" id="L66">  public RuleMatchesAsJsonSerializer(int compactMode, Language lang) {</span>
+<span class="fc" id="L67">    this.compactMode = compactMode;</span>
+<span class="fc" id="L68">    this.lang = lang;</span>
+<span class="fc" id="L69">  }</span>
+
+  public String ruleMatchesToJson(List&lt;RuleMatch&gt; matches, String text, int contextSize, DetectedLanguage detectedLang) {
+<span class="nc" id="L72">    return ruleMatchesToJson(matches, new ArrayList&lt;&gt;(), text, contextSize, detectedLang, null);</span>
+  }
+
+  /**
+   * @param incompleteResultsReason use a string that explains why results are incomplete (e.g. due to a timeout) -
+   *        a 'warnings' section will be added to the JSON. Use {@code null} if results are complete.
+   * @since 3.7
+   */
+  public String ruleMatchesToJson(List&lt;RuleMatch&gt; matches, List&lt;RuleMatch&gt; hiddenMatches, String text, int contextSize,
+                                  DetectedLanguage detectedLang, String incompleteResultsReason) {
+<span class="nc" id="L82">    return ruleMatchesToJson(matches, hiddenMatches, new AnnotatedTextBuilder().addText(text).build(), contextSize, detectedLang, incompleteResultsReason);</span>
+  }
+
+  /**
+   * @param incompleteResultsReason use a string that explains why results are incomplete (e.g. due to a timeout) -
+   *        a 'warnings' section will be added to the JSON. Use {@code null} if results are complete.
+   * @since 4.3
+   */
+  public String ruleMatchesToJson(List&lt;RuleMatch&gt; matches, List&lt;RuleMatch&gt; hiddenMatches, AnnotatedText text, int contextSize,
+                                  DetectedLanguage detectedLang, String incompleteResultsReason) {
+<span class="fc" id="L92">    ContextTools contextTools = new ContextTools();</span>
+<span class="fc" id="L93">    contextTools.setEscapeHtml(false);</span>
+<span class="fc" id="L94">    contextTools.setContextSize(contextSize);</span>
+<span class="fc" id="L95">    contextTools.setErrorMarker(START_MARKER, &quot;&quot;);</span>
+<span class="fc" id="L96">    StringWriter sw = new StringWriter();</span>
+    try {
+<span class="fc" id="L98">      try (JsonGenerator g = factory.createGenerator(sw)) {</span>
+<span class="fc" id="L99">        g.writeStartObject();</span>
+<span class="fc" id="L100">        writeSoftwareSection(g);</span>
+<span class="fc" id="L101">        writeWarningsSection(g, incompleteResultsReason);</span>
+<span class="fc" id="L102">        writeLanguageSection(g, detectedLang);</span>
+<span class="fc" id="L103">        writeMatchesSection(&quot;matches&quot;, g, matches, text, contextTools);</span>
+<span class="pc bpc" id="L104" title="2 of 4 branches missed.">        if (hiddenMatches != null &amp;&amp; hiddenMatches.size() &gt; 0) {</span>
+<span class="nc" id="L105">          writeMatchesSection(&quot;hiddenMatches&quot;, g, hiddenMatches, text, contextTools);</span>
+        }
+<span class="fc" id="L107">        g.writeEndObject();</span>
+      }
+<span class="nc" id="L109">    } catch (IOException e) {</span>
+<span class="nc" id="L110">      throw new RuntimeException(e);</span>
+<span class="fc" id="L111">    }</span>
+<span class="fc" id="L112">    return sw.toString();</span>
+  }
+
+  private void writeSoftwareSection(JsonGenerator g) throws IOException {
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">    if (compactMode == 1) {</span>
+<span class="nc" id="L117">      return;</span>
+    }
+<span class="fc" id="L119">    g.writeObjectFieldStart(&quot;software&quot;);</span>
+<span class="fc" id="L120">    g.writeStringField(&quot;name&quot;, &quot;LanguageTool&quot;);</span>
+<span class="fc" id="L121">    g.writeStringField(&quot;version&quot;, JLanguageTool.VERSION);</span>
+<span class="fc" id="L122">    g.writeStringField(&quot;buildDate&quot;, JLanguageTool.BUILD_DATE);</span>
+<span class="fc" id="L123">    g.writeNumberField(&quot;apiVersion&quot;, API_VERSION);</span>
+<span class="fc" id="L124">    g.writeBooleanField(&quot;premium&quot;, JLanguageTool.isPremiumVersion());</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">    if (!JLanguageTool.isPremiumVersion()) {</span>
+<span class="fc" id="L126">      g.writeStringField(&quot;premiumHint&quot;, PREMIUM_HINT);</span>
+    }
+<span class="fc" id="L128">    g.writeStringField(&quot;status&quot;, STATUS);</span>
+<span class="fc" id="L129">    g.writeEndObject();</span>
+<span class="fc" id="L130">  }</span>
+
+  private void writeWarningsSection(JsonGenerator g, String incompleteResultsReason) throws IOException {
+<span class="pc bpc" id="L133" title="3 of 4 branches missed.">    if (compactMode == 1 &amp;&amp; incompleteResultsReason == null) {</span>
+<span class="nc" id="L134">      return;</span>
+    }
+<span class="fc" id="L136">    g.writeObjectFieldStart(&quot;warnings&quot;);</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">    if (incompleteResultsReason != null) {</span>
+<span class="nc" id="L138">      g.writeBooleanField(&quot;incompleteResults&quot;, true);</span>
+<span class="nc" id="L139">      g.writeStringField(&quot;incompleteResultsReason&quot;, incompleteResultsReason);</span>
+    } else {
+<span class="fc" id="L141">      g.writeBooleanField(&quot;incompleteResults&quot;, false);</span>
+    }
+<span class="fc" id="L143">    g.writeEndObject();</span>
+<span class="fc" id="L144">  }</span>
+
+  private void writeLanguageSection(JsonGenerator g, DetectedLanguage detectedLang) throws IOException {
+<span class="fc" id="L147">    g.writeObjectFieldStart(&quot;language&quot;);</span>
+<span class="fc" id="L148">    g.writeStringField(&quot;name&quot;, detectedLang.getGivenLanguage().getName());</span>
+<span class="fc" id="L149">    g.writeStringField(&quot;code&quot;, detectedLang.getGivenLanguage().getShortCodeWithCountryAndVariant());</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">    if (detectedLang.getGivenLanguage().isSpellcheckOnlyLanguage()) {</span>
+<span class="nc" id="L151">      g.writeBooleanField(&quot;spellCheckOnly&quot;, true);</span>
+    }
+<span class="fc" id="L153">    g.writeObjectFieldStart(&quot;detectedLanguage&quot;);</span>
+<span class="fc" id="L154">    g.writeStringField(&quot;name&quot;, detectedLang.getDetectedLanguage().getName());</span>
+<span class="fc" id="L155">    g.writeStringField(&quot;code&quot;, detectedLang.getDetectedLanguage().getShortCodeWithCountryAndVariant());</span>
+<span class="fc" id="L156">    g.writeNumberField(&quot;confidence&quot;, detectedLang.getDetectionConfidence());</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">    if (detectedLang.getDetectedLanguage().isSpellcheckOnlyLanguage()) {</span>
+<span class="nc" id="L158">      g.writeBooleanField(&quot;spellCheckOnly&quot;, true);</span>
+    }
+<span class="fc" id="L160">    g.writeEndObject();</span>
+<span class="fc" id="L161">    g.writeEndObject();</span>
+<span class="fc" id="L162">  }</span>
+
+  private void writeMatchesSection(String sectionName, JsonGenerator g, List&lt;RuleMatch&gt; matches, AnnotatedText text, ContextTools contextTools) throws IOException {
+<span class="fc" id="L165">    g.writeArrayFieldStart(sectionName);</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">    for (RuleMatch match : matches) {</span>
+<span class="fc" id="L167">      g.writeStartObject();</span>
+<span class="fc" id="L168">      g.writeStringField(&quot;message&quot;, cleanSuggestion(match.getMessage()));</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">      if (match.getShortMessage() != null) {</span>
+<span class="fc" id="L170">        g.writeStringField(&quot;shortMessage&quot;, cleanSuggestion(match.getShortMessage()));</span>
+      }
+<span class="fc" id="L172">      writeReplacements(g, match);</span>
+<span class="fc" id="L173">      g.writeNumberField(&quot;offset&quot;, match.getFromPos());</span>
+<span class="fc" id="L174">      g.writeNumberField(&quot;length&quot;, match.getToPos()-match.getFromPos());</span>
+<span class="fc" id="L175">      writeContext(g, match, text, contextTools);</span>
+<span class="fc" id="L176">      g.writeObjectFieldStart(&quot;type&quot;);</span>
+<span class="fc" id="L177">      g.writeStringField(&quot;typeName&quot;, match.getType().toString());</span>
+<span class="fc" id="L178">      g.writeEndObject();</span>
+<span class="fc" id="L179">      writeRule(g, match);</span>
+      // 3 is a guess - key 'ignoreForIncompleteSentence' isn't official and can hopefully be removed in the future
+      // now that we have 'contextForSureMatch':
+<span class="fc" id="L182">      int contextEstimate = match.getRule().estimateContextForSureMatch();</span>
+<span class="pc bpc" id="L183" title="1 of 4 branches missed.">      g.writeBooleanField(&quot;ignoreForIncompleteSentence&quot;, contextEstimate == -1 || contextEstimate &gt; 3);</span>
+<span class="fc" id="L184">      g.writeNumberField(&quot;contextForSureMatch&quot;, contextEstimate);</span>
+<span class="fc" id="L185">      g.writeEndObject();</span>
+<span class="fc" id="L186">    }</span>
+<span class="fc" id="L187">    g.writeEndArray();</span>
+<span class="fc" id="L188">  }</span>
+
+  private String cleanSuggestion(String s) {
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">    if (lang != null) {</span>
+<span class="fc" id="L192">      return lang.toAdvancedTypography(s.replaceAll(&quot;&lt;suggestion&gt;&quot;, lang.getOpeningDoubleQuote()).replaceAll(&quot;&lt;/suggestion&gt;&quot;, lang.getClosingDoubleQuote()));</span>
+    } else {
+<span class="nc" id="L194">      return s.replace(&quot;&lt;suggestion&gt;&quot;, &quot;\&quot;&quot;).replace(&quot;&lt;/suggestion&gt;&quot;, &quot;\&quot;&quot;);</span>
+    }
+  }
+  
+  private void writeReplacements(JsonGenerator g, RuleMatch match) throws IOException {
+<span class="fc" id="L199">    g.writeArrayFieldStart(&quot;replacements&quot;);</span>
+<span class="fc" id="L200">    boolean autoCorrect = match.isAutoCorrect();</span>
+<span class="fc" id="L201">    int i = 0;</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">    for (SuggestedReplacement replacement : match.getSuggestedReplacementObjects()) {</span>
+<span class="fc" id="L203">      i++;</span>
+<span class="pc bpc" id="L204" title="3 of 4 branches missed.">      if (compactMode == 1 &amp;&amp; i &gt; 5) {  // these clients only show up to 5 suggestions anyway</span>
+<span class="nc" id="L205">        break;</span>
+      }
+<span class="fc" id="L207">      g.writeStartObject();</span>
+<span class="fc" id="L208">      g.writeStringField(&quot;value&quot;, replacement.getReplacement());</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">      if (replacement.getShortDescription() != null) {</span>
+<span class="nc" id="L210">        g.writeStringField(&quot;shortDescription&quot;, replacement.getShortDescription());</span>
+      }
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">      if (replacement.getSuffix() != null) {</span>
+<span class="nc" id="L213">        g.writeStringField(&quot;suffix&quot;, replacement.getSuffix());</span>
+      }
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">      if (replacement.getType() != SuggestedReplacement.SuggestionType.Default) {</span>
+<span class="nc" id="L216">        g.writeStringField(&quot;type&quot;, replacement.getType().name());</span>
+      }
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">      if (autoCorrect) {</span>
+<span class="nc" id="L219">        g.writeBooleanField(&quot;autoCorrect&quot;, true);</span>
+<span class="nc" id="L220">        autoCorrect = false; // only for first replacement</span>
+      }
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">      if (replacement.getConfidence() != null) {</span>
+<span class="nc" id="L223">        g.writeNumberField(&quot;confidence&quot;, replacement.getConfidence());</span>
+      }
+<span class="fc" id="L225">      g.writeEndObject();</span>
+<span class="fc" id="L226">    }</span>
+<span class="fc" id="L227">    g.writeEndArray();</span>
+<span class="fc" id="L228">  }</span>
+
+  private void writeContext(JsonGenerator g, RuleMatch match, AnnotatedText text, ContextTools contextTools) throws IOException {
+<span class="fc" id="L231">    String context = contextTools.getContext(match.getFromPos(), match.getToPos(), text.getTextWithMarkup());</span>
+<span class="fc" id="L232">    int contextOffset = context.indexOf(START_MARKER);</span>
+<span class="fc" id="L233">    context = context.replaceFirst(START_MARKER, &quot;&quot;);</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">    if (compactMode != 1) {</span>
+<span class="fc" id="L235">      g.writeObjectFieldStart(&quot;context&quot;);</span>
+<span class="fc" id="L236">      g.writeStringField(&quot;text&quot;, context);</span>
+<span class="fc" id="L237">      g.writeNumberField(&quot;offset&quot;, contextOffset);</span>
+<span class="fc" id="L238">      g.writeNumberField(&quot;length&quot;, match.getToPos()-match.getFromPos());</span>
+<span class="fc" id="L239">      g.writeEndObject();</span>
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">      if (match.getSentence() != null) {</span>
+<span class="fc" id="L241">        g.writeStringField(&quot;sentence&quot;, match.getSentence().getText().trim());</span>
+      }
+    }
+<span class="fc" id="L244">  }</span>
+
+  private void writeRule(JsonGenerator g, RuleMatch match) throws IOException {
+<span class="fc" id="L247">    g.writeObjectFieldStart(&quot;rule&quot;);</span>
+<span class="fc" id="L248">    Rule rule = match.getRule();</span>
+<span class="fc" id="L249">    g.writeStringField(&quot;id&quot;, rule.getId());</span>
+<span class="fc bfc" id="L250" title="All 2 branches covered.">    if (rule instanceof AbstractPatternRule) {</span>
+<span class="fc" id="L251">      AbstractPatternRule pRule = (AbstractPatternRule) rule;</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">      if (pRule.getSubId() != null) {</span>
+<span class="fc" id="L253">        g.writeStringField(&quot;subId&quot;, pRule.getSubId());</span>
+      }
+<span class="pc bpc" id="L255" title="2 of 4 branches missed.">      if (pRule.getSourceFile() != null &amp;&amp; compactMode != 1) {</span>
+<span class="fc" id="L256">        g.writeStringField(&quot;sourceFile&quot;, pRule.getSourceFile().replaceFirst(&quot;.*/&quot;, &quot;&quot;));</span>
+      }
+    }
+<span class="fc" id="L259">    g.writeStringField(&quot;description&quot;, rule.getDescription());</span>
+<span class="fc" id="L260">    g.writeStringField(&quot;issueType&quot;, rule.getLocQualityIssueType().toString());</span>
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">    if (rule.isDefaultTempOff()) {</span>
+<span class="nc" id="L262">      g.writeBooleanField(&quot;tempOff&quot;, true);</span>
+    }
+<span class="pc bpc" id="L264" title="1 of 4 branches missed.">    if (match.getUrl() != null || rule.getUrl() != null) {</span>
+<span class="fc" id="L265">      g.writeArrayFieldStart(&quot;urls&quot;);  // currently only one, but keep it extensible</span>
+<span class="fc" id="L266">      g.writeStartObject();</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">      if (match.getUrl() != null) {</span>
+<span class="nc" id="L268">        g.writeStringField(&quot;value&quot;, match.getUrl().toString());</span>
+      } else {
+<span class="fc" id="L270">        g.writeStringField(&quot;value&quot;, rule.getUrl().toString());</span>
+      }
+<span class="fc" id="L272">      g.writeEndObject();</span>
+<span class="fc" id="L273">      g.writeEndArray();</span>
+    }
+<span class="fc" id="L275">    writeCategory(g, rule.getCategory());</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">    if (rule.getTags().size() &gt; 0) {</span>
+<span class="nc" id="L277">      g.writeArrayFieldStart(&quot;tags&quot;);</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">      for (Tag tag : rule.getTags()) {</span>
+<span class="nc" id="L279">        g.writeString(tag.name());</span>
+<span class="nc" id="L280">      }</span>
+<span class="nc" id="L281">      g.writeEndArray();</span>
+    }
+<span class="fc" id="L283">    g.writeEndObject();</span>
+<span class="fc" id="L284">  }</span>
+
+  private void writeCategory(JsonGenerator g, Category category) throws IOException {
+<span class="fc" id="L287">    g.writeObjectFieldStart(&quot;category&quot;);</span>
+<span class="fc" id="L288">    CategoryId catId = category.getId();</span>
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">    if (catId != null) {</span>
+<span class="fc" id="L290">      g.writeStringField(&quot;id&quot;, catId.toString());</span>
+<span class="fc" id="L291">      g.writeStringField(&quot;name&quot;, category.getName());</span>
+    }
+<span class="fc" id="L293">    g.writeEndObject();</span>
+<span class="fc" id="L294">  }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

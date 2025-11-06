@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LuceneSingleIndexLanguageModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.languagemodel</a> &gt; <span class="el_source">LuceneSingleIndexLanguageModel.java</span></div><h1>LuceneSingleIndexLanguageModel.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker 
+ * Copyright (C) 2014 Daniel Naber (http://www.danielnaber.de)
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.languagemodel;
+
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.search.*;
+import org.apache.lucene.store.FSDirectory;
+import org.languagetool.Experimental;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.*;
+
+/**
+ * Information about ngram occurrences, taken from Lucene indexes (one index per ngram level).
+ * This is not a real language model as it only returns information
+ * about occurrence counts but has no probability calculation, especially
+ * not for the case with 0 occurrences.
+ * @since 3.2
+ */
+public class LuceneSingleIndexLanguageModel extends BaseLanguageModel {
+
+<span class="nc" id="L43">  private static final Map&lt;File,LuceneSearcher&gt; dirToSearcherMap = new HashMap&lt;&gt;();  // static to save memory for language variants</span>
+
+<span class="nc" id="L45">  private final List&lt;File&gt; indexes = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L46">  private final Map&lt;Integer,LuceneSearcher&gt; luceneSearcherMap = new HashMap&lt;&gt;();</span>
+  private final File topIndexDir;
+  private final long maxNgram;
+
+  /**
+   * Throw RuntimeException is the given directory does not seem to be a valid ngram top directory
+   * with sub directories {@code 1grams} etc.
+   * @since 3.0
+   */
+  public static void validateDirectory(File topIndexDir) {
+<span class="nc bnc" id="L56" title="All 4 branches missed.">    if (!topIndexDir.exists() || !topIndexDir.isDirectory()) {</span>
+<span class="nc" id="L57">      throw new RuntimeException(&quot;Not found or is not a directory:\n&quot; +</span>
+              topIndexDir + &quot;\n&quot; +
+              &quot;As ngram directory, please select the directory that has a subdirectory like 'en'\n&quot; +
+              &quot;(or whatever language code you're using).&quot;);
+    }
+<span class="nc" id="L62">    List&lt;String&gt; dirs = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">    for (String name : topIndexDir.list()) {</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">      if (name.matches(&quot;[123]grams&quot;)) {</span>
+<span class="nc" id="L65">        dirs.add(name);</span>
+      }
+    }
+<span class="nc bnc" id="L68" title="All 2 branches missed.">    if (dirs.isEmpty()) {</span>
+<span class="nc" id="L69">      throw new RuntimeException(&quot;Directory must contain at least '1grams', '2grams', and '3grams': &quot; + topIndexDir.getAbsolutePath());</span>
+    }
+<span class="nc bnc" id="L71" title="All 2 branches missed.">    if (dirs.size() &lt; 3) {</span>
+<span class="nc" id="L72">      throw new RuntimeException(&quot;Expected at least '1grams', '2grams', and '3grams' sub directories but only got &quot; + dirs + &quot; in &quot; + topIndexDir.getAbsolutePath());</span>
+    }
+<span class="nc" id="L74">  }</span>
+  
+  /**
+   * Only used internally. 
+   * @since 3.2 
+   */
+  @Experimental
+  public static void clearCaches() {
+<span class="nc" id="L82">    dirToSearcherMap.clear();</span>
+<span class="nc" id="L83">  }</span>
+
+  /**
+   * @param topIndexDir a directory which contains at least another sub directory called {@code 3grams},
+   *                    which is a Lucene index with ngram occurrences as created by
+   *                    {@code org.languagetool.dev.FrequencyIndexCreator}.
+   */
+<span class="nc" id="L90">  public LuceneSingleIndexLanguageModel(File topIndexDir)  {</span>
+<span class="nc" id="L91">    doValidateDirectory(topIndexDir);</span>
+<span class="nc" id="L92">    this.topIndexDir = topIndexDir;</span>
+<span class="nc" id="L93">    addIndex(topIndexDir, 1);</span>
+<span class="nc" id="L94">    addIndex(topIndexDir, 2);</span>
+<span class="nc" id="L95">    addIndex(topIndexDir, 3);</span>
+<span class="nc" id="L96">    addIndex(topIndexDir, 4);</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">    if (luceneSearcherMap.isEmpty()) {</span>
+<span class="nc" id="L98">      throw new RuntimeException(&quot;No directories '1grams' ... '3grams' found in &quot; + topIndexDir);</span>
+    }
+<span class="nc" id="L100">    maxNgram = Collections.&lt;Integer&gt;max(luceneSearcherMap.keySet());</span>
+<span class="nc" id="L101">  }</span>
+
+<span class="nc" id="L103">  public LuceneSingleIndexLanguageModel(int maxNgram) {</span>
+<span class="nc" id="L104">    this.maxNgram = maxNgram;</span>
+<span class="nc" id="L105">    this.topIndexDir = null;</span>
+<span class="nc" id="L106">  }</span>
+
+  protected void doValidateDirectory(File topIndexDir) {
+<span class="nc" id="L109">    validateDirectory(topIndexDir);</span>
+<span class="nc" id="L110">  }</span>
+
+  private void addIndex(File topIndexDir, int ngramSize) {
+<span class="nc" id="L113">    File indexDir = new File(topIndexDir, ngramSize + &quot;grams&quot;);</span>
+<span class="nc bnc" id="L114" title="All 4 branches missed.">    if (indexDir.exists() &amp;&amp; indexDir.isDirectory()) {</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">      if (luceneSearcherMap.containsKey(ngramSize)) {</span>
+<span class="nc" id="L116">        throw new RuntimeException(&quot;Searcher for ngram size &quot; + ngramSize + &quot; already exists&quot;);</span>
+      }
+<span class="nc" id="L118">      luceneSearcherMap.put(ngramSize, getCachedLuceneSearcher(indexDir));</span>
+<span class="nc" id="L119">      indexes.add(indexDir);</span>
+    }
+<span class="nc" id="L121">  }</span>
+
+  @Override
+  public long getCount(List&lt;String&gt; tokens) {
+<span class="nc bnc" id="L125" title="All 2 branches missed.">    if (tokens.size() &gt; maxNgram) {</span>
+<span class="nc" id="L126">      throw new RuntimeException(&quot;Requested &quot; + tokens.size() + &quot;gram but index has only up to &quot; + maxNgram + &quot;gram: &quot; + tokens);</span>
+    }
+<span class="nc" id="L128">    Objects.requireNonNull(tokens);</span>
+<span class="nc" id="L129">    Term term = new Term(&quot;ngram&quot;, String.join(&quot; &quot;, tokens));</span>
+<span class="nc" id="L130">    return getCount(term, getLuceneSearcher(tokens.size()));</span>
+  }
+
+  @Override
+  public long getCount(String token1) {
+<span class="nc" id="L135">    Objects.requireNonNull(token1);</span>
+    //TODO: move this into the document? It's not there currently...
+    //if (token1.equals(LanguageModel.GOOGLE_SENTENCE_START)) {
+    //  return 42_107_029_039L;  // see StartTokenCounter, run with 2grams (3grams: 124_541_229_392)
+    //}
+<span class="nc" id="L140">    return getCount(Arrays.asList(token1));</span>
+  }
+
+  @Override
+  public long getTotalTokenCount() {
+<span class="nc" id="L145">    LuceneSearcher luceneSearcher = getLuceneSearcher(1);</span>
+    try {
+<span class="nc" id="L147">      RegexpQuery query = new RegexpQuery(new Term(&quot;totalTokenCount&quot;, &quot;.*&quot;));</span>
+<span class="nc" id="L148">      TopDocs docs = luceneSearcher.searcher.search(query, 1000);  // Integer.MAX_VALUE might cause OOE on wrong index</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">      if (docs.totalHits == 0) {</span>
+<span class="nc" id="L150">        throw new RuntimeException(&quot;Expected 'totalTokenCount' meta documents not found in 1grams index: &quot; + luceneSearcher.directory);</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">      } else if (docs.totalHits &gt; 1000) {</span>
+<span class="nc" id="L152">        throw new RuntimeException(&quot;Did not expect more than 1000 'totalTokenCount' meta documents: &quot; + docs.totalHits + &quot; in &quot; + luceneSearcher.directory);</span>
+      } else {
+<span class="nc" id="L154">        long result = 0;</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        for (ScoreDoc scoreDoc : docs.scoreDocs) {</span>
+<span class="nc" id="L156">          long tmp = Long.parseLong(luceneSearcher.reader.document(scoreDoc.doc).get(&quot;totalTokenCount&quot;));</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">          if (tmp &gt; result) {</span>
+            // due to the way FrequencyIndexCreator adds these totalTokenCount fields, we must not sum them,
+            // but take the largest one:
+<span class="nc" id="L160">            result = tmp;</span>
+          }
+        }
+<span class="nc" id="L163">        return result;</span>
+      }
+<span class="nc" id="L165">    } catch (IOException e) {</span>
+<span class="nc" id="L166">      throw new RuntimeException(e);</span>
+    }
+  }
+
+  protected LuceneSearcher getLuceneSearcher(int ngramSize) {
+<span class="nc" id="L171">    LuceneSearcher luceneSearcher = luceneSearcherMap.get(ngramSize);</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">    if (luceneSearcher == null) {</span>
+<span class="nc" id="L173">      throw new RuntimeException(&quot;No &quot; + ngramSize + &quot;grams directory found in &quot; + topIndexDir);</span>
+    }
+<span class="nc" id="L175">    return luceneSearcher;</span>
+  }
+
+  private LuceneSearcher getCachedLuceneSearcher(File indexDir) {
+<span class="nc" id="L179">    LuceneSearcher luceneSearcher = dirToSearcherMap.get(indexDir);</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">    if (luceneSearcher == null) {</span>
+      try {
+<span class="nc" id="L182">        LuceneSearcher newSearcher = new LuceneSearcher(indexDir);</span>
+<span class="nc" id="L183">        dirToSearcherMap.put(indexDir, newSearcher);</span>
+<span class="nc" id="L184">        return newSearcher;</span>
+<span class="nc" id="L185">      } catch (IOException e) {</span>
+<span class="nc" id="L186">        throw new RuntimeException(e);</span>
+      }
+    } else {
+<span class="nc" id="L189">      return luceneSearcher;</span>
+    }
+  }
+
+  private long getCount(Term term, LuceneSearcher luceneSearcher) {
+<span class="nc" id="L194">    long result = 0;</span>
+    try {
+<span class="nc" id="L196">      TopDocs docs = luceneSearcher.searcher.search(new TermQuery(term), 2000);</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">      if (docs.totalHits &gt; 2000) {</span>
+<span class="nc" id="L198">        throw new RuntimeException(&quot;More than 2000 matches for '&quot; + term + &quot;' not supported for performance reasons: &quot; +</span>
+                                   docs.totalHits + &quot; matches in &quot; + luceneSearcher.directory);
+      }
+<span class="nc bnc" id="L201" title="All 2 branches missed.">      for (ScoreDoc scoreDoc : docs.scoreDocs) {</span>
+<span class="nc" id="L202">        String countStr = luceneSearcher.reader.document(scoreDoc.doc).get(&quot;count&quot;);</span>
+<span class="nc" id="L203">        result += Long.parseLong(countStr);</span>
+      }
+      //System.out.println(term + &quot; -&gt; &quot; + result);
+<span class="nc" id="L206">    } catch (IOException e) {</span>
+<span class="nc" id="L207">      throw new RuntimeException(e);</span>
+<span class="nc" id="L208">    }</span>
+<span class="nc" id="L209">    return result;</span>
+  }
+
+  @Override
+  public void close() {
+<span class="nc bnc" id="L214" title="All 2 branches missed.">    for (LuceneSearcher searcher : luceneSearcherMap.values()) {</span>
+      try {
+<span class="nc" id="L216">        searcher.reader.close();</span>
+<span class="nc" id="L217">        searcher.directory.close();</span>
+<span class="nc" id="L218">      } catch (IOException e) {</span>
+<span class="nc" id="L219">        throw new RuntimeException(e);</span>
+<span class="nc" id="L220">      }</span>
+<span class="nc" id="L221">    }</span>
+<span class="nc" id="L222">  }</span>
+
+  @Override
+  public String toString() {
+<span class="nc" id="L226">    return indexes.toString();</span>
+  }
+
+  protected static class LuceneSearcher {
+    final FSDirectory directory;
+    final IndexReader reader;
+    final IndexSearcher searcher;
+<span class="nc" id="L233">    private LuceneSearcher(File indexDir) throws IOException {</span>
+<span class="nc" id="L234">      Path path = indexDir.toPath();</span>
+      // symlinks are not supported here, see https://issues.apache.org/jira/browse/LUCENE-6700,
+      // so we resolve the link ourselves:
+<span class="nc bnc" id="L237" title="All 2 branches missed.">      if (Files.isSymbolicLink(path)) {</span>
+<span class="nc" id="L238">        path = indexDir.getCanonicalFile().toPath();</span>
+      }
+<span class="nc" id="L240">      this.directory = FSDirectory.open(path);</span>
+<span class="nc" id="L241">      this.reader = DirectoryReader.open(directory);</span>
+<span class="nc" id="L242">      this.searcher = new IndexSearcher(reader);</span>
+<span class="nc" id="L243">    }</span>
+    public IndexReader getReader() {
+<span class="nc" id="L245">      return reader;</span>
+    }
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

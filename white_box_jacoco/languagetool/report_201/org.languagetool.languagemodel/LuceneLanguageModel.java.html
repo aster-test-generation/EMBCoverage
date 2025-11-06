@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LuceneLanguageModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.languagemodel</a> &gt; <span class="el_source">LuceneLanguageModel.java</span></div><h1>LuceneLanguageModel.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker 
+ * Copyright (C) 2015 Daniel Naber (http://www.danielnaber.de)
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.languagemodel;
+
+import org.jetbrains.annotations.Nullable;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+/**
+ * Like {@link LuceneSingleIndexLanguageModel}, but can merge the results of
+ * lookups in several independent indexes to one result.
+ * @since 2.7
+ */
+public class LuceneLanguageModel extends BaseLanguageModel {
+
+<span class="nc" id="L35">  private final List&lt;LuceneSingleIndexLanguageModel&gt; lms = new ArrayList&lt;&gt;();</span>
+
+  public static void validateDirectory(File topIndexDir) {
+<span class="nc" id="L38">    File[] subDirs = getSubDirectoriesOrNull(topIndexDir);</span>
+<span class="nc bnc" id="L39" title="All 4 branches missed.">    if (subDirs == null || subDirs.length == 0) {</span>
+<span class="nc" id="L40">      LuceneSingleIndexLanguageModel.validateDirectory(topIndexDir);</span>
+    }
+<span class="nc" id="L42">  }</span>
+
+  @Nullable
+  private static File[] getSubDirectoriesOrNull(File topIndexDir) {
+<span class="nc" id="L46">    return topIndexDir.listFiles((file, name) -&gt; name.matches(&quot;index-\\d+&quot;));</span>
+  }
+
+  /**
+   * @param topIndexDir a directory which contains either:
+   *                    1) sub directories called {@code 1grams}, {@code 2grams}, {@code 3grams},
+   *                    which are Lucene indexes with ngram occurrences as created by
+   *                    {@code org.languagetool.dev.FrequencyIndexCreator}
+   *                    or 2) sub directories {@code index-1}, {@code index-2} etc that contain
+   *                    the sub directories described under 1)
+   */
+<span class="nc" id="L57">  public LuceneLanguageModel(File topIndexDir)  {</span>
+<span class="nc" id="L58">    File[] subDirs = getSubDirectoriesOrNull(topIndexDir);</span>
+<span class="nc bnc" id="L59" title="All 4 branches missed.">    if (subDirs != null &amp;&amp; subDirs.length &gt; 0) {</span>
+<span class="nc" id="L60">      System.out.println(&quot;Running in multi-index mode with &quot; + subDirs.length + &quot; indexes: &quot; + topIndexDir);</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">      for (File subDir : subDirs) {</span>
+<span class="nc" id="L62">        lms.add(new LuceneSingleIndexLanguageModel(subDir));</span>
+      }
+    } else {
+<span class="nc" id="L65">      lms.add(new LuceneSingleIndexLanguageModel(topIndexDir));</span>
+    }
+<span class="nc" id="L67">  }</span>
+
+  @Override
+  public long getCount(List&lt;String&gt; tokens) {
+<span class="nc" id="L71">    return lms.stream().mapToLong(lm -&gt; lm.getCount(tokens)).sum();</span>
+  }
+
+  @Override
+  public long getCount(String token) {
+<span class="nc" id="L76">    return getCount(Arrays.asList(token));</span>
+  }
+
+  @Override
+  public long getTotalTokenCount() {
+<span class="nc" id="L81">    return lms.stream().mapToLong(lm -&gt; lm.getTotalTokenCount()).sum();</span>
+  }
+
+  @Override
+  public void close() {
+<span class="nc" id="L86">    lms.forEach(lm -&gt; lm.close());</span>
+<span class="nc" id="L87">  }</span>
+
+  @Override
+  public String toString() {
+<span class="nc" id="L91">    return lms.toString();</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

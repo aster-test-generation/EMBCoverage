@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractSimpleReplaceRule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules</a> &gt; <span class="el_source">AbstractSimpleReplaceRule.java</span></div><h1>AbstractSimpleReplaceRule.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2005 Daniel Naber (http://www.danielnaber.de)
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules;
+
+import java.io.IOException;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import org.jetbrains.annotations.Nullable;
+import org.languagetool.AnalyzedSentence;
+import org.languagetool.AnalyzedToken;
+import org.languagetool.AnalyzedTokenReadings;
+import org.languagetool.JLanguageTool;
+import org.languagetool.synthesis.Synthesizer;
+import org.languagetool.tools.StringTools;
+
+/**
+ * A rule that matches words which should not be used and suggests
+ * correct ones instead. Loads the relevant words from
+ * &lt;code&gt;rules/XX/replace.txt&lt;/code&gt;, where XX is a code of the language.
+ * 
+ * @author Andriy Rysin
+ */
+public abstract class AbstractSimpleReplaceRule extends Rule {
+
+<span class="nc" id="L42">  protected boolean ignoreTaggedWords = false;</span>
+<span class="nc" id="L43">  private boolean checkLemmas = true;</span>
+
+  protected abstract Map&lt;String, List&lt;String&gt;&gt; getWrongWords();
+
+  protected static Map&lt;String, List&lt;String&gt;&gt; loadFromPath(String path) {
+<span class="nc" id="L48">    return new SimpleReplaceDataLoader().loadWords(path);</span>
+  }
+
+  /**
+   * @since 5.0
+   */
+  protected static Map&lt;String, List&lt;String&gt;&gt; loadFromPath(String... paths) {
+<span class="nc" id="L55">    SimpleReplaceDataLoader loader = new SimpleReplaceDataLoader();</span>
+<span class="nc" id="L56">    Map&lt;String, List&lt;String&gt;&gt; map = new HashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">    for (String path : paths) {</span>
+<span class="nc" id="L58">      map.putAll(loader.loadWords(path));</span>
+    }
+<span class="nc" id="L60">    return map;</span>
+  }
+
+  /**
+   * Indicates if the rule is case-sensitive. Default value is &lt;code&gt;true&lt;/code&gt;.
+   * 
+   * @return true if the rule is case-sensitive, false otherwise.
+   */
+  public boolean isCaseSensitive() {
+<span class="nc" id="L69">    return true;</span>
+  }
+
+  /**
+   * @return the locale used for case conversion when {@link #isCaseSensitive()}
+   *         is set to &lt;code&gt;false&lt;/code&gt;.
+   */
+  public Locale getLocale() {
+<span class="nc" id="L77">    return Locale.getDefault();</span>
+  }
+
+  /**
+   * Skip words that are known in the POS tagging dictionary, assuming they
+   * cannot be incorrect.
+   * @since 2.3
+   */
+  public void setIgnoreTaggedWords() {
+<span class="nc" id="L86">    ignoreTaggedWords = true;</span>
+<span class="nc" id="L87">  }</span>
+
+<span class="nc" id="L89">  public AbstractSimpleReplaceRule(ResourceBundle messages) {</span>
+<span class="nc" id="L90">    super.setCategory(Categories.MISC.getCategory(messages));</span>
+<span class="nc" id="L91">  }</span>
+
+  @Override
+  public String getId() {
+<span class="nc" id="L95">    return &quot;SIMPLE_REPLACE&quot;;</span>
+  }
+
+  @Override
+  public String getDescription() {
+<span class="nc" id="L100">    return &quot;Checks for wrong words/phrases&quot;;</span>
+  }
+
+  public String getMessage(String tokenStr, List&lt;String&gt; replacements) {
+<span class="nc" id="L104">    return tokenStr + &quot; is not valid. Use: &quot;</span>
+<span class="nc" id="L105">        + String.join(&quot;, &quot;, replacements) + &quot;.&quot;;</span>
+  }
+
+  public String getShort() {
+<span class="nc" id="L109">    return &quot;Wrong word&quot;;</span>
+  }
+
+  private String cleanup(String word) {
+<span class="nc bnc" id="L113" title="All 2 branches missed.">    return isCaseSensitive() ? word : word.toLowerCase(getLocale()); </span>
+  }
+
+  @Override
+  public RuleMatch[] match(AnalyzedSentence sentence) throws IOException {
+<span class="nc" id="L118">    List&lt;RuleMatch&gt; ruleMatches = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L119">    AnalyzedTokenReadings[] tokens = sentence.getTokensWithoutWhitespace();</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">    for (AnalyzedTokenReadings tokenReadings : tokens) {</span>
+      // short for SENT_START
+<span class="nc bnc" id="L122" title="All 2 branches missed.">      if( JLanguageTool.SENTENCE_START_TAGNAME.equals(tokenReadings.getAnalyzedToken(0).getPOSTag()) ||</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">          tokenReadings.isImmunized() ||        //this rule is used mostly for spelling, so ignore both immunized</span>
+<span class="nc bnc" id="L124" title="All 4 branches missed.">          tokenReadings.isIgnoredBySpeller() || //and speller-ignorable rules</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">          (ignoreTaggedWords &amp;&amp; isTagged(tokenReadings))</span>
+      ) {
+<span class="nc" id="L127">        continue;</span>
+      }
+<span class="nc" id="L129">      List&lt;RuleMatch&gt; matchesForToken = findMatches(tokenReadings, sentence);</span>
+<span class="nc" id="L130">      ruleMatches.addAll(matchesForToken);</span>
+    }
+<span class="nc" id="L132">    return toRuleMatchArray(ruleMatches);</span>
+  }
+
+  protected List&lt;RuleMatch&gt; findMatches(AnalyzedTokenReadings tokenReadings, AnalyzedSentence sentence) throws IOException {
+<span class="nc" id="L136">    List&lt;RuleMatch&gt; ruleMatches = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L138">    String originalTokenStr = tokenReadings.getToken();</span>
+<span class="nc" id="L139">    String tokenString = cleanup(originalTokenStr);</span>
+
+    // try first with the original word, then with the all lower-case version
+<span class="nc" id="L142">    List&lt;String&gt; possibleReplacements = getWrongWords().get(originalTokenStr);</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">    if (possibleReplacements == null) {</span>
+<span class="nc" id="L144">      possibleReplacements = getWrongWords().get(tokenString);</span>
+    }
+
+<span class="nc bnc" id="L147" title="All 4 branches missed.">    if (possibleReplacements == null &amp;&amp; checkLemmas) {</span>
+<span class="nc" id="L148">      possibleReplacements = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L150">      List&lt;String&gt; lemmas = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">      for (AnalyzedToken analyzedToken : tokenReadings.getReadings()) {</span>
+<span class="nc" id="L152">        String lemma = analyzedToken.getLemma();</span>
+<span class="nc bnc" id="L153" title="All 6 branches missed.">        if (lemma != null &amp;&amp; getWrongWords().containsKey(lemma) &amp;&amp; ! lemmas.contains(lemma) ) {</span>
+<span class="nc" id="L154">          lemmas.add(cleanup(lemma));</span>
+        }
+<span class="nc" id="L156">      }</span>
+
+<span class="nc bnc" id="L158" title="All 2 branches missed.">      for (String lemma : lemmas) {</span>
+<span class="nc" id="L159">        List&lt;String&gt; replacements = getWrongWords().get(lemma);</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">        if (replacements != null) {</span>
+<span class="nc" id="L161">          Synthesizer synth = getSynthesizer();</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">          if (synth != null) {</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">            for (String replacementLemma : replacements) {</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">              for (AnalyzedToken at : tokenReadings.getReadings()) {</span>
+<span class="nc" id="L165">                AnalyzedToken newAt = new AnalyzedToken(at.getLemma(), at.getPOSTag(), replacementLemma);</span>
+<span class="nc" id="L166">                String[] s = synth.synthesize(newAt, at.getPOSTag());</span>
+<span class="nc" id="L167">                possibleReplacements.addAll(Arrays.asList(s));</span>
+<span class="nc" id="L168">              }</span>
+<span class="nc" id="L169">            }</span>
+          } else {
+<span class="nc" id="L171">            possibleReplacements.addAll(replacements);</span>
+          }
+        }
+<span class="nc" id="L174">      }</span>
+<span class="nc" id="L175">      possibleReplacements = possibleReplacements.stream().distinct().collect(Collectors.toList());</span>
+    }
+
+<span class="nc bnc" id="L178" title="All 4 branches missed.">    if (possibleReplacements != null &amp;&amp; possibleReplacements.size() &gt; 0) {</span>
+<span class="nc" id="L179">      List&lt;String&gt; replacements = new ArrayList&lt;&gt;(possibleReplacements);</span>
+<span class="nc" id="L180">      replacements.remove(originalTokenStr);</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">      if (replacements.size() &gt; 0) {</span>
+<span class="nc" id="L182">        RuleMatch potentialRuleMatch = createRuleMatch(tokenReadings, replacements, sentence);</span>
+<span class="nc" id="L183">        ruleMatches.add(potentialRuleMatch);</span>
+      }
+    }
+    
+<span class="nc" id="L187">    return ruleMatches;</span>
+  }
+
+  /**
+   * This method allows to override which tags will mark token as tagged
+   * @return returns true if token has valid tag
+   */
+  protected boolean isTagged(AnalyzedTokenReadings tokenReadings) {
+<span class="nc" id="L195">    return tokenReadings.isTagged();</span>
+  }
+
+  protected RuleMatch createRuleMatch(AnalyzedTokenReadings tokenReadings,
+                                      List&lt;String&gt; replacements, AnalyzedSentence sentence) {
+<span class="nc" id="L200">    String tokenString = tokenReadings.getToken();</span>
+<span class="nc" id="L201">    int pos = tokenReadings.getStartPos();</span>
+
+<span class="nc" id="L203">    RuleMatch potentialRuleMatch = new RuleMatch(this, sentence, pos, pos</span>
+<span class="nc" id="L204">        + tokenString.length(), getMessage(tokenString, replacements), getShort());</span>
+
+<span class="nc bnc" id="L206" title="All 4 branches missed.">    if (!isCaseSensitive() &amp;&amp; StringTools.startsWithUppercase(tokenString)) {</span>
+<span class="nc bnc" id="L207" title="All 2 branches missed.">      for (int i = 0; i &lt; replacements.size(); i++) {</span>
+<span class="nc" id="L208">        replacements.set(i, StringTools.uppercaseFirstChar(replacements.get(i)));</span>
+      }
+    }
+
+<span class="nc" id="L212">    potentialRuleMatch.setSuggestedReplacements(replacements);</span>
+
+<span class="nc" id="L214">    return potentialRuleMatch;</span>
+  }
+
+  /**
+   * @since 2.5
+   */
+  public boolean isCheckLemmas() {
+<span class="nc" id="L221">    return checkLemmas;</span>
+  }
+
+  /**
+   * Used to disable matching lemmas.
+   * @since 2.5
+   */
+  public void setCheckLemmas(boolean checkLemmas) {
+<span class="nc" id="L229">    this.checkLemmas = checkLemmas;</span>
+<span class="nc" id="L230">  }</span>
+
+  /**
+   * Synthesizer to generate inflected suggestions
+   * @since 5.1
+   */
+  @Nullable
+  public Synthesizer getSynthesizer() {
+<span class="nc" id="L238">    return null;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InputSentence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool</a> &gt; <span class="el_source">InputSentence.java</span></div><h1>InputSentence.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2017 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool;
+
+import org.languagetool.rules.CategoryId;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * For internal use only. Used as a key for caching check results.
+ * @since 3.7
+ */
+class InputSentence {
+
+  private final String text;
+  private final Language lang;
+  private final Language motherTongue;
+  private final Set&lt;String&gt; disabledRules;
+  private final Set&lt;CategoryId&gt; disabledRuleCategories;
+  private final Set&lt;String&gt; enabledRules;
+  private final Set&lt;CategoryId&gt; enabledRuleCategories;
+  private final UserConfig userConfig;
+  private final List&lt;Language&gt; altLanguages;
+  private final JLanguageTool.Mode mode;
+  private final JLanguageTool.Level level;
+
+  InputSentence(String text, Language lang, Language motherTongue,
+                Set&lt;String&gt; disabledRules, Set&lt;CategoryId&gt; disabledRuleCategories,
+                Set&lt;String&gt; enabledRules, Set&lt;CategoryId&gt; enabledRuleCategories, UserConfig userConfig,
+<span class="nc" id="L48">                List&lt;Language&gt; altLanguages, JLanguageTool.Mode mode, JLanguageTool.Level level) {</span>
+<span class="nc" id="L49">    this.text = Objects.requireNonNull(text);</span>
+<span class="nc" id="L50">    this.lang = Objects.requireNonNull(lang);</span>
+<span class="nc" id="L51">    this.motherTongue = motherTongue;</span>
+<span class="nc" id="L52">    this.disabledRules = disabledRules;</span>
+<span class="nc" id="L53">    this.disabledRuleCategories = disabledRuleCategories;</span>
+<span class="nc" id="L54">    this.enabledRules = enabledRules;</span>
+<span class="nc" id="L55">    this.enabledRuleCategories = enabledRuleCategories;</span>
+<span class="nc" id="L56">    this.userConfig = userConfig;</span>
+<span class="nc" id="L57">    this.altLanguages = altLanguages;</span>
+<span class="nc" id="L58">    this.mode = Objects.requireNonNull(mode);</span>
+<span class="nc" id="L59">    this.level = Objects.requireNonNull(level);</span>
+<span class="nc" id="L60">  }</span>
+
+  /** @since 4.1 */
+  public String getText() {
+<span class="nc" id="L64">    return text;</span>
+  }
+  
+  @Override
+  public boolean equals(Object o) {
+<span class="nc bnc" id="L69" title="All 2 branches missed.">    if (o == null) return false;</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">    if (o == this) return true;</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">    if (o.getClass() != getClass()) return false;</span>
+<span class="nc" id="L72">    InputSentence other = (InputSentence) o;</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">    return Objects.equals(text, other.text) &amp;&amp; </span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">           Objects.equals(lang, other.lang) &amp;&amp;</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">           Objects.equals(motherTongue, other.motherTongue) &amp;&amp;</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">           Objects.equals(disabledRules, other.disabledRules) &amp;&amp;</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">           Objects.equals(disabledRuleCategories, other.disabledRuleCategories) &amp;&amp;</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">           Objects.equals(enabledRules, other.enabledRules) &amp;&amp;</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">           Objects.equals(enabledRuleCategories, other.enabledRuleCategories) &amp;&amp;</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">           Objects.equals(userConfig, other.userConfig) &amp;&amp;</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">           Objects.equals(altLanguages, other.altLanguages) &amp;&amp;</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">           Objects.equals(mode, other.mode) &amp;&amp;</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">           Objects.equals(level, other.level);</span>
+  }
+
+  @Override
+  public int hashCode() {
+<span class="nc" id="L88">    return Objects.hash(text, lang, motherTongue, disabledRules, disabledRuleCategories,</span>
+            enabledRules, enabledRuleCategories, userConfig, altLanguages, mode, level);
+  }
+
+  @Override
+  public String toString() {
+<span class="nc" id="L94">    return text;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

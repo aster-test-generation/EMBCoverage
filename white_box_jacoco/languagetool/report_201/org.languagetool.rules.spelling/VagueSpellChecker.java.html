@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VagueSpellChecker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules.spelling</a> &gt; <span class="el_source">VagueSpellChecker.java</span></div><h1>VagueSpellChecker.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2020 Daniel Naber (http://danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules.spelling;
+
+import morfologik.speller.Speller;
+import morfologik.stemming.Dictionary;
+import org.languagetool.AnalyzedSentence;
+import org.languagetool.JLanguageTool;
+import org.languagetool.Language;
+import org.languagetool.UserConfig;
+import org.languagetool.rules.Rule;
+import org.languagetool.rules.RuleMatch;
+import org.languagetool.rules.spelling.hunspell.HunspellRule;
+import org.languagetool.rules.spelling.morfologik.MorfologikSpellerRule;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.ResourceBundle;
+
+/**
+ * A spell checker that's fast but not guaranteed to always agree with the
+ * &quot;real&quot; spell checker used in LT. Doesn't offer corrections.
+ * Can be used for guessing the language of shorts texts where ngram
+ * or AI-based language identification isn't exact enough.
+ */
+<span class="nc" id="L43">public class VagueSpellChecker {</span>
+
+<span class="nc" id="L45">  private final static Map&lt;Language, Rule&gt; langToRule = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L46">  private final static Map&lt;Language, Dictionary&gt; langToDict = new HashMap&lt;&gt;();</span>
+  
+  public boolean isValidWord(String word, Language lang) {
+<span class="nc" id="L49">    Rule rule = langToRule.get(lang);</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">    if (rule == null) {</span>
+<span class="nc" id="L51">      Rule tempRule = getSpellingCheckRule(lang);</span>
+<span class="nc bnc" id="L52" title="All 2 branches missed.">      if (tempRule instanceof HunspellRule) {</span>
+<span class="nc" id="L53">        rule = tempRule;</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">      } else if (tempRule instanceof MorfologikSpellerRule) {</span>
+<span class="nc" id="L55">        rule = new NonThreadSafeSpellRule(JLanguageTool.getMessageBundle(), lang, null);</span>
+      }
+<span class="nc" id="L57">      langToRule.put(lang, rule);</span>
+    }
+<span class="nc bnc" id="L59" title="All 2 branches missed.">    if (rule instanceof NonThreadSafeSpellRule) {</span>
+      // indicates a Morfologik-based speller - it's not thread-safe, so re-create Speller in isMisspelled():
+<span class="nc" id="L61">      return ((NonThreadSafeSpellRule) rule).isMisspelled(word);</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">    } else if (rule instanceof HunspellRule) {</span>
+      // it's okay to use a cached rule, as hunspell-based &quot;isMisspelled()&quot; is thread-safe
+<span class="nc bnc" id="L64" title="All 2 branches missed.">      return !((HunspellRule) rule).isMisspelled(word);</span>
+    } else {
+<span class="nc" id="L66">      throw new RuntimeException(&quot;Unknown rule type for language &quot; + lang.getShortCodeWithCountryAndVariant() + &quot;: &quot; + rule);</span>
+    }
+  }
+
+  private SpellingCheckRule getSpellingCheckRule(Language lang) {
+<span class="nc" id="L71">    JLanguageTool lt = new JLanguageTool(lang);</span>
+<span class="nc" id="L72">    SpellingCheckRule spellRule = null;</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">    for (Rule r : lt.getAllActiveRules()) {</span>
+<span class="nc bnc" id="L74" title="All 4 branches missed.">      if (r instanceof HunspellRule || r instanceof MorfologikSpellerRule) {</span>
+<span class="nc" id="L75">        spellRule = (SpellingCheckRule) r;</span>
+        // TODO: what if there's more than one spell rule?
+<span class="nc" id="L77">        break;</span>
+      }
+<span class="nc" id="L79">    }</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">    if (spellRule == null) {</span>
+<span class="nc" id="L81">      throw new RuntimeException(&quot;No spelling rule found for language &quot; + lang.getShortCodeWithCountryAndVariant() +</span>
+        &quot; - make sure to set 'preferredVariants' so a variant with a spell checker can be selected&quot;);
+    }
+<span class="nc" id="L84">    return spellRule;</span>
+  }
+
+  private class NonThreadSafeSpellRule extends SpellingCheckRule {
+
+<span class="nc" id="L89">    private NonThreadSafeSpellRule(ResourceBundle messages, Language language, UserConfig userConfig) {</span>
+<span class="nc" id="L90">      super(messages, language, userConfig);</span>
+<span class="nc" id="L91">    }</span>
+
+    @Override
+    public String getId() {
+<span class="nc" id="L95">      return &quot;FAKE_FOR_VAGUE_SPELL_CHECKER&quot;;</span>
+    }
+
+    @Override
+    public String getDescription() {
+<span class="nc" id="L100">      return &quot;internal&quot;;</span>
+    }
+
+    @Override
+    public RuleMatch[] match(AnalyzedSentence sentence) throws IOException {
+<span class="nc" id="L105">      throw new RuntimeException(&quot;not implemented&quot;);</span>
+    }
+
+    @Override
+    public boolean isMisspelled(String word) {
+      try {
+<span class="nc" id="L111">        Dictionary dict = langToDict.get(language);  // Dictionary itself is thread-safe, so it can be cached and re-used</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        if (dict == null) {</span>
+<span class="nc" id="L113">          SpellingCheckRule spellingRule = getSpellingCheckRule(language);</span>
+<span class="nc" id="L114">          dict = Dictionary.read(JLanguageTool.getDataBroker().getFromResourceDirAsUrl(((MorfologikSpellerRule)spellingRule).getFileName()));</span>
+<span class="nc" id="L115">          langToDict.put(language, dict);</span>
+        }
+<span class="nc" id="L117">        Speller speller = new Speller(dict, 1);</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        return !speller.isMisspelled(word);</span>
+<span class="nc" id="L119">      } catch (IOException e) {</span>
+<span class="nc" id="L120">        throw new RuntimeException(e);</span>
+      }
+    }
+  }
+  
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

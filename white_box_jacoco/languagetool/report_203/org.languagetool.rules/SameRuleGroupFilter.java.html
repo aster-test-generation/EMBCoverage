@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SameRuleGroupFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules</a> &gt; <span class="el_source">SameRuleGroupFilter.java</span></div><h1>SameRuleGroupFilter.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2012 Daniel Naber (http://www.danielnaber.de)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/**
+ * Filter rule matches so that only the first match is kept from overlapping
+ * matches with the same rule group (actually: the same id).
+ * @since 1.8
+ */
+<span class="fc" id="L30">public class SameRuleGroupFilter implements RuleMatchFilter {</span>
+
+  /**
+   * @param ruleMatches list of matches
+   */
+  @Override
+  public List&lt;RuleMatch&gt; filter(List&lt;RuleMatch&gt; ruleMatches) {
+<span class="fc" id="L37">    Collections.sort(ruleMatches);</span>
+<span class="fc" id="L38">    List&lt;RuleMatch&gt; filteredRules = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">    for (int i = 0; i &lt; ruleMatches.size(); i++) {</span>
+<span class="fc" id="L40">      RuleMatch match = ruleMatches.get(i);</span>
+<span class="pc bpc" id="L41" title="1 of 4 branches missed.">      while (i &lt; ruleMatches.size() - 1 &amp;&amp; overlapAndMatch(match, ruleMatches.get(i + 1))) {</span>
+<span class="nc" id="L42">        i++;  // skip next match</span>
+      }
+<span class="fc" id="L44">      filteredRules.add(match);</span>
+    }
+<span class="fc" id="L46">    return filteredRules;</span>
+  }
+
+  private boolean overlapAndMatch(RuleMatch match, RuleMatch nextMatch) {
+<span class="pc bpc" id="L50" title="1 of 4 branches missed.">    return overlaps(match, nextMatch) &amp;&amp; haveSameRuleGroup(match, nextMatch);</span>
+  }
+
+  boolean overlaps(RuleMatch match, RuleMatch nextMatch) {
+<span class="pc bpc" id="L54" title="1 of 4 branches missed.">    if (match.getFromPos() &lt;= nextMatch.getToPos() &amp;&amp; match.getToPos() &gt;= nextMatch.getFromPos()) {</span>
+<span class="fc" id="L55">      return true;</span>
+    }
+<span class="fc" id="L57">    return false;</span>
+  }
+
+  private boolean haveSameRuleGroup(RuleMatch match, RuleMatch nextMatch) {
+<span class="fc" id="L61">    String id1 = match.getRule().getId();</span>
+<span class="pc bpc" id="L62" title="2 of 4 branches missed.">    return id1 != null &amp;&amp; id1.equals(nextMatch.getRule().getId());</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

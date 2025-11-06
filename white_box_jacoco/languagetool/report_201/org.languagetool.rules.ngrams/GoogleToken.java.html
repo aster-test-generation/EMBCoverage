@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GoogleToken.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules.ngrams</a> &gt; <span class="el_source">GoogleToken.java</span></div><h1>GoogleToken.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker 
+ * Copyright (C) 2015 Daniel Naber (http://www.danielnaber.de)
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules.ngrams;
+
+import org.languagetool.AnalyzedSentence;
+import org.languagetool.AnalyzedToken;
+import org.languagetool.AnalyzedTokenReadings;
+import org.languagetool.Experimental;
+import org.languagetool.languagemodel.LanguageModel;
+import org.languagetool.tokenizers.Tokenizer;
+import org.languagetool.tools.StringTools;
+
+import java.util.*;
+
+/**
+ * A token as tokenized in the Google ngram index.
+ * @since 3.2
+ */
+class GoogleToken {
+
+  final String token;
+  final int startPos;
+  final int endPos;
+  final Set&lt;AnalyzedToken&gt; posTags;
+
+  GoogleToken(String token, int startPos, int endPos) {
+<span class="nc" id="L43">    this(token, startPos, endPos, Collections.emptySet());</span>
+<span class="nc" id="L44">  }</span>
+
+<span class="nc" id="L46">  GoogleToken(String token, int startPos, int endPos, Set&lt;AnalyzedToken&gt; posTags) {</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">    this.token = &quot;’&quot;.equals(token) ? &quot;'&quot; : token;  // Google seems to have indexed the apostrophe always like this</span>
+<span class="nc" id="L48">    this.startPos = startPos;</span>
+<span class="nc" id="L49">    this.endPos = endPos;</span>
+<span class="nc" id="L50">    this.posTags = posTags;</span>
+<span class="nc" id="L51">  }</span>
+
+  Set&lt;AnalyzedToken&gt; getPosTags() {
+<span class="nc" id="L54">    return posTags;</span>
+  }
+
+  boolean isWhitespace() {
+<span class="nc" id="L58">    return StringTools.isWhitespace(token);</span>
+  }
+
+  @Override
+  public String toString() {
+<span class="nc" id="L63">    return token;</span>
+  }
+
+  // Tokenization in google ngram corpus is different from LT tokenization (e.g. {@code you ' re} -&gt; {@code you 're}),
+  // so we use getTokenizer() and simple ignore the LT tokens.
+  static List&lt;GoogleToken&gt; getGoogleTokens(String sentence, boolean addStartToken, Tokenizer wordTokenizer) {
+<span class="nc" id="L69">    List&lt;GoogleToken&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">    if (addStartToken) {</span>
+<span class="nc" id="L71">      result.add(new GoogleToken(LanguageModel.GOOGLE_SENTENCE_START, 0, 0));</span>
+    }
+<span class="nc" id="L73">    List&lt;String&gt; tokens = wordTokenizer.tokenize(sentence);</span>
+<span class="nc" id="L74">    int startPos = 0;</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">    for (String token : tokens) {</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">      if (!StringTools.isWhitespace(token)) {</span>
+<span class="nc" id="L77">        result.add(new GoogleToken(token, startPos, startPos+token.length()));</span>
+      }
+<span class="nc" id="L79">      startPos += token.length();</span>
+<span class="nc" id="L80">    }</span>
+<span class="nc" id="L81">    return result;</span>
+  }
+
+  // Tokenization in google ngram corpus is different from LT tokenization (e.g. {@code you ' re} -&gt; {@code you 're}),
+  // so we use getTokenizer() and simple ignore the LT tokens. Also adds POS tags from original sentence if trivially possible.
+  static List&lt;GoogleToken&gt; getGoogleTokens(AnalyzedSentence sentence, boolean addStartToken, Tokenizer wordTokenizer) {
+<span class="nc" id="L87">    List&lt;GoogleToken&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">    if (addStartToken) {</span>
+<span class="nc" id="L89">      result.add(new GoogleToken(LanguageModel.GOOGLE_SENTENCE_START, 0, 0));</span>
+    }
+<span class="nc" id="L91">    List&lt;String&gt; tokens = wordTokenizer.tokenize(sentence.getText());</span>
+<span class="nc" id="L92">    int startPos = 0;</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">    for (String token : tokens) {</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">      if (!StringTools.isWhitespace(token)) {</span>
+<span class="nc" id="L95">        int endPos = startPos + token.length();</span>
+<span class="nc" id="L96">        Set&lt;AnalyzedToken&gt; pos = findOriginalAnalyzedTokens(sentence, startPos, endPos);</span>
+<span class="nc" id="L97">        GoogleToken gToken = new GoogleToken(token, startPos, endPos, pos);</span>
+<span class="nc" id="L98">        result.add(gToken);</span>
+      }
+<span class="nc" id="L100">      startPos += token.length();</span>
+<span class="nc" id="L101">    }</span>
+<span class="nc" id="L102">    return result;</span>
+  }
+
+  private static Set&lt;AnalyzedToken&gt; findOriginalAnalyzedTokens(AnalyzedSentence sentence, int startPos, int endPos) {
+<span class="nc" id="L106">    Set&lt;AnalyzedToken&gt; result = new HashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">    for (AnalyzedTokenReadings tokens : sentence.getTokensWithoutWhitespace()) {</span>
+<span class="nc bnc" id="L108" title="All 4 branches missed.">      if (tokens.getStartPos() == startPos &amp;&amp; tokens.getEndPos() == endPos) {</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        for (AnalyzedToken analyzedToken : tokens.getReadings()) {</span>
+<span class="nc" id="L110">          result.add(analyzedToken);</span>
+<span class="nc" id="L111">        }</span>
+      }
+    }
+<span class="nc" id="L114">    return result;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

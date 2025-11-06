@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SuggestionsOrdererFeatureExtractor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules.spelling.suggestions</a> &gt; <span class="el_source">SuggestionsOrdererFeatureExtractor.java</span></div><h1>SuggestionsOrdererFeatureExtractor.java</h1><pre class="source lang-java linenums">/*
+ *  LanguageTool, a natural language style checker
+ *  * Copyright (C) 2018 Fabian Richter
+ *  *
+ *  * This library is free software; you can redistribute it and/or
+ *  * modify it under the terms of the GNU Lesser General Public
+ *  * License as published by the Free Software Foundation; either
+ *  * version 2.1 of the License, or (at your option) any later version.
+ *  *
+ *  * This library is distributed in the hope that it will be useful,
+ *  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *  * Lesser General Public License for more details.
+ *  *
+ *  * You should have received a copy of the GNU Lesser General Public
+ *  * License along with this library; if not, write to the Free Software
+ *  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ *  * USA
+ *
+ */
+
+package org.languagetool.rules.spelling.suggestions;
+
+import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.text.similarity.JaroWinklerDistance;
+import org.apache.commons.text.similarity.SimilarityScore;
+import org.jetbrains.annotations.NotNull;
+import org.languagetool.AnalyzedSentence;
+import org.languagetool.Language;
+import org.languagetool.languagemodel.BaseLanguageModel;
+import org.languagetool.languagemodel.LanguageModel;
+import org.languagetool.rules.SuggestedReplacement;
+import org.languagetool.rules.ngrams.LanguageModelUtils;
+import org.languagetool.rules.spelling.morfologik.suggestions_ordering.DetailedDamerauLevenstheinDistance;
+import org.languagetool.rules.spelling.symspell.implementation.EditDistance;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * Computes features that can be stored for training a model to rank suggestions,
+ * or when using the same model for prediction
+ * Used directly by SuggestionChangesTest for the former,
+ * and as a superclass for the latter
+ */
+public class SuggestionsOrdererFeatureExtractor implements SuggestionsOrderer {
+
+<span class="nc" id="L51">  private static final Logger logger = LoggerFactory.getLogger(SuggestionsOrdererFeatureExtractor.class);</span>
+
+  protected final Language language;
+  protected final LanguageModel languageModel;
+
+<span class="nc" id="L56">  protected int topN = -1;</span>
+  protected String score;
+  protected double mistakeProb;
+
+
+<span class="nc" id="L61">  public SuggestionsOrdererFeatureExtractor(Language lang, LanguageModel languageModel) {</span>
+<span class="nc" id="L62">    language = lang;</span>
+<span class="nc" id="L63">    this.languageModel = languageModel;</span>
+<span class="nc" id="L64">    initParameters();</span>
+<span class="nc" id="L65">  }</span>
+
+  protected void initParameters() {
+<span class="nc" id="L68">    SuggestionChangesExperiment experiment = SuggestionsChanges.getInstance().getCurrentExperiment();</span>
+<span class="nc" id="L69">    topN = (Integer) experiment.parameters.getOrDefault(&quot;topN&quot;, -1);</span>
+<span class="nc" id="L70">    score = (String) experiment.parameters.get(&quot;score&quot;);</span>
+<span class="nc" id="L71">    mistakeProb = (double) experiment.parameters.getOrDefault(&quot;levenstheinProb&quot;, 1.0);</span>
+<span class="nc" id="L72">  }</span>
+
+  @Override
+  public boolean isMlAvailable() {
+<span class="nc bnc" id="L76" title="All 2 branches missed.">    return languageModel != null;</span>
+  }
+
+  @Override
+  public List&lt;SuggestedReplacement&gt; orderSuggestions(List&lt;String&gt; suggestions, String word, AnalyzedSentence sentence, int startPos) {
+<span class="nc" id="L81">    return computeFeatures(suggestions, word, sentence, startPos).getLeft();</span>
+  }
+
+  /**
+   * compute features for training or prediction of a ranking model for suggestions
+   * @param suggestions
+   * @param word
+   * @param sentence
+   * @param startPos
+   * @return correction candidates, features for the match in general, features specific to candidates
+   */
+  public Pair&lt;List&lt;SuggestedReplacement&gt;, SortedMap&lt;String, Float&gt;&gt; computeFeatures(List&lt;String&gt; suggestions, String word, AnalyzedSentence sentence, int startPos) {
+<span class="nc bnc" id="L93" title="All 2 branches missed.">    if (suggestions.isEmpty()) {</span>
+<span class="nc" id="L94">      return Pair.of(Collections.emptyList(), Collections.emptySortedMap());</span>
+    }
+<span class="nc bnc" id="L96" title="All 2 branches missed.">    if (topN &lt;= 0) {</span>
+<span class="nc" id="L97">      topN = suggestions.size();</span>
+    }
+<span class="nc" id="L99">    List&lt;String&gt; topSuggestions = suggestions.subList(0, Math.min(suggestions.size(), topN));</span>
+    //EditDistance&lt;Integer&gt; levenshteinDistance = new LevenshteinDistance(4);
+<span class="nc" id="L101">    EditDistance levenstheinDistance = new EditDistance(word, EditDistance.DistanceAlgorithm.Damerau);</span>
+<span class="nc" id="L102">    SimilarityScore&lt;Double&gt; jaroWrinklerDistance = new JaroWinklerDistance();</span>
+<span class="nc" id="L103">    List&lt;Feature&gt; features = new ArrayList&lt;&gt;(topSuggestions.size());</span>
+
+<span class="nc bnc" id="L105" title="All 2 branches missed.">    for (String candidate : topSuggestions) {</span>
+<span class="nc" id="L106">      double prob1 = languageModel.getPseudoProbability(Collections.singletonList(candidate)).getProb();</span>
+<span class="nc" id="L107">      double prob3 = LanguageModelUtils.get3gramProbabilityFor(language, languageModel, startPos, sentence, candidate);</span>
+      //double prob4 = LanguageModelUtils.get4gramProbabilityFor(language, languageModel, startPos, sentence, candidate);
+<span class="nc" id="L109">      long wordCount = ((BaseLanguageModel) languageModel).getCount(candidate);</span>
+<span class="nc" id="L110">      int levenstheinDist = levenstheinDistance.compare(candidate, 3);</span>
+<span class="nc" id="L111">      double jaroWrinklerDist = jaroWrinklerDistance.apply(word, candidate);</span>
+<span class="nc" id="L112">      DetailedDamerauLevenstheinDistance.Distance detailedDistance = DetailedDamerauLevenstheinDistance.compare(word, candidate);</span>
+
+<span class="nc" id="L114">      features.add(new Feature(prob1, prob3, wordCount, levenstheinDist, detailedDistance, jaroWrinklerDist, candidate));</span>
+<span class="nc" id="L115">    }</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">    if (!&quot;noop&quot;.equals(score)) {</span>
+<span class="nc" id="L117">      features.sort(Feature::compareTo);</span>
+    }
+    //logger.trace(&quot;Features for '%s' in '%s': %n&quot;, word, sentence.getText());
+    //features.stream().map(Feature::toString).forEach(logger::trace);
+<span class="nc" id="L121">    List&lt;String&gt; words = features.stream().map(Feature::getWord).collect(Collectors.toList());</span>
+
+    // compute general features, not tied to candidates
+<span class="nc" id="L124">    SortedMap&lt;String, Float&gt; matchData = new TreeMap&lt;&gt;();</span>
+<span class="nc" id="L125">    matchData.put(&quot;candidateCount&quot;, (float) words.size());</span>
+
+<span class="nc" id="L127">    List&lt;SuggestedReplacement&gt; suggestionsData = features.stream().map(f -&gt; {</span>
+<span class="nc" id="L128">      SuggestedReplacement s = new SuggestedReplacement(f.getWord());</span>
+<span class="nc" id="L129">      s.setFeatures(f.getData());</span>
+<span class="nc" id="L130">      return s;</span>
+<span class="nc" id="L131">    }).collect(Collectors.toList());</span>
+<span class="nc" id="L132">    return Pair.of(suggestionsData, matchData);</span>
+  }
+
+
+  class Feature implements Comparable&lt;Feature&gt;{
+    private final double prob1gram;
+    private final double prob3gram;
+    //private final double prob4gram;
+    private final long wordCount;
+    private final int levenshteinDistance;
+    private final DetailedDamerauLevenstheinDistance.Distance detailedDistance;
+    private final double jaroWrinklerDistance;
+    private final String word;
+
+    Feature(double prob1, double prob3, long wordCount, int levenshteinDistance,
+<span class="nc" id="L147">            DetailedDamerauLevenstheinDistance.Distance detailedDistance, double jaroWrinklerDistance, String word) {</span>
+<span class="nc" id="L148">      this.prob1gram = prob1;</span>
+<span class="nc" id="L149">      this.prob3gram = prob3;</span>
+<span class="nc" id="L150">      this.wordCount = wordCount;</span>
+<span class="nc" id="L151">      this.levenshteinDistance = levenshteinDistance;</span>
+<span class="nc" id="L152">      this.detailedDistance = detailedDistance;</span>
+<span class="nc" id="L153">      this.jaroWrinklerDistance = jaroWrinklerDistance;</span>
+<span class="nc" id="L154">      this.word = word;</span>
+<span class="nc" id="L155">    }</span>
+
+    public String getWord() {
+<span class="nc" id="L158">      return word;</span>
+    }
+
+    private int factorial(int n) {
+<span class="nc" id="L162">      int factor = n;</span>
+<span class="nc" id="L163">      int result = 1;</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">      while (factor &gt; 1) {</span>
+<span class="nc" id="L165">        result *= factor--;</span>
+      }
+<span class="nc" id="L167">      return result;</span>
+    }
+
+    private int binomialCoefficient(int n, int k) {
+<span class="nc" id="L171">      return factorial(n) / (factorial(k) * factorial(n - k));</span>
+    }
+
+    private double binomialProbability(double p, int n, int k) {
+<span class="nc" id="L175">      return binomialCoefficient(n, k) * Math.pow(p, k) * Math.pow(1 - p, n - k);</span>
+    }
+
+    private double getMeanProbability() {
+      // TODO: test weighing unigrams less
+      // TODO: test 4grams again
+<span class="nc" id="L181">      double ngramProb = Math.log(prob1gram) + Math.log(prob3gram);// + Math.log(prob4gram);</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">      if (&quot;ngrams+levensthein&quot;.equals(score)) {</span>
+<span class="nc" id="L183">        double misspellingProb = Math.pow(mistakeProb, levenshteinDistance);</span>
+<span class="nc" id="L184">        return ngramProb + Math.log(misspellingProb);</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">      } else if (&quot;ngrams&quot;.equals(score)) {</span>
+<span class="nc" id="L186">        return ngramProb;</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">      } else if (&quot;ngrams+binomialLevensthein&quot;.equals(score)) {</span>
+<span class="nc" id="L188">        double misspellingProb = binomialProbability(mistakeProb, word.length(), levenshteinDistance);</span>
+<span class="nc" id="L189">        return ngramProb + Math.log(misspellingProb);</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">      } else if (&quot;noop&quot;.equals(score)) {</span>
+<span class="nc" id="L191">        return 0;</span>
+      } else {
+<span class="nc" id="L193">        throw new RuntimeException(&quot;Unknown scoring method: &quot; + score);</span>
+      }
+    }
+
+    @Override
+    public int compareTo(@NotNull Feature o) {
+      // sort descending
+<span class="nc" id="L200">      return Double.compare(o.getMeanProbability(), this.getMeanProbability());</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L205">      return new ToStringBuilder(this)</span>
+<span class="nc" id="L206">        .append(&quot;word&quot;, word)</span>
+<span class="nc" id="L207">        .append(&quot;data&quot;, getData())</span>
+<span class="nc" id="L208">        .build();</span>
+    }
+
+    public SortedMap&lt;String, Float&gt; getData() {
+<span class="nc" id="L212">      SortedMap&lt;String, Float&gt; data = new TreeMap&lt;&gt;();</span>
+<span class="nc" id="L213">      data.put(&quot;prob1gram&quot;, (float) prob1gram);</span>
+<span class="nc" id="L214">      data.put(&quot;prob3gram&quot;, (float) prob3gram);</span>
+<span class="nc" id="L215">      data.put(&quot;wordCount&quot;, (float) wordCount);</span>
+<span class="nc" id="L216">      data.put(&quot;levensthein&quot;, (float) levenshteinDistance);</span>
+<span class="nc" id="L217">      data.put(&quot;jaroWrinkler&quot;, (float) jaroWrinklerDistance);</span>
+<span class="nc" id="L218">      data.put(&quot;inserts&quot;, (float) detailedDistance.inserts);</span>
+<span class="nc" id="L219">      data.put(&quot;deletes&quot;, (float) detailedDistance.deletes);</span>
+<span class="nc" id="L220">      data.put(&quot;replaces&quot;, (float) detailedDistance.replaces);</span>
+<span class="nc" id="L221">      data.put(&quot;transposes&quot;, (float) detailedDistance.transposes);</span>
+<span class="nc" id="L222">      data.put(&quot;wordLength&quot;, (float) word.length());</span>
+      // TODO: new features: at sentence start / end;
+<span class="nc" id="L224">      return data;</span>
+    }
+  }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

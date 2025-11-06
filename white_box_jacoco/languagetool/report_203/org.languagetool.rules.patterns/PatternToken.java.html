@@ -1,0 +1,800 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PatternToken.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.languagetool.rules.patterns</a> &gt; <span class="el_source">PatternToken.java</span></div><h1>PatternToken.java</h1><pre class="source lang-java linenums">/* LanguageTool, a natural language style checker
+ * Copyright (C) 2005 Daniel Naber (http://www.danielnaber.de)
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+ * USA
+ */
+package org.languagetool.rules.patterns;
+
+import org.jetbrains.annotations.Nullable;
+import org.languagetool.*;
+import org.languagetool.chunking.ChunkTag;
+import org.languagetool.synthesis.Synthesizer;
+import org.languagetool.tools.InterruptibleCharSequence;
+import org.languagetool.tools.StringTools;
+
+import java.io.IOException;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * A part of a pattern, represents the 'token' element of the {@code grammar.xml}.
+ */
+public class PatternToken implements Cloneable {
+
+  /** Matches only tokens without any POS tag. **/
+  public static final String UNKNOWN_TAG = &quot;UNKNOWN&quot;;
+
+  /** Parameter passed to regular expression matcher to enable case insensitive Unicode matching. */
+  private static final String CASE_INSENSITIVE = &quot;(?iu)&quot;;
+
+  private final boolean caseSensitive;
+  private final boolean stringRegExp;
+  private List&lt;PatternToken&gt; andGroupList;
+  private List&lt;PatternToken&gt; orGroupList;
+  private final boolean inflected;
+
+  private String stringToken;
+  private PosToken posToken;
+  private ChunkTag chunkTag;
+  private boolean negation;
+  private boolean testWhitespace;
+  private boolean whitespaceBefore;
+<span class="fc" id="L56">  private boolean isInsideMarker = true;</span>
+
+  /**  List of exceptions that are valid for the current token and / or some next tokens. */
+  private List&lt;PatternToken&gt; exceptionList;
+
+  /** True if scope==&quot;next&quot;. */
+  private boolean exceptionValidNext;
+
+  /** True if any exception with a scope==&quot;current&quot; or scope==&quot;next&quot; is set for the element. */
+  private boolean exceptionSet;
+
+  /** True if attribute scope==&quot;previous&quot;. */
+  private boolean exceptionValidPrevious;
+
+  /** List of exceptions that are valid for a previous token. */
+  private List&lt;PatternToken&gt; previousExceptionList;
+
+  private int skip;
+<span class="fc" id="L74">  private int minOccurrence = 1;</span>
+<span class="fc" id="L75">  private int maxOccurrence = 1;</span>
+
+  private Pattern pattern;
+
+  /** The reference to another element in the pattern. **/
+  private Match tokenReference;
+  /** True when the element stores a formatted reference to another element of the pattern. */
+  private String referenceString;
+  /** String ID of the phrase the element is in. **/
+  private String phraseName;
+
+  /**
+   * This var is used to determine if calling {@link #setStringElement} makes sense. This method
+   * takes most time so it's best to reduce the number of its calls.
+   */
+  private boolean testString;
+
+  /** Determines whether the element should be ignored when doing unification **/
+  private boolean unificationNeutral;
+
+  private boolean uniNegation;
+  private Map&lt;String, List&lt;String&gt;&gt; unificationFeatures;
+
+  /** Set to true on tokens that close the unification block. */
+  private boolean isLastUnified;
+
+  /**
+   * Creates Element that is used to match tokens in the text.
+   * @param token String to be matched
+   * @param caseSensitive true if the check is case-sensitive
+   * @param regExp true if the check uses regular expressions
+   * @param inflected true if the check refers to base forms (lemmas), note that {@code token} must be a base form for this to work
+   */
+<span class="fc" id="L108">  public PatternToken(String token, boolean caseSensitive, boolean regExp, boolean inflected) {</span>
+<span class="fc" id="L109">    this.caseSensitive = caseSensitive;</span>
+<span class="fc" id="L110">    this.stringRegExp = regExp;</span>
+<span class="fc" id="L111">    this.inflected = inflected;</span>
+<span class="fc" id="L112">    setStringElement(token);</span>
+<span class="fc" id="L113">  }</span>
+
+  @Override
+  public Object clone() throws CloneNotSupportedException {
+<span class="fc" id="L117">    return super.clone();</span>
+  }
+
+  /**
+   * Checks whether the rule element matches the token given as a parameter.
+   * @param token AnalyzedToken to check matching against
+   * @return True if token matches, false otherwise.
+   */
+  public boolean isMatched(AnalyzedToken token) {
+<span class="fc bfc" id="L126" title="All 4 branches covered.">    if (testWhitespace &amp;&amp; !isWhitespaceBefore(token)) {</span>
+<span class="fc" id="L127">      return false;</span>
+    }
+<span class="fc bfc" id="L129" title="All 4 branches covered.">    boolean posNegation = posToken != null &amp;&amp; posToken.negation;</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">    if (testString) {</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">      return isStringTokenMatched(token) ^ negation &amp;&amp;</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">             isPosTokenMatched(token) ^ posNegation;</span>
+    } else {
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">      return !negation &amp;&amp;</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">             isPosTokenMatched(token) ^ posNegation;</span>
+    }
+  }
+
+  /**
+   * Checks whether an exception matches.
+   * @param token AnalyzedToken to check matching against
+   * @return True if any of the exceptions matches (logical disjunction).
+   */
+  public boolean isExceptionMatched(AnalyzedToken token) {
+<span class="fc bfc" id="L145" title="All 2 branches covered.">    if (exceptionSet) {</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">      for (PatternToken testException : exceptionList) {</span>
+<span class="fc bfc" id="L147" title="All 4 branches covered.">        if (!testException.exceptionValidNext &amp;&amp; testException.isMatched(token)) {</span>
+<span class="fc" id="L148">          return true;</span>
+        }
+<span class="fc" id="L150">      }</span>
+    }
+<span class="fc" id="L152">    return false;</span>
+  }
+
+  /**
+   * Enables testing multiple conditions specified by multiple element exceptions.
+   * Works as logical AND operator.
+   * @param token the token checked for exceptions.
+   * @return true if all conditions are met, false otherwise.
+   */
+  public boolean isAndExceptionGroupMatched(AnalyzedToken token) {
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">    if (andGroupList == null) return false;</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">    for (PatternToken testAndGroup : andGroupList) {</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">      if (testAndGroup.isExceptionMatched(token)) {</span>
+<span class="nc" id="L165">        return true;</span>
+      }
+<span class="nc" id="L167">    }</span>
+<span class="nc" id="L168">    return false;</span>
+  }
+
+  /**
+   * This method checks exceptions both in AND-group and the token. Introduced to for clarity.
+   * @param token Token to match
+   * @return True if matched.
+   */
+  public boolean isExceptionMatchedCompletely(AnalyzedToken token) {
+    // note: short-circuiting possible
+<span class="pc bpc" id="L178" title="1 of 4 branches missed.">    return isExceptionMatched(token) || isAndExceptionGroupMatched(token);</span>
+  }
+
+  public void setAndGroupElement(PatternToken andToken) {
+<span class="fc bfc" id="L182" title="All 2 branches covered.">    if (andGroupList == null) {</span>
+<span class="fc" id="L183">      andGroupList = new ArrayList&lt;&gt;(0);</span>
+    }
+<span class="fc" id="L185">    andGroupList.add(Objects.requireNonNull(andToken));</span>
+<span class="fc" id="L186">  }</span>
+
+  /**
+   * Checks if this element has an AND group associated with it.
+   * @return true if the element has a group of elements that all should match.
+   */
+  public boolean hasAndGroup() {
+<span class="pc bpc" id="L193" title="1 of 4 branches missed.">    return andGroupList != null &amp;&amp; andGroupList.size() &gt; 0;</span>
+  }
+
+  /**
+   * Returns the group of elements linked with AND operator.
+   */
+  public List&lt;PatternToken&gt; getAndGroup() {
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">    return andGroupList == null ? Collections.emptyList() : Collections.unmodifiableList(andGroupList);</span>
+  }
+
+  /** @since 2.3 */
+  public void setOrGroupElement(PatternToken orToken) {
+<span class="fc bfc" id="L205" title="All 2 branches covered.">    if (orGroupList == null) {</span>
+<span class="fc" id="L206">      orGroupList = new ArrayList&lt;&gt;(0);</span>
+    }
+<span class="fc" id="L208">    orGroupList.add(Objects.requireNonNull(orToken));</span>
+<span class="fc" id="L209">  }</span>
+
+  /**
+   * Checks if this element has an OR group associated with it.
+   * @return true if the element has a group of elements that all should match.
+   * @since 2.3
+   */
+  public boolean hasOrGroup() {
+<span class="pc bpc" id="L217" title="1 of 4 branches missed.">    return orGroupList != null &amp;&amp; orGroupList.size() &gt; 0;</span>
+  }
+
+  /**
+   * Returns the group of elements linked with OR operator.
+   * @since 2.3
+   */
+  public List&lt;PatternToken&gt; getOrGroup() {
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">    return orGroupList == null ? Collections.emptyList() : Collections.unmodifiableList(orGroupList);</span>
+  }
+
+  /**
+   * Checks whether a previously set exception matches (in case the exception had scope == &quot;next&quot;).
+   * @param token {@link AnalyzedToken} to check matching against.
+   * @return True if any of the exceptions matches.
+   */
+  public boolean isMatchedByScopeNextException(AnalyzedToken token) {
+<span class="fc bfc" id="L234" title="All 2 branches covered.">    if (exceptionSet) {</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">      for (PatternToken testException : exceptionList) {</span>
+<span class="fc bfc" id="L236" title="All 4 branches covered.">        if (testException.exceptionValidNext &amp;&amp; testException.isMatched(token)) {</span>
+<span class="fc" id="L237">          return true;</span>
+        }
+<span class="fc" id="L239">      }</span>
+    }
+<span class="fc" id="L241">    return false;</span>
+  }
+
+  /**
+   * Checks whether an exception for a previous token matches (in case the exception had scope ==
+   * &quot;previous&quot;).
+   * @param token {@link AnalyzedToken} to check matching against.
+   * @return True if any of the exceptions matches.
+   */
+  public boolean isMatchedByPreviousException(AnalyzedToken token) {
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">    if (exceptionValidPrevious) {</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">      for (PatternToken testException : previousExceptionList) {</span>
+<span class="pc bpc" id="L253" title="2 of 4 branches missed.">        if (!testException.exceptionValidNext &amp;&amp; testException.isMatched(token)) {</span>
+<span class="nc" id="L254">          return true;</span>
+        }
+<span class="fc" id="L256">      }</span>
+    }
+<span class="fc" id="L258">    return false;</span>
+  }
+
+  /**
+   * Checks whether an exception for a previous token matches all readings of a given token (in case
+   * the exception had scope == &quot;previous&quot;).
+   * @param prevToken {@link AnalyzedTokenReadings} to check matching against.
+   * @return true if any of the exceptions matches.
+   */
+  public boolean isMatchedByPreviousException(AnalyzedTokenReadings prevToken) {
+<span class="fc bfc" id="L268" title="All 2 branches covered.">    for (AnalyzedToken analyzedToken : prevToken) {</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">      if (isMatchedByPreviousException(analyzedToken)) {</span>
+<span class="nc" id="L270">        return true;</span>
+      }
+<span class="fc" id="L272">    }</span>
+<span class="fc" id="L273">    return false;</span>
+  }
+
+  /**
+   * Checks if the token is a sentence start.
+   * @return True if the element starts the sentence and the element hasn't been set to have negated POS token.
+   */
+  public boolean isSentenceStart() {
+<span class="fc bfc" id="L281" title="All 6 branches covered.">    return posToken != null &amp;&amp; JLanguageTool.SENTENCE_START_TAGNAME.equals(posToken.posTag) &amp;&amp; !posToken.negation;</span>
+  }
+
+  /** @since 2.9 */
+  public void setPosToken(PosToken posToken) {
+<span class="fc" id="L286">    this.posToken = posToken;</span>
+<span class="fc" id="L287">  }</span>
+
+  /** @since 2.9 */
+  public void setChunkTag(ChunkTag chunkTag) {
+<span class="fc" id="L291">    this.chunkTag = chunkTag;</span>
+<span class="fc" id="L292">  }</span>
+
+  @Nullable
+  public String getString() {
+<span class="fc" id="L296">    return stringToken;</span>
+  }
+
+  public void setStringElement(String token) {
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">    if (token != null) {</span>
+<span class="fc" id="L301">      String tok = StringTools.trimWhitespace(token);</span>
+<span class="fc bfc" id="L302" title="All 2 branches covered.">      if (tok.isEmpty()) {</span>
+<span class="fc" id="L303">        stringToken = &quot;&quot;;</span>
+      } else {
+<span class="fc" id="L305">        stringToken = tok;</span>
+      }
+<span class="fc" id="L307">    } else {</span>
+<span class="nc" id="L308">      stringToken = null;</span>
+    }
+<span class="fc bfc" id="L310" title="All 2 branches covered.">    testString = !StringTools.isEmpty(stringToken);</span>
+<span class="fc bfc" id="L311" title="All 4 branches covered.">    if (testString &amp;&amp; stringRegExp) {</span>
+<span class="fc" id="L312">      String regToken = stringToken;</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">      if (!caseSensitive) {</span>
+<span class="fc" id="L314">        regToken = CASE_INSENSITIVE + stringToken;</span>
+      }
+<span class="fc bfc" id="L316" title="All 2 branches covered.">      if (!&quot;\\0&quot;.equals(token)) {</span>
+<span class="fc" id="L317">        pattern = Pattern.compile(regToken);</span>
+      }
+    }
+<span class="fc" id="L320">  }</span>
+
+  /**
+   * Sets a string and/or pos exception for matching tokens.
+   * @param token The string in the exception.
+   * @param regExp True if the string is specified as a regular expression.
+   * @param inflected True if the string is a base form (lemma).
+   * @param negation True if the exception is negated.
+   * @param scopeNext True if the exception scope is next tokens.
+   * @param scopePrevious True if the exception should match only a single previous token.
+   * @param posToken The part of the speech tag in the exception.
+   * @param posRegExp True if the POS is specified as a regular expression.
+   * @param posNegation True if the POS exception is negated.
+   * @param caseSensitivity if null, use this element's setting for case sensitivity, otherwise the specified value
+   * @since 2.9
+   */
+  public void setStringPosException(
+          String token, boolean regExp, boolean inflected,
+          boolean negation, boolean scopeNext, boolean scopePrevious,
+          String posToken, boolean posRegExp, boolean posNegation, Boolean caseSensitivity) {
+<span class="fc bfc" id="L340" title="All 2 branches covered.">    PatternToken exception = new PatternToken(token, caseSensitivity == null ? caseSensitive : caseSensitivity, regExp, inflected);</span>
+<span class="fc" id="L341">    exception.setNegation(negation);</span>
+<span class="fc" id="L342">    exception.setPosToken(new PosToken(posToken, posRegExp, posNegation));</span>
+<span class="fc" id="L343">    exception.exceptionValidNext = scopeNext;</span>
+<span class="fc" id="L344">    setException(exception, scopePrevious);</span>
+<span class="fc" id="L345">  }</span>
+
+  private void setException(PatternToken pToken, boolean scopePrevious) {
+<span class="fc" id="L348">    exceptionValidPrevious |= scopePrevious;</span>
+<span class="fc bfc" id="L349" title="All 4 branches covered.">    if (exceptionList == null &amp;&amp; !scopePrevious) {</span>
+<span class="fc" id="L350">      exceptionList = new ArrayList&lt;&gt;();</span>
+    }
+<span class="fc bfc" id="L352" title="All 4 branches covered.">    if (previousExceptionList == null &amp;&amp; scopePrevious) {</span>
+<span class="fc" id="L353">      previousExceptionList = new ArrayList&lt;&gt;();</span>
+    }
+<span class="fc bfc" id="L355" title="All 2 branches covered.">    if (scopePrevious) {</span>
+<span class="fc" id="L356">      previousExceptionList.add(pToken);</span>
+    } else {
+<span class="fc bfc" id="L358" title="All 2 branches covered.">      if (!exceptionSet) {</span>
+<span class="fc" id="L359">        exceptionSet = true;</span>
+      }
+<span class="fc" id="L361">      exceptionList.add(pToken);</span>
+    }
+<span class="fc" id="L363">  }</span>
+
+  /**
+   * Tests if part of speech matches a given string.
+   * Special value UNKNOWN_TAG matches null POS tags.
+   * @param token Token to test.
+   * @return true if matches
+   */
+  private boolean isPosTokenMatched(AnalyzedToken token) {
+<span class="fc bfc" id="L372" title="All 4 branches covered.">    if (posToken == null || posToken.posTag == null) {</span>
+      // if no POS set defaulting to true
+<span class="fc" id="L374">      return true;</span>
+    }
+<span class="fc bfc" id="L376" title="All 2 branches covered.">    if (token.getPOSTag() == null) {</span>
+<span class="pc bpc" id="L377" title="1 of 4 branches missed.">      return posToken.posUnknown &amp;&amp; token.hasNoTag();</span>
+    }
+    boolean match;
+<span class="fc bfc" id="L380" title="All 2 branches covered.">    if (posToken.regExp) {</span>
+<span class="fc" id="L381">      Matcher mPos = posToken.posPattern.matcher(token.getPOSTag());</span>
+<span class="fc" id="L382">      match = mPos.matches();</span>
+<span class="fc" id="L383">    } else {</span>
+<span class="fc" id="L384">      match = posToken.posTag.equals(token.getPOSTag());</span>
+    }
+<span class="fc bfc" id="L386" title="All 4 branches covered.">    if (!match &amp;&amp; posToken.posUnknown) { // ignore helper tags</span>
+<span class="fc" id="L387">      match = token.hasNoTag();</span>
+    }
+<span class="fc" id="L389">    return match;</span>
+  }
+
+  /**
+   * Tests whether the string token element matches a given token.
+   * @param token {@link AnalyzedToken} to match against.
+   * @return True if matches.
+   */
+  private boolean isStringTokenMatched(AnalyzedToken token) {
+<span class="fc" id="L398">    String testToken = getTestToken(token);</span>
+<span class="fc bfc" id="L399" title="All 2 branches covered.">    if (stringRegExp) {</span>
+<span class="fc" id="L400">      Matcher m = pattern.matcher(new InterruptibleCharSequence(testToken));</span>
+<span class="fc" id="L401">      return m.matches();</span>
+    }
+<span class="fc bfc" id="L403" title="All 2 branches covered.">    if (caseSensitive) {</span>
+<span class="fc" id="L404">      return stringToken.equals(testToken);</span>
+    }
+<span class="fc" id="L406">    return stringToken.equalsIgnoreCase(testToken);</span>
+  }
+
+  private String getTestToken(AnalyzedToken token) {
+    // enables using words with lemmas and without lemmas
+    // in the same regexp with inflected=&quot;yes&quot;
+<span class="fc bfc" id="L412" title="All 2 branches covered.">    if (inflected) {</span>
+<span class="fc bfc" id="L413" title="All 2 branches covered.">      if (token.getLemma() != null) {</span>
+<span class="fc" id="L414">        return token.getLemma();</span>
+      } else {
+<span class="fc" id="L416">        return token.getToken();</span>
+      }
+    }
+<span class="fc" id="L419">    return token.getToken();</span>
+  }
+
+  /**
+   * Gets the exception scope length.
+   * @return scope length in tokens
+   */
+  public int getSkipNext() {
+<span class="fc" id="L427">    return skip;</span>
+  }
+
+  /**
+   * The minimum number of times the element needs to occur.
+   */
+  public int getMinOccurrence() {
+<span class="fc" id="L434">    return minOccurrence;</span>
+  }
+
+  /**
+   * The maximum number of times the element may occur.
+   */
+  public int getMaxOccurrence() {
+<span class="fc" id="L441">    return maxOccurrence;</span>
+  }
+
+  /**
+   * @param i exception scope length.
+   */
+  public void setSkipNext(int i) {
+<span class="fc" id="L448">    skip = i;</span>
+<span class="fc" id="L449">  }</span>
+
+  /**
+   * The minimum number of times this element may occur.
+   * @param i currently only {@code 0} and {@code 1} are supported
+   */
+  public void setMinOccurrence(int i) {
+<span class="pc bpc" id="L456" title="3 of 4 branches missed.">    if (i != 0 &amp;&amp; i != 1) {</span>
+<span class="nc" id="L457">      throw new IllegalArgumentException(&quot;minOccurrences must be 0 or 1: &quot; + i);</span>
+    }
+<span class="fc" id="L459">    minOccurrence = i;</span>
+<span class="fc" id="L460">  }</span>
+
+  /**
+   * The maximum number of times this element may occur.
+   * @param i a number &amp;gt;= 1 or {@code -1} for unlimited occurrences
+   */
+  public void setMaxOccurrence(int i) {
+<span class="pc bpc" id="L467" title="1 of 2 branches missed.">    if (i == 0) {</span>
+<span class="nc" id="L468">      throw new IllegalArgumentException(&quot;maxOccurrences may not be 0&quot;);</span>
+    }
+<span class="fc" id="L470">    maxOccurrence = i;</span>
+<span class="fc" id="L471">  }</span>
+
+  /**
+   * Checks if the element has an exception for a previous token.
+   * @return True if the element has a previous token matching exception.
+   */
+  public boolean hasPreviousException() {
+<span class="fc" id="L478">    return exceptionValidPrevious;</span>
+  }
+
+  /**
+   * Checks if the element has an exception for a next scope.
+   * (only used for testing)
+   * @return True if the element has exception for the next scope.
+   */
+  public boolean hasNextException() {
+<span class="nc" id="L487">    return exceptionValidNext;</span>
+  }
+
+  /**
+   * Negates the matching so that non-matching elements match and vice-versa.
+   */
+  public void setNegation(boolean negation) {
+<span class="fc" id="L494">    this.negation = negation;</span>
+<span class="fc" id="L495">  }</span>
+
+  /**
+   * see {@link #setNegation}
+   * @since 0.9.3
+   */
+  public boolean getNegation() {
+<span class="fc" id="L502">    return negation;</span>
+  }
+
+  /**
+   * @return true when this element refers to another token.
+   */
+  public boolean isReferenceElement() {
+<span class="fc bfc" id="L509" title="All 2 branches covered.">    return tokenReference != null;</span>
+  }
+
+  /**
+   * Sets the reference to another token.
+   * @param match Formatting object for the token reference.
+   */
+  public void setMatch(Match match) {
+<span class="fc" id="L517">    tokenReference = Objects.requireNonNull(match);</span>
+<span class="fc" id="L518">  }</span>
+
+  public Match getMatch() {
+<span class="fc" id="L521">    return tokenReference;</span>
+  }
+
+  /**
+   * Prepare PatternToken for matching by formatting its string token and POS (if the Element is supposed
+   * to refer to some other token).
+   * @param token the token specified as {@link AnalyzedTokenReadings}
+   * @param synth the language synthesizer ({@link Synthesizer})
+   */
+  public PatternToken compile(AnalyzedTokenReadings token, Synthesizer synth) throws IOException {
+    PatternToken compiledPatternToken;
+    try {
+<span class="nc" id="L533">      compiledPatternToken = (PatternToken) clone();</span>
+<span class="nc" id="L534">    } catch (CloneNotSupportedException e) {</span>
+<span class="nc" id="L535">      throw new IllegalStateException(&quot;Could not clone element&quot;, e);</span>
+<span class="nc" id="L536">    }</span>
+<span class="nc" id="L537">    compiledPatternToken.doCompile(token, synth);</span>
+<span class="nc" id="L538">    return compiledPatternToken;</span>
+  }
+
+  private void doCompile(AnalyzedTokenReadings token, Synthesizer synth) throws IOException {
+<span class="nc" id="L542">    MatchState matchState = tokenReference.createState(synth, token);</span>
+<span class="nc bnc" id="L543" title="All 2 branches missed.">    if (StringTools.isEmpty(referenceString)) {</span>
+<span class="nc" id="L544">      referenceString = stringToken;</span>
+    }
+<span class="nc" id="L546">    String reference = &quot;\\&quot; + tokenReference.getTokenRef();</span>
+<span class="nc bnc" id="L547" title="All 2 branches missed.">    if (tokenReference.setsPos()) {</span>
+<span class="nc" id="L548">      String posReference = matchState.getTargetPosTag();</span>
+<span class="nc bnc" id="L549" title="All 2 branches missed.">      if (posReference != null) {</span>
+<span class="nc" id="L550">        setPosToken(new PosToken(posReference, tokenReference.posRegExp(), negation));</span>
+      }
+<span class="nc" id="L552">      setStringElement(referenceString.replace(reference, &quot;&quot;));</span>
+<span class="nc" id="L553">    } else {</span>
+<span class="nc" id="L554">      setStringElement(referenceString.replace(reference, matchState.toTokenString()));</span>
+    }
+<span class="nc" id="L556">  }</span>
+
+  /**
+   * Sets the phrase the element is in.
+   * @param id ID of the phrase.
+   */
+  public void setPhraseName(String id) {
+<span class="fc" id="L563">    phraseName = id;</span>
+<span class="fc" id="L564">  }</span>
+
+  /**
+   * Checks if the Element is in any phrase.
+   * @return True if the Element is contained in the phrase.
+   */
+  public boolean isPartOfPhrase() {
+<span class="fc bfc" id="L571" title="All 2 branches covered.">    return phraseName != null;</span>
+  }
+
+  /**
+   * Whether the element matches case sensitively.
+   * @since 2.3
+   */
+  public boolean isCaseSensitive() {
+<span class="nc" id="L579">    return caseSensitive;</span>
+  }
+
+  /**
+   * Tests whether the element matches a regular expression.
+   * @since 0.9.6
+   */
+  public boolean isRegularExpression() {
+<span class="fc" id="L587">    return stringRegExp;</span>
+  }
+
+  /**
+   * Tests whether the POS matches a regular expression.
+   * @since 1.3.0
+   */
+  public boolean isPOStagRegularExpression() {
+<span class="nc bnc" id="L595" title="All 4 branches missed.">    return posToken != null &amp;&amp; posToken.regExp;</span>
+  }
+
+  /**
+   * @return the POS of the Element or {@code null}
+   * @since 0.9.6
+   */
+  @Nullable
+  public String getPOStag() {
+<span class="fc bfc" id="L604" title="All 2 branches covered.">    return posToken != null ? posToken.posTag : null;</span>
+  }
+
+  /**
+   * @return the chunk tag of the Element or {@code null}
+   * @since 2.3
+   */
+  @Nullable
+  public ChunkTag getChunkTag() {
+<span class="fc" id="L613">    return chunkTag;</span>
+  }
+
+  /**
+   * @return true if the POS is negated.
+   */
+  public boolean getPOSNegation() {
+<span class="pc bpc" id="L620" title="1 of 4 branches missed.">    return posToken != null &amp;&amp; posToken.negation;</span>
+  }
+
+  /**
+   * @return true if the token matches all inflected forms
+   */
+  public boolean isInflected() {
+<span class="fc" id="L627">    return inflected;</span>
+  }
+
+  /**
+   * Gets the phrase the element is in.
+   * @return String The name of the phrase.
+   */
+  @Nullable
+  public String getPhraseName() {
+<span class="fc" id="L636">    return phraseName;</span>
+  }
+
+  public boolean isUnified() {
+<span class="fc bfc" id="L640" title="All 2 branches covered.">    return unificationFeatures != null;</span>
+  }
+
+  public void setUnification(Map&lt;String, List&lt;String&gt;&gt; uniFeatures) {
+<span class="fc" id="L644">    unificationFeatures = Objects.requireNonNull(uniFeatures);</span>
+<span class="fc" id="L645">  }</span>
+
+  /**
+   * Get unification features and types.
+   * @return A map from features to a list of types or {@code null}
+   * @since 1.0.1
+   */
+  @Nullable
+  public Map&lt;String, List&lt;String&gt;&gt; getUniFeatures() {
+<span class="nc" id="L654">    return unificationFeatures;</span>
+  }
+
+  public void setUniNegation() {
+<span class="fc" id="L658">    uniNegation = true;</span>
+<span class="fc" id="L659">  }</span>
+
+  public boolean isUniNegated() {
+<span class="nc" id="L662">    return uniNegation;</span>
+  }
+
+  public boolean isLastInUnification() {
+<span class="nc" id="L666">    return isLastUnified;</span>
+  }
+
+  public void setLastInUnification() {
+<span class="fc" id="L670">    isLastUnified = true;</span>
+<span class="fc" id="L671">  }</span>
+
+  /**
+   * Determines whether the element should be silently ignored during unification,
+   * and simply added.
+   * @return True when the element is not included in unifying.
+   * @since 2.5
+   */
+  public boolean isUnificationNeutral() {
+<span class="fc" id="L680">    return unificationNeutral;</span>
+  }
+
+  /**
+   * Sets the element as ignored during unification.
+   * @since 2.5
+   */
+  public void setUnificationNeutral() {
+<span class="fc" id="L688">    this.unificationNeutral = true;</span>
+<span class="fc" id="L689">  }</span>
+
+
+  public void setWhitespaceBefore(boolean isWhite) {
+<span class="fc" id="L693">    whitespaceBefore = isWhite;</span>
+<span class="fc" id="L694">    testWhitespace = true;</span>
+<span class="fc" id="L695">  }</span>
+
+  public boolean isInsideMarker() {
+<span class="fc" id="L698">    return isInsideMarker;</span>
+  }
+
+  public void setInsideMarker(boolean isInsideMarker) {
+<span class="fc" id="L702">    this.isInsideMarker = isInsideMarker;</span>
+<span class="fc" id="L703">  }</span>
+
+  /**
+   * Sets the attribute on the exception that determines matching of patterns
+   * that depends on whether there was a space before the token matching the exception
+   * or not.
+   * The same procedure is used for tokens that are valid for previous or current tokens.
+   * 
+   * @param isWhite If true, the space before exception is required.
+   */
+  public void setExceptionSpaceBefore(boolean isWhite) {
+<span class="pc bpc" id="L714" title="1 of 4 branches missed.">    if (previousExceptionList != null &amp;&amp; exceptionValidPrevious) {</span>
+<span class="fc" id="L715">      previousExceptionList.get(previousExceptionList.size() - 1).setWhitespaceBefore(isWhite);</span>
+    } else {
+<span class="pc bpc" id="L717" title="1 of 2 branches missed.">      if (exceptionList != null) {</span>
+<span class="fc" id="L718">        exceptionList.get(exceptionList.size() - 1).setWhitespaceBefore(isWhite);</span>
+      }
+    }
+<span class="fc" id="L721">  }</span>
+
+  public boolean isWhitespaceBefore(AnalyzedToken token) {
+<span class="fc bfc" id="L724" title="All 2 branches covered.">    return whitespaceBefore == token.isWhitespaceBefore();</span>
+  }
+
+  /**
+   * @return A List of Exceptions. Used for testing.
+   * @since 1.0.0
+   */
+  public List&lt;PatternToken&gt; getExceptionList() {
+<span class="fc" id="L732">    return exceptionList;</span>
+  }
+
+  /**
+   * @return List of previous exceptions. Used for testing.
+   */
+  public List&lt;PatternToken&gt; getPreviousExceptionList() {
+<span class="nc" id="L739">    return previousExceptionList;</span>
+  }
+
+  public boolean hasExceptionList() {
+<span class="nc bnc" id="L743" title="All 4 branches missed.">    return exceptionList != null || previousExceptionList != null;</span>
+  }
+
+  @Override
+  public String toString() {
+<span class="fc" id="L748">    StringBuilder sb = new StringBuilder();</span>
+<span class="pc bpc" id="L749" title="1 of 2 branches missed.">    if (negation) {</span>
+<span class="nc" id="L750">      sb.append('!');</span>
+    }
+<span class="fc" id="L752">    sb.append(stringToken);</span>
+<span class="pc bpc" id="L753" title="1 of 2 branches missed.">    if (phraseName != null) {</span>
+<span class="nc" id="L754">      sb.append(&quot; {&quot;);</span>
+<span class="nc" id="L755">      sb.append(phraseName);</span>
+<span class="nc" id="L756">      sb.append('}');</span>
+    }
+<span class="pc bpc" id="L758" title="1 of 2 branches missed.">    if (posToken != null) {</span>
+<span class="nc" id="L759">      sb.append('/');</span>
+<span class="nc" id="L760">      sb.append(posToken);</span>
+    }
+<span class="pc bpc" id="L762" title="1 of 2 branches missed.">    if (chunkTag != null) {</span>
+<span class="nc" id="L763">      sb.append('/');</span>
+<span class="nc" id="L764">      sb.append(chunkTag);</span>
+    }
+<span class="pc bpc" id="L766" title="1 of 2 branches missed.">    if (exceptionList != null) {</span>
+<span class="nc" id="L767">      sb.append(&quot;/exceptions=&quot;);</span>
+<span class="nc" id="L768">      sb.append(exceptionList);</span>
+    }
+<span class="fc" id="L770">    return sb.toString();</span>
+  }
+
+  public static class PosToken {
+
+    private final String posTag;
+    private final boolean regExp;
+    private final boolean negation;
+    private final Pattern posPattern;
+    private final boolean posUnknown;
+
+<span class="fc" id="L781">    public PosToken(String posTag, boolean regExp, boolean negation) {</span>
+<span class="fc" id="L782">      this.posTag = posTag;</span>
+<span class="fc" id="L783">      this.regExp = regExp;</span>
+<span class="fc" id="L784">      this.negation = negation;</span>
+<span class="fc bfc" id="L785" title="All 2 branches covered.">      if (regExp) {</span>
+<span class="fc" id="L786">        posPattern = Pattern.compile(posTag);</span>
+<span class="fc" id="L787">        posUnknown = posPattern.matcher(UNKNOWN_TAG).matches();</span>
+      } else {
+<span class="fc" id="L789">        posPattern = null;</span>
+<span class="fc" id="L790">        posUnknown = UNKNOWN_TAG.equals(posTag);</span>
+      }
+<span class="fc" id="L792">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L796">      return posTag;</span>
+    }
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
