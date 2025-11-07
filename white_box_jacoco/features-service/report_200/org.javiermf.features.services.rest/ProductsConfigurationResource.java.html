@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProductsConfigurationResource.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.javiermf.features.services.rest</a> &gt; <span class="el_source">ProductsConfigurationResource.java</span></div><h1>ProductsConfigurationResource.java</h1><pre class="source lang-java linenums">package org.javiermf.features.services.rest;
+
+import org.javiermf.features.models.ProductConfiguration;
+import org.javiermf.features.services.ProductsConfigurationsService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import javax.ws.rs.*;
+import javax.ws.rs.core.Response;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.List;
+
+@Component
+@Produces(&quot;application/json&quot;)
+<span class="fc" id="L16">public class ProductsConfigurationResource {</span>
+
+    @Autowired
+    ProductsConfigurationsService configurationsService;
+
+    @Autowired
+    ProductsConfigurationFeaturesResource productsConfigurationFeaturesResource;
+
+    @GET
+    public List&lt;String&gt; getConfigurationsForProduct(@PathParam(&quot;productName&quot;) String productName) {
+<span class="fc" id="L26">        return configurationsService.getConfigurationsNamesForProduct(productName);</span>
+
+    }
+
+    @Path(&quot;/{configurationName}&quot;)
+    @GET
+    public ProductConfiguration getConfigurationWithNameForProduct(@PathParam(&quot;productName&quot;) String productName,
+                                                                   @PathParam(&quot;configurationName&quot;) String configurationName) {
+<span class="nc" id="L34">        return configurationsService.findByNameAndProductName(productName, configurationName);</span>
+    }
+
+    @POST
+    @Path(&quot;/{configurationName}&quot;)
+    public Response addConfiguration(@PathParam(&quot;productName&quot;) String productName,
+                                     @PathParam(&quot;configurationName&quot;) String configurationName) throws URISyntaxException {
+<span class="nc" id="L41">        configurationsService.add(productName, configurationName);</span>
+<span class="nc" id="L42">        return Response.created(new URI(&quot;/products/&quot; + productName + &quot;/configurations/&quot; + configurationName)).build();</span>
+    }
+
+    @DELETE
+    @Path(&quot;/{configurationName}&quot;)
+    public Response deleteConfiguration(@PathParam(&quot;productName&quot;) String productName,
+                                        @PathParam(&quot;configurationName&quot;) String configurationName) throws URISyntaxException {
+<span class="nc" id="L49">        configurationsService.deleteByName(productName, configurationName);</span>
+<span class="nc" id="L50">        return Response.noContent().build();</span>
+    }
+
+    @Path(&quot;/{configurationName}/features&quot;)
+    public ProductsConfigurationFeaturesResource getConfigurationActivedFeatures(@PathParam(&quot;productName&quot;) String productName,
+                                                                                 @PathParam(&quot;configurationName&quot;) String configurationName) {
+<span class="fc" id="L56">        return productsConfigurationFeaturesResource;</span>
+
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProductsDAO.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.javiermf.features.daos</a> &gt; <span class="el_source">ProductsDAO.java</span></div><h1>ProductsDAO.java</h1><pre class="source lang-java linenums">package org.javiermf.features.daos;
+
+import com.mysema.query.jpa.impl.JPADeleteClause;
+import com.mysema.query.jpa.impl.JPAQuery;
+import org.javiermf.features.exceptions.ObjectNotFoundException;
+import org.javiermf.features.models.Feature;
+import org.javiermf.features.models.Product;
+import org.javiermf.features.models.QFeature;
+import org.javiermf.features.models.QProduct;
+import org.javiermf.features.models.constraints.FeatureConstraint;
+import org.javiermf.features.models.constraints.QFeatureConstraint;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import java.util.List;
+
+@Repository
+<span class="fc" id="L20">public class ProductsDAO {</span>
+
+    @PersistenceContext
+    private EntityManager entityManager;
+
+<span class="fc" id="L25">    QProduct qProduct = QProduct.product;</span>
+<span class="fc" id="L26">    QFeature qFeature = QFeature.feature;</span>
+<span class="fc" id="L27">    QFeatureConstraint qFeatureConstraint = QFeatureConstraint.featureConstraint;</span>
+
+    public List&lt;Product&gt; findAll() {
+<span class="nc" id="L30">        JPAQuery query = new JPAQuery(entityManager);</span>
+
+<span class="nc" id="L32">        return query.from(qProduct).list(qProduct);</span>
+    }
+
+    public Product findByName(String name) {
+<span class="fc" id="L36">        JPAQuery query = new JPAQuery(entityManager);</span>
+
+<span class="fc" id="L38">        query.from(qProduct).where(qProduct.name.eq(name));</span>
+<span class="fc" id="L39">        Product product = query.singleResult(qProduct);</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        if (product == null) {</span>
+<span class="fc" id="L41">            throw new ObjectNotFoundException(name);</span>
+        }
+<span class="nc" id="L43">        return product;</span>
+    }
+
+    @Transactional
+    public void deleteByName(String productName) {
+<span class="nc" id="L48">        Product product = findByName(productName);</span>
+<span class="nc" id="L49">        entityManager.remove(product);</span>
+
+<span class="nc" id="L51">    }</span>
+
+    @Transactional
+    public void deleteConstraintsForProduct(String productName) {
+<span class="nc" id="L55">        Product product = findByName(productName);</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">        for (FeatureConstraint featureConstraint : product.getProductFeatureConstraints()) {</span>
+<span class="nc" id="L57">            entityManager.remove(featureConstraint);</span>
+<span class="nc" id="L58">        }</span>
+<span class="nc" id="L59">        product.getProductFeatureConstraints().clear();</span>
+<span class="nc" id="L60">    }</span>
+
+    @Transactional
+    public void insert(Product product) {
+<span class="fc" id="L64">        entityManager.persist(product);</span>
+<span class="fc" id="L65">    }</span>
+
+    @Transactional
+    public void insertFeature(Feature feature) {
+<span class="nc" id="L69">        entityManager.persist(feature);</span>
+<span class="nc" id="L70">    }</span>
+
+    @Transactional
+    public void deleteFeature(Feature feature) {
+<span class="nc" id="L74">        JPADeleteClause deleteClause = new JPADeleteClause(entityManager, qFeature);</span>
+<span class="nc" id="L75">        deleteClause.where(qFeature.id.eq(feature.getId()));</span>
+<span class="nc" id="L76">        deleteClause.execute();</span>
+<span class="nc" id="L77">    }</span>
+
+    @Transactional
+    public void insertConstraint(FeatureConstraint constraint) {
+<span class="nc" id="L81">        entityManager.persist(constraint);</span>
+<span class="nc" id="L82">    }</span>
+
+    @Transactional
+    public void deleteConstraintForProduct(String productName, Long constraintId) {
+<span class="fc" id="L86">        JPADeleteClause deleteClause = new JPADeleteClause(entityManager, qFeatureConstraint);</span>
+<span class="fc" id="L87">        deleteClause.where(qFeatureConstraint.id.eq(constraintId));</span>
+<span class="fc" id="L88">        deleteClause.execute();</span>
+<span class="fc" id="L89">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProductConfiguration.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.javiermf.features.models</a> &gt; <span class="el_source">ProductConfiguration.java</span></div><h1>ProductConfiguration.java</h1><pre class="source lang-java linenums">package org.javiermf.features.models;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import javax.persistence.*;
+import java.util.HashSet;
+import java.util.Set;
+
+@Entity
+<span class="fc" id="L10">public class ProductConfiguration {</span>
+
+    @Id
+    @GeneratedValue
+    Long id;
+
+    @Column(nullable = false)
+    String name;
+
+<span class="fc" id="L19">    @Column</span>
+<span class="fc" id="L20">    Boolean valid = true;</span>
+
+    @JsonIgnore
+    @ManyToOne
+    Product product;
+
+<span class="fc" id="L26">    @ManyToMany(fetch = FetchType.EAGER)</span>
+    Set&lt;Feature&gt; activedFeatures = new HashSet&lt;Feature&gt;();
+
+    public Set&lt;Feature&gt; getActivedFeatures() {
+<span class="nc" id="L30">        return activedFeatures;</span>
+    }
+
+    public Set&lt;String&gt; availableFeatures() {
+<span class="nc" id="L34">        return collectFeatureNames(product.getProductFeatures());</span>
+    }
+
+    private Set&lt;String&gt; collectFeatureNames(Set&lt;Feature&gt; featuresSet) {
+<span class="nc" id="L38">        Set&lt;String&gt; features = new HashSet&lt;String&gt;();</span>
+<span class="nc bnc" id="L39" title="All 2 branches missed.">        for (Feature feature : featuresSet) {</span>
+<span class="nc" id="L40">            features.add(feature.name);</span>
+<span class="nc" id="L41">        }</span>
+
+<span class="nc" id="L43">        return features;</span>
+    }
+
+    public String getName() {
+<span class="nc" id="L47">        return name;</span>
+    }
+
+    public void setName(String name) {
+<span class="nc" id="L51">        this.name = name;</span>
+<span class="nc" id="L52">    }</span>
+
+    public Product getProduct() {
+<span class="nc" id="L55">        return product;</span>
+    }
+
+    public void setProduct(Product product) {
+<span class="nc" id="L59">        this.product = product;</span>
+<span class="nc" id="L60">    }</span>
+
+    public Set&lt;String&gt; activedFeatures() {
+<span class="nc" id="L63">        return collectFeatureNames(activedFeatures);</span>
+    }
+
+    public Boolean isValid() {
+<span class="nc" id="L67">        return valid;</span>
+    }
+
+    public void setValid(Boolean valid) {
+<span class="nc" id="L71">        this.valid = valid;</span>
+<span class="nc" id="L72">    }</span>
+
+    public void active(Feature feature) {
+<span class="nc" id="L75">        activedFeatures.add(feature);</span>
+
+<span class="nc" id="L77">    }</span>
+
+    public void deactive(Feature feature) {
+<span class="nc" id="L80">        activedFeatures.remove(feature);</span>
+<span class="nc" id="L81">    }</span>
+
+    public void active(String featureName) {
+<span class="nc" id="L84">        Feature feature = product.findProductFeatureByName(featureName);</span>
+<span class="nc" id="L85">        active(feature);</span>
+<span class="nc" id="L86">    }</span>
+
+    public void deactive(String featureName) {
+<span class="nc" id="L89">        Feature feature = product.findProductFeatureByName(featureName);</span>
+<span class="nc" id="L90">        deactive(feature);</span>
+<span class="nc" id="L91">    }</span>
+
+    public boolean hasActiveFeature(String featureName) {
+<span class="nc" id="L94">        return activedFeatures().contains(featureName);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

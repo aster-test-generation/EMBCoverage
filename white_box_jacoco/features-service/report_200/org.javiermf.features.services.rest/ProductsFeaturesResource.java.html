@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProductsFeaturesResource.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">org.javiermf.features.services.rest</a> &gt; <span class="el_source">ProductsFeaturesResource.java</span></div><h1>ProductsFeaturesResource.java</h1><pre class="source lang-java linenums">package org.javiermf.features.services.rest;
+
+import org.javiermf.features.models.Feature;
+import org.javiermf.features.services.ProductsService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import javax.ws.rs.*;
+import javax.ws.rs.core.Response;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.Set;
+
+@Component
+@Produces(&quot;application/json&quot;)
+<span class="fc" id="L16">public class ProductsFeaturesResource {</span>
+
+    @Autowired
+    ProductsService productsService;
+
+    @GET
+    public Set&lt;Feature&gt; getFeaturesForProduct(@PathParam(&quot;productName&quot;) String productName) {
+<span class="nc" id="L23">        return productsService.getFeaturesForProduct(productName);</span>
+
+    }
+
+    @POST
+    @Path(&quot;/{featureName}&quot;)
+    public Response addFeatureToProduct(@PathParam(&quot;productName&quot;) String productName,
+                                        @PathParam(&quot;featureName&quot;) String featureName,
+                                        @FormParam(&quot;description&quot;) String featureDescription) throws URISyntaxException {
+<span class="nc" id="L32">        productsService.addFeatureToProduct(productName, featureName, featureDescription);</span>
+<span class="nc" id="L33">        return Response.created(new URI(&quot;/products/&quot; + productName + &quot;/features/&quot; + featureName)).build();</span>
+    }
+
+    @PUT
+    @Path(&quot;/{featureName}&quot;)
+    public Feature updateFeatureOfProduct(@PathParam(&quot;productName&quot;) String productName,
+                                          @PathParam(&quot;featureName&quot;) String featureName,
+                                          @FormParam(&quot;description&quot;) String featureDescription) throws URISyntaxException {
+<span class="nc" id="L41">        return productsService.updateFeatureOfProduct(productName, featureName, featureDescription);</span>
+    }
+
+    @DELETE
+    @Path(&quot;/{featureName}&quot;)
+    public Response deleteFeatureOfProduct(@PathParam(&quot;productName&quot;) String productName,
+                                           @PathParam(&quot;featureName&quot;) String featureName) throws URISyntaxException {
+<span class="nc" id="L48">        productsService.deleteFeatureOfProduct(productName, featureName);</span>
+<span class="nc" id="L49">        return Response.noContent().build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
